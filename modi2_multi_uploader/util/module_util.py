@@ -11,6 +11,8 @@ def get_module_type_from_uuid(uuid):
     hexadecimal = hex(uuid).lstrip("0x")
     type_indicator = str(hexadecimal)[:4]
     module_type = {
+        # Setup modules
+        "10"  : "battery",
         # Input modules
         "2000": "env",
         "2010": "gyro",
@@ -19,6 +21,8 @@ def get_module_type_from_uuid(uuid):
         "2040": "dial",
         "2050": "ultrasonic",
         "2060": "ir",
+        "2070": "joystick",
+        "2080": "tof",
         # Output modules
         "4000": "display",
         "4010": "motor",

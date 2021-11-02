@@ -226,14 +226,20 @@ class ModuleFirmwareUpdater:
                 bin_buffer = bin_file.read()
 
             # Init metadata of the bytes loaded
-            page_size = 0x800
-            flash_memory_addr = 0x08000000
 
+            flash_memory_addr = 0x08000000
             bin_size = sys.getsizeof(bin_buffer)
-            bin_begin = 0x9000
+            page_size = 0x400
+            bin_begin = 0x400
+            page_offset = 0x4C00
+            erase_page_num = 1
+            if module_type == "speaker" or module_type == "display" or module_type == "env":
+                page_size = 0x800
+                bin_begin = 0x800
+                page_offset = 0x8800
+                erase_page_num = 2
             bin_end = bin_size - ((bin_size - bin_begin) % page_size)
 
-            page_offset = 0
             for page_begin in range(bin_begin, bin_end + 1, page_size):
                 # self.progress = 100 * page_begin // bin_end
                 progress = 100 * page_begin // bin_end
@@ -270,7 +276,7 @@ class ModuleFirmwareUpdater:
                 erase_page_success = self.send_firmware_command(
                     oper_type="erase",
                     module_id=module_id,
-                    crc_val=0,
+                    crc_val=erase_page_num, # when page erase, crc value is replaced by data size
                     dest_addr=flash_memory_addr,
                     page_addr=page_begin + page_offset,
                 )
@@ -322,10 +328,17 @@ class ModuleFirmwareUpdater:
         )
 
         # Set end-flash data to be sent at the end of the firmware update
-        end_flash_data = bytearray(8)
+        end_flash_data = bytearray(16)
         end_flash_data[0] = 0xAA
         end_flash_data[6] = version & 0xFF
         end_flash_data[7] = (version >> 8) & 0xFF
+
+        for xxx in range(4):
+            end_flash_data[xxx + 12] = ((0x08005000 >> (xxx * 8)) & 0xFF)
+        if module_type == "speaker" or module_type == "display" or module_type == "env":
+            for xxx in range(4):
+                end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
+
         self.send_end_flash_data(module_type, module_id, end_flash_data)
         self.__print(
             f"Version info (v{version_info}) has been written to its firmware!"
@@ -408,30 +421,42 @@ class ModuleFirmwareUpdater:
     ) -> None:
         # Write end-flash data until success
         end_flash_success = False
+        end_flash_address = 0x0800f800
+        end_flash_erase_page_num = 1
+        if module_type == "speaker" or module_type == "display" or module_type == "env":
+            end_flash_address = 0x0801f800
+            end_flash_erase_page_num = 2
+
         while not end_flash_success:
 
             # Erase page (send erase request and receive erase response)
             erase_page_success = self.send_firmware_command(
                 oper_type="erase",
                 module_id=module_id,
-                crc_val=0,
-                dest_addr=0x0801F800,
+                crc_val=end_flash_erase_page_num,
+                dest_addr=end_flash_address,
             )
             # TODO: Remove magic number of dest_addr above, try using flash_mem
             if not erase_page_success:
                 continue
 
             # Send data
-            checksum = self.send_firmware_data(
-                module_id, seq_num=0, bin_data=end_flash_data, crc_val=0
-            )
+            checksum = 0
+            for end_flash_ptr in range(0, len(end_flash_data), 8):
+                curr_data = end_flash_data[end_flash_ptr : end_flash_ptr + 8]
+                checksum = self.send_firmware_data(
+                    module_id, 
+                    seq_num=end_flash_ptr//8, 
+                    bin_data=curr_data, 
+                    crc_val=checksum
+                )
 
             # CRC on current page (send CRC request and receive CRC response)
             crc_page_success = self.send_firmware_command(
                 oper_type="crc",
                 module_id=module_id,
                 crc_val=checksum,
-                dest_addr=0x0801F800,
+                dest_addr=end_flash_address,
             )
             if not crc_page_success:
                 continue
