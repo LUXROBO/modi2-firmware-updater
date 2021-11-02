@@ -190,12 +190,12 @@ class Form(QDialog):
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         # Redirect stdout to text browser (i.e. console in our UI)
-        self.stdout = StdoutRedirect()
-        self.stdout.start()
-        self.stdout.printOccur.connect(
-            lambda line: self.__append_text_line(line)
-        )
-        self.stdout.logger = self.logger
+        # self.stdout = StdoutRedirect()
+        # self.stdout.start()
+        # self.stdout.printOccur.connect(
+        #     lambda line: self.__append_text_line(line)
+        # )
+        # self.stdout.logger = self.logger
 
         # Set signal for thread communication
         self.stream = ThreadSignal()
@@ -261,7 +261,7 @@ class Form(QDialog):
             "https://download.luxrobo.com/modi-esp32-firmware/esp.zip",
         ]
         self.latest_esp32_version_path = "https://download.luxrobo.com/modi-esp32-firmware/version.txt"
-        self.check_module_firmware()
+        # self.check_module_firmware()
 
         # Set Button Status
         self.translate_button_text()
