@@ -1,0 +1,7 @@
+pyserial
+pyqt5
+pyinstaller
+pytest
+mypy
+flake8
+isort
