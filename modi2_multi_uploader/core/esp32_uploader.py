@@ -4054,7 +4054,7 @@ class ESP32FirmwareUpdater():
     def __init__(self, port):
         self.port = port
         self.baudrate = 921600
-        self.firmware_path = pathlib.PurePosixPath(pathlib.PurePath(__file__),"..", "..", "assets", "firmware", "esp32")
+        self.firmware_path = pathlib.PurePosixPath(pathlib.PurePath(__file__),"..", "..", "assets", "firmware", "latest", "esp32")
         self.arg = ['--chip', 'esp32',
                     '--port', self.port,
                     '--baud', str(self.baudrate),
@@ -4091,14 +4091,14 @@ class ESP32FirmwareUpdater():
             print(data, end)
 
     def get_latest_app_version(self):
-        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "esp32")
+        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest", "esp32")
         version_path = path.join(root_path, "esp_app_version.txt")
         with open(version_path, "r") as version_file:
             version_info = version_file.readline().lstrip("v").rstrip("\n")
         return version_info
 
     def get_latest_ota_version(self):
-        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "esp32")
+        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest", "esp32")
         version_path = path.join(root_path, "esp_ota_version.txt")
         with open(version_path, "r") as version_file:
             version_info = version_file.readline().lstrip("v").rstrip("\n")

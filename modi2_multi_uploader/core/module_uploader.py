@@ -225,7 +225,7 @@ class ModuleFirmwareUpdater:
 
         # Init base root_path, utilizing local binary files
         root_path = path.join(
-            path.dirname(__file__), "..", "assets", "firmware", "module"
+            path.dirname(__file__), "..", "assets", "firmware", "latest", "module"
         )
 
         if self.__is_os_update:

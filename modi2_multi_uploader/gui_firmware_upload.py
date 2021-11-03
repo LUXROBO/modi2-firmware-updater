@@ -261,7 +261,7 @@ class Form(QDialog):
             "https://download.luxrobo.com/modi-esp32-firmware/esp.zip",
         ]
         self.latest_esp32_version_path = "https://download.luxrobo.com/modi-esp32-firmware/version.txt"
-        # self.check_module_firmware()
+        self.check_module_firmware()
 
         # Set Button Status
         self.translate_button_text()
@@ -571,73 +571,82 @@ class Form(QDialog):
             return False
 
     def __check_module_version(self):
-        try:
-            local_version_info = None
-            latest_version_info = None
+        # try:
+        #     local_version_info = None
+        #     latest_version_info = None
 
-            with ur.urlopen(self.latest_module_version_path, timeout=5) as conn:
-                latest_version_name = conn.read().decode("utf8")
-                latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
+        #     with ur.urlopen(self.latest_module_version_path, timeout=5) as conn:
+        #         latest_version_name = conn.read().decode("utf8")
+        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
 
-            if os.path.exists(self.local_module_firmware_path):
-                with open(self.local_module_version_path) as version_file:
-                    local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-            else:
-                os.mkdir(self.local_module_firmware_path)
+        #     if os.path.exists(self.local_module_firmware_path):
+        #         with open(self.local_module_version_path) as version_file:
+        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
+        #     else:
+        #         os.mkdir(self.local_module_firmware_path)
 
-            if (local_version_info == None) or (local_version_info != latest_version_info):
-                self.__download_module_firmware()
+        #     if (local_version_info == None) or (local_version_info != latest_version_info):
+        #         self.__download_module_firmware()
 
-        except URLError:
-            if not os.path.exists(self.local_module_firmware_path):
-                assert_path = path.join(path.dirname(__file__), "assets", "firmware", "stm32")
-                shutil.copytree(assert_path, self.local_module_firmware_path)
+        # except URLError:
+        #     if not os.path.exists(self.local_module_firmware_path):
+        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "stm32")
+        #         shutil.copytree(assert_path, self.local_module_firmware_path)
+        if not os.path.exists(self.local_module_firmware_path):
+            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
+            shutil.copytree(assert_path, self.local_module_firmware_path)
 
     def __check_network_base_version(self):
-        try:
-            local_version_info = None
-            latest_version_info = None
+        # try:
+        #     local_version_info = None
+        #     latest_version_info = None
 
-            with ur.urlopen(self.latest_network_version_path, timeout=5) as conn:
-                latest_version_name = conn.read().decode("utf8")
-                latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
+        #     with ur.urlopen(self.latest_network_version_path, timeout=5) as conn:
+        #         latest_version_name = conn.read().decode("utf8")
+        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
 
-            if os.path.exists(self.local_network_firmware_path):
-                with open(self.local_module_version_path) as version_file:
-                    local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-            else:
-                os.mkdir(self.local_network_firmware_path)
+        #     if os.path.exists(self.local_network_firmware_path):
+        #         with open(self.local_module_version_path) as version_file:
+        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
+        #     else:
+        #         os.mkdir(self.local_network_firmware_path)
 
-            if (local_version_info == None) or (local_version_info != latest_version_info):
-                self.__download_network_firmware()
+        #     if (local_version_info == None) or (local_version_info != latest_version_info):
+        #         self.__download_network_firmware()
 
-        except URLError:
-            if not os.path.exists(self.local_network_firmware_path):
-                assert_path = path.join(path.dirname(__file__), "assets", "firmware", "stm32")
-                shutil.copytree(assert_path, self.local_network_firmware_path)
+        # except URLError:
+        #     if not os.path.exists(self.local_network_firmware_path):
+        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "stm32")
+        #         shutil.copytree(assert_path, self.local_network_firmware_path)
+        if not os.path.exists(self.local_network_firmware_path):
+            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
+            shutil.copytree(assert_path, self.local_network_firmware_path)
 
     def __check_esp32_version(self):
-        try:
-            local_version_info = None
-            latest_version_info = None
+        # try:
+        #     local_version_info = None
+        #     latest_version_info = None
 
-            with ur.urlopen(self.latest_esp32_version_path, timeout=5) as conn:
-                latest_version_name = conn.read().decode("utf8")
-                latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
+        #     with ur.urlopen(self.latest_esp32_version_path, timeout=5) as conn:
+        #         latest_version_name = conn.read().decode("utf8")
+        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
 
-            if os.path.exists(self.local_esp32_firmware_path):
-                with open(self.local_module_version_path) as version_file:
-                    local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-            else:
-                os.mkdir(self.local_esp32_firmware_path)
+        #     if os.path.exists(self.local_esp32_firmware_path):
+        #         with open(self.local_module_version_path) as version_file:
+        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
+        #     else:
+        #         os.mkdir(self.local_esp32_firmware_path)
 
-            if (local_version_info == None) or (local_version_info != latest_version_info):
-                self.__download_esp32_firmware()
+        #     if (local_version_info == None) or (local_version_info != latest_version_info):
+        #         self.__download_esp32_firmware()
 
-        except URLError:
-            if not os.path.exists(self.local_esp32_firmware_path):
-                assert_path = path.join(path.dirname(__file__), "assets", "firmware", "esp32")
-                shutil.copytree(assert_path, self.local_esp32_firmware_path)
+        # except URLError:
+        #     if not os.path.exists(self.local_esp32_firmware_path):
+        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "esp32")
+        #         shutil.copytree(assert_path, self.local_esp32_firmware_path)
+        if not os.path.exists(self.local_esp32_firmware_path):
+            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "esp32")
+            shutil.copytree(assert_path, self.local_esp32_firmware_path)
     #
     # Helper functions
     #
