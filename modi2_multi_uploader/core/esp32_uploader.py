@@ -4174,6 +4174,7 @@ class ESP32FirmwareUpdater():
 
                 time.sleep(0.2)
             self.__print("ESP interpreter reset is complete!!")
+            self.esp.close_conn()
 
             self.esp.firmware_progress = 100
 
