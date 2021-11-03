@@ -4182,16 +4182,16 @@ class ESP32FirmwareUpdater():
             self.update_error = 1
 
             if self.ui:
-                self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_stm32_modules.setEnabled(True)
-                self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32.setEnabled(True)
-                self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32.setEnabled(True)
+                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_modules_button.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_esp32_interpreter.setText("Update Network ESP32 Interpreter")
+                    self.ui.update_network_esp32_interpreter_button.setText("Update Network ESP32 Interpreter")
                 else:
-                    self.ui.update_network_esp32_interpreter.setText("네트워크 모듈 인터프리터 초기화")
+                    self.ui.update_network_esp32_interpreter_button.setText("네트워크 모듈 인터프리터 초기화")
 
         else:
             self.__print("update_firmware")
@@ -4499,9 +4499,9 @@ class ESP32FirmwareUpdater():
 
             if self.ui:
                 if self.ui.is_english:
-                    self.ui.update_network_esp32.setText("Network ESP32 update is in progress. (100%)")
+                    self.ui.update_network_esp32_button.setText("Network ESP32 update is in progress. (100%)")
                 else:
-                    self.ui.update_network_esp32.setText("네트워크 모듈 업데이트가 진행중입니다. (100%)")
+                    self.ui.update_network_esp32_button.setText("네트워크 모듈 업데이트가 진행중입니다. (100%)")
 
             self.update_in_progress = False
             self.update_error = 1
@@ -4509,16 +4509,16 @@ class ESP32FirmwareUpdater():
             time.sleep(1)
 
             if self.ui:
-                self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_stm32_modules.setEnabled(True)
-                self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32.setEnabled(True)
-                self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32_interpreter.setEnabled(True)
+                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_modules_button.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_interpreter_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_esp32.setText("Update Network ESP32")
+                    self.ui.update_network_esp32_button.setText("Update Network ESP32")
                 else:
-                    self.ui.update_network_esp32.setText("네트워크 모듈 업데이트")
+                    self.ui.update_network_esp32_button.setText("네트워크 모듈 업데이트")
 
 
 class ESP32FirmwareMultiUploder():
@@ -4620,23 +4620,23 @@ class ESP32FirmwareMultiUploder():
                 if self.ui:
                     if update_interpreter:
                         if self.ui.is_english:
-                            self.ui.update_network_esp32_interpreter.setText(
+                            self.ui.update_network_esp32_interpreter_button.setText(
                                 f"Network ESP32 Interpreter reset is in progress. "
                                 f"({int(current_sequence/total_sequence*100)}%)"
                             )
                         else:
-                            self.ui.update_network_esp32_interpreter.setText(
+                            self.ui.update_network_esp32_interpreter_button.setText(
                                 f"네트워크 모듈 인터프리터 초기화가 진행중입니다. "
                                 f"({int(current_sequence/total_sequence*100)}%)"
                             )
                     else:
                         if self.ui.is_english:
-                            self.ui.update_network_esp32.setText(
+                            self.ui.update_network_esp32_button.setText(
                                 f"Network ESP32 update is in progress. "
                                 f"({int(current_sequence/total_sequence*100)}%)"
                             )
                         else:
-                            self.ui.update_network_esp32.setText(
+                            self.ui.update_network_esp32_button.setText(
                                 f"네트워크 모듈 업데이트가 진행중입니다. "
                                 f"({int(current_sequence/total_sequence*100)}%)"
                             )
@@ -4660,32 +4660,32 @@ class ESP32FirmwareMultiUploder():
 
         if update_interpreter:
             if self.ui:
-                self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_stm32_modules.setEnabled(True)
-                self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32.setEnabled(True)
-                self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32_bootloader.setEnabled(True)
-                self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32.setEnabled(True)
+                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_modules_button.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
+                self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_esp32_interpreter.setText("Update Network ESP32 Interpreter")
+                    self.ui.update_network_esp32_interpreter_button.setText("Update Network ESP32 Interpreter")
                 else:
-                    self.ui.update_network_esp32_interpreter.setText("네트워크 모듈 인터프리터 초기화")
+                    self.ui.update_network_esp32_interpreter_button.setText("네트워크 모듈 인터프리터 초기화")
         else:
             if self.ui:
-                self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_stm32_modules.setEnabled(True)
-                self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32.setEnabled(True)
-                self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32_bootloader.setEnabled(True)
-                self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32_interpreter.setEnabled(True)
+                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_modules_button.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
+                self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_interpreter_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_esp32.setText("Update Network ESP32")
+                    self.ui.update_network_esp32_button.setText("Update Network ESP32")
                 else:
-                    self.ui.update_network_esp32.setText("네트워크 모듈 업데이트")
+                    self.ui.update_network_esp32_button.setText("네트워크 모듈 업데이트")
 
         print("\nESP firmware update is complete!!")
 

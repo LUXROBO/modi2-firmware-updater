@@ -123,7 +123,7 @@ class PopupMessageBox(QtWidgets.QMessageBox):
     #     self.window.stream.thread_signal.emit(True)
     # @pyqtSlot(object)
     # def restart_update(self, click):
-    #     self.window.update_network_stm32.clicked(click)
+    #     self.window.update_network_button.clicked(click)
 
 
 class ThreadSignal(QObject):
@@ -177,11 +177,11 @@ class Form(QDialog):
         self.language_frame_path = pathlib.PurePosixPath(self.component_path, "lang_frame.png")
         self.language_frame_pressed_path = pathlib.PurePosixPath(self.component_path, "lang_frame_pressed.png")
 
-        self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_network_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         self.ui.console.setStyleSheet("font-size: 10px")
@@ -201,27 +201,27 @@ class Form(QDialog):
         self.stream = ThreadSignal()
 
         # Connect up the buttons
-        self.ui.update_network_esp32.clicked.connect(self.update_network_esp32)
-        self.ui.update_network_esp32_interpreter.clicked.connect(self.update_network_esp32_interpreter)
-        self.ui.update_stm32_modules.clicked.connect(self.update_stm32_modules)
-        self.ui.update_network_stm32.clicked.connect(self.update_network_stm32)
-        self.ui.update_network_stm32_bootloader.clicked.connect(self.update_network_bootloader_stm32)
+        self.ui.update_network_esp32_button.clicked.connect(self.update_network_esp32)
+        self.ui.update_network_esp32_interpreter_button.clicked.connect(self.update_network_esp32_interpreter)
+        self.ui.update_modules_button.clicked.connect(self.update_modules)
+        self.ui.update_network_button.clicked.connect(self.update_network)
+        self.ui.update_network_bootloader_button.clicked.connect(self.update_network_bootloader)
         self.ui.translate_button.clicked.connect(self.translate_button_text)
         self.ui.devmode_button.clicked.connect(self.dev_mode_button)
 
         self.buttons = [
-            self.ui.update_network_esp32,
-            self.ui.update_network_esp32_interpreter,
-            self.ui.update_stm32_modules,
-            self.ui.update_network_stm32,
-            self.ui.update_network_stm32_bootloader,
+            self.ui.update_network_esp32_button,
+            self.ui.update_network_esp32_interpreter_button,
+            self.ui.update_modules_button,
+            self.ui.update_network_button,
+            self.ui.update_network_bootloader_button,
             self.ui.devmode_button,
             self.ui.translate_button,
         ]
 
         # Disable the first button to be focused when UI is loaded
-        self.ui.update_network_esp32.setAutoDefault(False)
-        self.ui.update_network_esp32.setDefault(False)
+        self.ui.update_network_esp32_button.setAutoDefault(False)
+        self.ui.update_network_esp32_button.setDefault(False)
 
         # Print init status
         time_now_str = time.strftime("[%Y/%m/%d@%X]", time.localtime())
@@ -278,7 +278,7 @@ class Form(QDialog):
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.esp32_upload_list_form.ui.show()
             return
-        self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
         print("ESP32 Firmware Updater has been initialized for esp update!")
         th.Thread(
@@ -305,7 +305,7 @@ class Form(QDialog):
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.esp32_upload_list_form.ui.show()
             return
-        self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
         print("ESP32 Firmware Updater has been initialized for esp interpreter update!")
         th.Thread(
@@ -327,12 +327,12 @@ class Form(QDialog):
         ).start()
         self.firmware_updater = esp32_updater
 
-    def update_stm32_modules(self):
+    def update_modules(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.module_upload_list_form.ui.show()
             return
-        self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
         print("STM32 Firmware Updater has been initialized for module update!")
         th.Thread(
@@ -354,12 +354,12 @@ class Form(QDialog):
         ).start()
         self.firmware_updater = stm32_updater
 
-    def update_network_stm32(self):
+    def update_network(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.module_upload_list_form.ui.show()
             return
-        self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
         print("STM32 Firmware Updater has been initialized for base update!")
         th.Thread(
@@ -381,12 +381,12 @@ class Form(QDialog):
         ).start()
         self.firmware_updater = network_updater
 
-    def update_network_bootloader_stm32(self):
+    def update_network_bootloader(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.module_upload_list_form.ui.show()
             return
-        self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
         print("STM32 Firmware Updater has been initialized for base update!")
         th.Thread(

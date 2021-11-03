@@ -495,14 +495,14 @@ class NetworkFirmwareUpdater(serial.Serial):
             if self.ui:
                 if self.bootloader:
                     if self.ui.is_english:
-                        self.ui.update_network_stm32_bootloader.setText(f"Network bootloader is in progress. ({progress}%)")
+                        self.ui.update_network_bootloader_button.setText(f"Network bootloader is in progress. ({progress}%)")
                     else:
-                        self.ui.update_network_stm32_bootloader.setText(f"네트워크 모듈 부트로터 진행중입니다. ({progress}%)")
+                        self.ui.update_network_bootloader_button.setText(f"네트워크 모듈 부트로터 진행중입니다. ({progress}%)")
                 else:
                     if self.ui.is_english:
-                        self.ui.update_network_stm32.setText(f"Network STM32 update is in progress. ({progress}%)")
+                        self.ui.update_network_button.setText(f"Network STM32 update is in progress. ({progress}%)")
                     else:
-                        self.ui.update_network_stm32.setText(f"네트워크 모듈 초기화가 진행중입니다. ({progress}%)")
+                        self.ui.update_network_button.setText(f"네트워크 모듈 초기화가 진행중입니다. ({progress}%)")
 
             self.__print(f"\rUpdating network ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
 
@@ -600,26 +600,26 @@ class NetworkFirmwareUpdater(serial.Serial):
             self.close()
 
         if self.ui:
-            self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_stm32_modules.setEnabled(True)
-            self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32.setEnabled(True)
-            self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_interpreter.setEnabled(True)
+            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_modules_button.setEnabled(True)
+            self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_button.setEnabled(True)
+            self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_interpreter_button.setEnabled(True)
             if self.bootloader:
-                self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_stm32_bootloader.setText("Set Network Bootloader STM32")
+                    self.ui.update_network_bootloader_button.setText("Set Network Bootloader STM32")
                 else:
-                    self.ui.update_network_stm32_bootloader.setText("네트워크 모듈 부트로더")
+                    self.ui.update_network_bootloader_button.setText("네트워크 모듈 부트로더")
             else:
-                self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32_bootloader.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_stm32.setText("Update Network STM32")
+                    self.ui.update_network_button.setText("Update Network STM32")
                 else:
-                    self.ui.update_network_stm32.setText("네트워크 모듈 초기화")
+                    self.ui.update_network_button.setText("네트워크 모듈 초기화")
 
         return True
 
@@ -821,14 +821,14 @@ class NetworkFirmwareMultiUpdater():
                 if self.ui:
                     if bootloader:
                         if self.ui.is_english:
-                            self.ui.update_network_stm32_bootloader.setText(f"Network bootloader is in progress. ({int(total_progress)}%)")
+                            self.ui.update_network_bootloader_button.setText(f"Network bootloader is in progress. ({int(total_progress)}%)")
                         else:
-                            self.ui.update_network_stm32_bootloader.setText(f"네트워크 모듈 부트로터 진행중입니다. ({int(total_progress)}%)")
+                            self.ui.update_network_bootloader_button.setText(f"네트워크 모듈 부트로터 진행중입니다. ({int(total_progress)}%)")
                     else:
                         if self.ui.is_english:
-                            self.ui.update_network_stm32.setText(f"Network STM32 update is in progress. ({int(total_progress)}%)")
+                            self.ui.update_network_button.setText(f"Network STM32 update is in progress. ({int(total_progress)}%)")
                         else:
-                            self.ui.update_network_stm32.setText(f"네트워크 모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
+                            self.ui.update_network_button.setText(f"네트워크 모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(total_progress)
@@ -842,26 +842,26 @@ class NetworkFirmwareMultiUpdater():
         self.update_in_progress = False
 
         if self.ui:
-            self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_stm32_modules.setEnabled(True)
-            self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32.setEnabled(True)
-            self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_interpreter.setEnabled(True)
+            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_modules_button.setEnabled(True)
+            self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_button.setEnabled(True)
+            self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_interpreter_button.setEnabled(True)
             if bootloader:
-                self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_stm32_bootloader.setText("Set Network Bootloader STM32")
+                    self.ui.update_network_bootloader_button.setText("Set Network Bootloader STM32")
                 else:
-                    self.ui.update_network_stm32_bootloader.setText("네트워크 모듈 부트로더")
+                    self.ui.update_network_bootloader_button.setText("네트워크 모듈 부트로더")
             else:
-                self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32_bootloader.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_stm32.setText("Update Network STM32")
+                    self.ui.update_network_button.setText("Update Network STM32")
                 else:
-                    self.ui.update_network_stm32.setText("네트워크 모듈 초기화")
+                    self.ui.update_network_button.setText("네트워크 모듈 초기화")
 
         if self.list_ui:
             self.list_ui.ui.close_button.setEnabled(True)

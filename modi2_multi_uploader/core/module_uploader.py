@@ -243,14 +243,14 @@ class ModuleFirmwareUpdater:
                     update_module_num = self.update_module_num
                     num_updated = len(self.modules_updated)
                     if self.ui.is_english:
-                        self.ui.update_stm32_modules.setText(
+                        self.ui.update_modules_button.setText(
                             f"STM32 modules update is in progress. "
                             f"({num_updated} / "
                             f"{update_module_num})"
                             f"({progress}%)"
                         )
                     else:
-                        self.ui.update_stm32_modules.setText(
+                        self.ui.update_modules_button.setText(
                             f"모듈 초기화가 진행중입니다. "
                             f"({num_updated} / "
                             f"{update_module_num})"
@@ -362,18 +362,18 @@ class ModuleFirmwareUpdater:
             self.reset_state()
 
             if self.ui:
-                self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32.setEnabled(True)
-                self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32_bootloader.setEnabled(True)
-                self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32.setEnabled(True)
-                self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32_interpreter.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
+                self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_button.setEnabled(True)
+                self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_interpreter_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_stm32_modules.setText("Update STM32 Modules.")
+                    self.ui.update_modules_button.setText("Update STM32 Modules.")
                 else:
-                    self.ui.update_stm32_modules.setText("모듈 초기화")
+                    self.ui.update_modules_button.setText("모듈 초기화")
 
     @staticmethod
     def __delay(span):
@@ -761,9 +761,9 @@ class ModuleFirmwareMultiUpdater():
 
                 if self.ui:
                     if self.ui.is_english:
-                        self.ui.update_stm32_modules.setText(f"STM32 modules update is in progress. ({int(total_progress)}%)")
+                        self.ui.update_modules_button.setText(f"STM32 modules update is in progress. ({int(total_progress)}%)")
                     else:
-                        self.ui.update_stm32_modules.setText(f"모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
+                        self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(total_progress)
@@ -777,18 +777,18 @@ class ModuleFirmwareMultiUpdater():
         self.update_in_progress = False
 
         if self.ui:
-            self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_stm32.setEnabled(True)
-            self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32.setEnabled(True)
-            self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_stm32_bootloader.setEnabled(True)
-            self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_interpreter.setEnabled(True)
+            self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_button.setEnabled(True)
+            self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_button.setEnabled(True)
+            self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_bootloader_button.setEnabled(True)
+            self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_interpreter_button.setEnabled(True)
             if self.ui.is_english:
-                self.ui.update_stm32_modules.setText("Update STM32 Modules.")
+                self.ui.update_modules_button.setText("Update STM32 Modules.")
             else:
-                self.ui.update_stm32_modules.setText("모듈 초기화")
+                self.ui.update_modules_button.setText("모듈 초기화")
 
         if self.list_ui:
             self.list_ui.ui.close_button.setEnabled(True)
