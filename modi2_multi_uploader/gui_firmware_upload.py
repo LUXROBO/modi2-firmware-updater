@@ -261,7 +261,7 @@ class Form(QDialog):
             "https://download.luxrobo.com/modi-esp32-firmware/esp.zip",
         ]
         self.latest_esp32_version_path = "https://download.luxrobo.com/modi-esp32-firmware/version.txt"
-        self.check_module_firmware()
+        # self.check_module_firmware()
 
         # Set Button Status
         self.translate_button_text()
