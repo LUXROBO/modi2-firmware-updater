@@ -762,15 +762,12 @@ class ModuleFirmwareMultiUpdater():
                         total_module_progress = 0
 
                         if module_uploader.progress:
-                            self.update_module_num[index] = module_uploader.update_module_num
                             current_module_progress = module_uploader.progress
-                            if self.update_module_num[index]:
-                                total_num = self.update_module_num[index]
+                            if len(module_uploader.modules_to_update) == 0:
+                                total_module_progress = module_uploader.progress
                             else:
-                                total_num = 1
-                            updated = (len(module_uploader.modules_updated) - 1) / total_num * 100
-                            current = (current_module_progress) / total_num
-                            total_module_progress = updated + current
+                                total_module_progress = (module_uploader.progress + (len(module_uploader.modules_updated) - 1) * 100) / (len(module_uploader.modules_to_update) * 100) * 100
+
                             total_progress += total_module_progress / len(self.module_uploaders)
 
                         if self.list_ui:
