@@ -31,7 +31,7 @@ def retry(exception_to_catch):
 
 
 class ModuleFirmwareUpdater:
-    """STM32 Firmware Updater: Updates a firmware of given module"""
+    """Module Firmware Updater: Updates a firmware of given module"""
 
     NO_ERROR = 0
     UPDATE_READY = 1
@@ -225,7 +225,7 @@ class ModuleFirmwareUpdater:
 
         # Init base root_path, utilizing local binary files
         root_path = path.join(
-            path.dirname(__file__), "..", "assets", "firmware", "module"
+            path.dirname(__file__), "..", "assets", "firmware", "latest", "module"
         )
 
         if self.__is_os_update:
@@ -259,14 +259,14 @@ class ModuleFirmwareUpdater:
                     update_module_num = len(self.modules_to_update)
                     num_updated = len(self.modules_updated)
                     if self.ui.is_english:
-                        self.ui.update_stm32_modules.setText(
-                            f"STM32 modules update is in progress. "
+                        self.ui.update_modules_button.setText(
+                            f"Modules update is in progress. "
                             f"({num_updated} / "
                             f"{update_module_num})"
                             f"({progress}%)"
                         )
                     else:
-                        self.ui.update_stm32_modules.setText(
+                        self.ui.update_modules_button.setText(
                             f"모듈 초기화가 진행중입니다. "
                             f"({num_updated} / "
                             f"{update_module_num})"
@@ -392,18 +392,18 @@ class ModuleFirmwareUpdater:
             self.reset_state()
 
             if self.ui:
-                self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32.setEnabled(True)
-                self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_stm32_bootloader.setEnabled(True)
-                self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32.setEnabled(True)
-                self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32_interpreter.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
+                self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_button.setEnabled(True)
+                self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_interpreter_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_stm32_modules.setText("Update STM32 Modules.")
+                    self.ui.update_modules_button.setText("Update Modules.")
                 else:
-                    self.ui.update_stm32_modules.setText("모듈 초기화")
+                    self.ui.update_modules_button.setText("모듈 초기화")
 
     @staticmethod
     def __delay(span):
@@ -762,15 +762,12 @@ class ModuleFirmwareMultiUpdater():
                         total_module_progress = 0
 
                         if module_uploader.progress:
-                            self.update_module_num[index] = module_uploader.update_module_num
                             current_module_progress = module_uploader.progress
-                            if self.update_module_num[index]:
-                                total_num = self.update_module_num[index]
+                            if len(module_uploader.modules_to_update) == 0:
+                                total_module_progress = module_uploader.progress
                             else:
-                                total_num = 1
-                            updated = (len(module_uploader.modules_updated) - 1) / total_num * 100
-                            current = (current_module_progress) / total_num
-                            total_module_progress = updated + current
+                                total_module_progress = (module_uploader.progress + (len(module_uploader.modules_updated) - 1) * 100) / (len(module_uploader.modules_to_update) * 100) * 100
+
                             total_progress += total_module_progress / len(self.module_uploaders)
 
                         if self.list_ui:
@@ -804,9 +801,9 @@ class ModuleFirmwareMultiUpdater():
 
                 if self.ui:
                     if self.ui.is_english:
-                        self.ui.update_stm32_modules.setText(f"STM32 modules update is in progress. ({int(total_progress)}%)")
+                        self.ui.update_modules_button.setText(f"Modules update is in progress. ({int(total_progress)}%)")
                     else:
-                        self.ui.update_stm32_modules.setText(f"모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
+                        self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(total_progress)
@@ -820,18 +817,18 @@ class ModuleFirmwareMultiUpdater():
         self.update_in_progress = False
 
         if self.ui:
-            self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_stm32.setEnabled(True)
-            self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32.setEnabled(True)
-            self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_stm32_bootloader.setEnabled(True)
-            self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_interpreter.setEnabled(True)
+            self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_button.setEnabled(True)
+            self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_button.setEnabled(True)
+            self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_bootloader_button.setEnabled(True)
+            self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_interpreter_button.setEnabled(True)
             if self.ui.is_english:
-                self.ui.update_stm32_modules.setText("Update STM32 Modules.")
+                self.ui.update_modules_button.setText("Update Modules.")
             else:
-                self.ui.update_stm32_modules.setText("모듈 초기화")
+                self.ui.update_modules_button.setText("모듈 초기화")
 
         if self.list_ui:
             self.list_ui.ui.close_button.setEnabled(True)
@@ -840,7 +837,7 @@ class ModuleFirmwareMultiUpdater():
             for index, module_uploader in enumerate(self.module_uploaders):
                 self.list_ui.progress_signal.emit(index, 100, 100)
 
-        print("\nSTM firmware update is complete!!")
+        print("\nFirmware update is complete!!")
 
     @staticmethod
     def __progress_bar(current: int, total: int) -> str:

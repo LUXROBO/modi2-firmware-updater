@@ -229,7 +229,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="update_network_esp32">
+      <widget class="QPushButton" name="update_network_esp32_button">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -291,7 +291,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="update_network_esp32_interpreter">
+      <widget class="QPushButton" name="update_network_esp32_interpreter_button">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -353,7 +353,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="update_stm32_modules">
+      <widget class="QPushButton" name="update_modules_button">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -412,7 +412,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="update_network_stm32_bootloader">
+      <widget class="QPushButton" name="update_network_bootloader_button">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -471,7 +471,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="update_network_stm32">
+      <widget class="QPushButton" name="update_network_button">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
          <horstretch>0</horstretch>
