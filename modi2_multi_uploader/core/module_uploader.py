@@ -31,7 +31,7 @@ def retry(exception_to_catch):
 
 
 class ModuleFirmwareUpdater:
-    """STM32 Firmware Updater: Updates a firmware of given module"""
+    """Module Firmware Updater: Updates a firmware of given module"""
 
     NO_ERROR = 0
     UPDATE_READY = 1
@@ -260,7 +260,7 @@ class ModuleFirmwareUpdater:
                     num_updated = len(self.modules_updated)
                     if self.ui.is_english:
                         self.ui.update_modules_button.setText(
-                            f"STM32 modules update is in progress. "
+                            f"Modules update is in progress. "
                             f"({num_updated} / "
                             f"{update_module_num})"
                             f"({progress}%)"
@@ -401,7 +401,7 @@ class ModuleFirmwareUpdater:
                 self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_esp32_interpreter_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_modules_button.setText("Update STM32 Modules.")
+                    self.ui.update_modules_button.setText("Update Modules.")
                 else:
                     self.ui.update_modules_button.setText("모듈 초기화")
 
@@ -801,7 +801,7 @@ class ModuleFirmwareMultiUpdater():
 
                 if self.ui:
                     if self.ui.is_english:
-                        self.ui.update_modules_button.setText(f"STM32 modules update is in progress. ({int(total_progress)}%)")
+                        self.ui.update_modules_button.setText(f"Modules update is in progress. ({int(total_progress)}%)")
                     else:
                         self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
 
@@ -826,7 +826,7 @@ class ModuleFirmwareMultiUpdater():
             self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
             self.ui.update_network_esp32_interpreter_button.setEnabled(True)
             if self.ui.is_english:
-                self.ui.update_modules_button.setText("Update STM32 Modules.")
+                self.ui.update_modules_button.setText("Update Modules.")
             else:
                 self.ui.update_modules_button.setText("모듈 초기화")
 
@@ -837,7 +837,7 @@ class ModuleFirmwareMultiUpdater():
             for index, module_uploader in enumerate(self.module_uploaders):
                 self.list_ui.progress_signal.emit(index, 100, 100)
 
-        print("\nSTM firmware update is complete!!")
+        print("\nFirmware update is complete!!")
 
     @staticmethod
     def __progress_bar(current: int, total: int) -> str:

@@ -28,7 +28,7 @@ def retry(exception_to_catch):
 
 
 class NetworkFirmwareUpdater(serial.Serial):
-    """STM32 Network Firmware Updater: Updates a firmware of given module"""
+    """Network Firmware Updater: Updates a firmware of given module"""
 
     NO_ERROR = 0
     UPDATE_READY = 1
@@ -500,7 +500,7 @@ class NetworkFirmwareUpdater(serial.Serial):
                         self.ui.update_network_bootloader_button.setText(f"네트워크 모듈 부트로터 진행중입니다. ({progress}%)")
                 else:
                     if self.ui.is_english:
-                        self.ui.update_network_button.setText(f"Network STM32 update is in progress. ({progress}%)")
+                        self.ui.update_network_button.setText(f"Network update is in progress. ({progress}%)")
                     else:
                         self.ui.update_network_button.setText(f"네트워크 모듈 초기화가 진행중입니다. ({progress}%)")
 
@@ -610,14 +610,14 @@ class NetworkFirmwareUpdater(serial.Serial):
                 self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_bootloader_button.setText("Set Network Bootloader STM32")
+                    self.ui.update_network_bootloader_button.setText("Set Network Bootloader")
                 else:
                     self.ui.update_network_bootloader_button.setText("네트워크 모듈 부트로더")
             else:
                 self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_bootloader_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_button.setText("Update Network STM32")
+                    self.ui.update_network_button.setText("Update Network")
                 else:
                     self.ui.update_network_button.setText("네트워크 모듈 초기화")
 
@@ -826,7 +826,7 @@ class NetworkFirmwareMultiUpdater():
                             self.ui.update_network_bootloader_button.setText(f"네트워크 모듈 부트로터 진행중입니다. ({int(total_progress)}%)")
                     else:
                         if self.ui.is_english:
-                            self.ui.update_network_button.setText(f"Network STM32 update is in progress. ({int(total_progress)}%)")
+                            self.ui.update_network_button.setText(f"Network update is in progress. ({int(total_progress)}%)")
                         else:
                             self.ui.update_network_button.setText(f"네트워크 모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
 
@@ -852,14 +852,14 @@ class NetworkFirmwareMultiUpdater():
                 self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_bootloader_button.setText("Set Network Bootloader STM32")
+                    self.ui.update_network_bootloader_button.setText("Set Network Bootloader")
                 else:
                     self.ui.update_network_bootloader_button.setText("네트워크 모듈 부트로더")
             else:
                 self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_bootloader_button.setEnabled(True)
                 if self.ui.is_english:
-                    self.ui.update_network_button.setText("Update Network STM32")
+                    self.ui.update_network_button.setText("Update Network")
                 else:
                     self.ui.update_network_button.setText("네트워크 모듈 초기화")
 
@@ -870,7 +870,7 @@ class NetworkFirmwareMultiUpdater():
             for index, network_updater in enumerate(self.network_updaters):
                 self.list_ui.progress_signal.emit(index, 100, 100)
 
-        print("\nSTM firmware update is complete!!")
+        print("\nFirmware update is complete!!")
 
     @staticmethod
     def __progress_bar(current: int, total: int) -> str:

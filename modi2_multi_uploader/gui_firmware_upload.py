@@ -168,7 +168,7 @@ class Form(QDialog):
         self.ui.lux_logo.setPixmap(qPixmapVar)
 
         self.esp32_upload_list_form = ESP32UpdateListForm(esp32_upload_list_ui_path, self.component_path)
-        self.module_upload_list_form = STM32UpdateListForm(module_upload_list_ui_path, self.component_path)
+        self.module_upload_list_form = ModuleUpdateListForm(module_upload_list_ui_path, self.component_path)
 
         # Buttons image
         self.active_path = pathlib.PurePosixPath(self.component_path, "btn_frame_active.png")
@@ -334,7 +334,7 @@ class Form(QDialog):
             return
         self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
-        print("STM32 Firmware Updater has been initialized for module update!")
+        print("Module Firmware Updater has been initialized for module update!")
         th.Thread(
             target=self.__click_motion, args=(2, button_start), daemon=True
         ).start()
@@ -345,14 +345,14 @@ class Form(QDialog):
 
         self.module_upload_list_form.reset_device_list()
         self.module_upload_list_form.ui.show()
-        stm32_updater = ModuleFirmwareMultiUpdater()
-        stm32_updater.set_ui(self.ui, self.module_upload_list_form)
+        module_updater = ModuleFirmwareMultiUpdater()
+        module_updater.set_ui(self.ui, self.module_upload_list_form)
         th.Thread(
-            target=stm32_updater.update_module_firmware,
+            target=module_updater.update_module_firmware,
             args=(modi_ports, ),
             daemon=True
         ).start()
-        self.firmware_updater = stm32_updater
+        self.firmware_updater = module_updater
 
     def update_network(self):
         button_start = time.time()
@@ -361,7 +361,7 @@ class Form(QDialog):
             return
         self.ui.update_network_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
-        print("STM32 Firmware Updater has been initialized for base update!")
+        print("Network Firmware Updater has been initialized for base update!")
         th.Thread(
             target=self.__click_motion, args=(3, button_start), daemon=True
         ).start()
@@ -388,7 +388,7 @@ class Form(QDialog):
             return
         self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
-        print("STM32 Firmware Updater has been initialized for base update!")
+        print("Network Firmware Updater has been initialized for base update!")
         th.Thread(
             target=self.__click_motion, args=(4, button_start), daemon=True
         ).start()
@@ -431,9 +431,9 @@ class Form(QDialog):
         button_en = [
             "Update Network ESP32",
             "Update Network ESP32 Interpreter",
-            "Update STM32 Modules",
-            "Update Network STM32",
-            "Set Network Bootloader STM32",
+            "Update Modules",
+            "Update Network",
+            "Set Network Bootloader",
             "Dev Mode",
             "한국어",
         ]
@@ -590,7 +590,7 @@ class Form(QDialog):
 
         # except URLError:
         #     if not os.path.exists(self.local_module_firmware_path):
-        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "stm32")
+        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
         #         shutil.copytree(assert_path, self.local_module_firmware_path)
         if not os.path.exists(self.local_module_firmware_path):
             assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
@@ -616,7 +616,7 @@ class Form(QDialog):
 
         # except URLError:
         #     if not os.path.exists(self.local_network_firmware_path):
-        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "stm32")
+        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
         #         shutil.copytree(assert_path, self.local_network_firmware_path)
         if not os.path.exists(self.local_network_firmware_path):
             assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
@@ -901,7 +901,7 @@ class ESP32UpdateListForm(QDialog):
         self.ui_error_message_list[index].setText(error_message)
 
 
-class STM32UpdateListForm(QDialog):
+class ModuleUpdateListForm(QDialog):
     network_state_signal = pyqtSignal(int, int)
     network_uuid_signal = pyqtSignal(int, str)
     current_module_changed_signal = pyqtSignal(int, str)
