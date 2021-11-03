@@ -190,12 +190,12 @@ class Form(QDialog):
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         # Redirect stdout to text browser (i.e. console in our UI)
-        # self.stdout = StdoutRedirect()
-        # self.stdout.start()
-        # self.stdout.printOccur.connect(
-        #     lambda line: self.__append_text_line(line)
-        # )
-        # self.stdout.logger = self.logger
+        self.stdout = StdoutRedirect()
+        self.stdout.start()
+        self.stdout.printOccur.connect(
+            lambda line: self.__append_text_line(line)
+        )
+        self.stdout.logger = self.logger
 
         # Set signal for thread communication
         self.stream = ThreadSignal()
