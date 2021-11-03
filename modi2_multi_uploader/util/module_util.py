@@ -9,25 +9,27 @@ BROADCAST_ID = 0xFFF
 
 def get_module_type_from_uuid(uuid):
     hexadecimal = hex(uuid).lstrip("0x")
-    type_indicator = str(hexadecimal)[:4]
+    hexadecimal = int(hexadecimal, 16) >> 32
+    type_indicator = hexadecimal
     module_type = {
         # Setup modules
-        "10"  : "battery",
+        0x10  : "battery",
         # Input modules
-        "2000": "env",
-        "2010": "gyro",
-        "2020": "mic",
-        "2030": "button",
-        "2040": "dial",
-        "2050": "ultrasonic",
-        "2060": "ir",
-        "2070": "joystick",
-        "2080": "tof",
+        0x2000: "env",
+        0x2010: "gyro",
+        0x2020: "mic",
+        0x2030: "button",
+        0x2040: "dial",
+        0x2050: "ultrasonic",
+        0x2060: "ir",
+        0x2070: "joystick",
+        0x2080: "tof",
         # Output modules
-        "4000": "display",
-        "4010": "motor",
-        "4020": "led",
-        "4030": "speaker",
+        0x4000: "display",
+        0x4010: "motor",
+        0x4011: "motor",
+        0x4020: "led",
+        0x4030: "speaker",
     }.get(type_indicator)
     return "network" if module_type is None else module_type
 
