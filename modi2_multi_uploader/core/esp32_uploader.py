@@ -4480,16 +4480,15 @@ class ESP32FirmwareUpdater():
 
                 self.esp.firmware_progress = 94
                 time.sleep(3)
-
                 self.esp.wait_for_json()
-                time.sleep(1)
+                time.sleep(0.01)
                 self.esp.firmware_progress = 98
                 self.esp.set_esp_app_version(self.app_version_to_update)
-                time.sleep(1)
+                time.sleep(0.01)
                 self.esp.set_esp_ota_version(self.ota_version_to_update)
                 self.__print("ESP firmware update is complete!!")
                 self.esp.firmware_progress = 100
-                time.sleep(0.5)
+                time.sleep(0.05)
 
                 self.esp._port.close()
 
