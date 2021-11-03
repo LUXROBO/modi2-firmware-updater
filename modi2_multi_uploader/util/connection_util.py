@@ -119,7 +119,7 @@ class SerTask(ConnTask):
         """
         self._bus.close()
 
-    def recv(self) -> Optional[str]:
+    def recv(self, verbose=False) -> Optional[str]:
         """Read serial message and put message to serial read queue
 
         :return: str
@@ -136,7 +136,7 @@ class SerTask(ConnTask):
             return None
         json_pkt = self.__json_buffer[: idx + 1].decode("utf8")
         self.__json_buffer = self.__json_buffer[idx + 1 :]
-        if self.verbose:
+        if self.verbose or verbose:
             print(f"recv: {json_pkt}")
         return json_pkt
 
