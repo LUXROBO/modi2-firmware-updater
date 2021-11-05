@@ -251,17 +251,35 @@ class NetworkFirmwareUpdater(serial.Serial):
         end_flash_success = False
         page_retry_count = 0
         page_retry_max_count = 10
+        erase_page_num = 2
 
         while not end_flash_success:
             # Erase page (send erase request and receive erase response)
-            erase_page_success = self.set_firmware_command("erase", module_id, 0, 0x0801F800)
+            erase_page_success = self.set_firmware_command(
+                oper_type = "erase",
+                module_id = module_id,
+                crc_val = erase_page_num,
+                page_addr = 0x0801f800
+            )
+            
+            # erase_page_success = self.set_firmware_command("erase", module_id, 0, 0x0801F800)
             if not erase_page_success:
                 self.update_error = -1
                 self.update_error_message = "End erase error"
                 return False
 
             # Send data
-            checksum = self.set_firmware_data(module_id, 0, end_flash_data, 0)
+            checksum = 0
+            for end_flash_ptr in range(0, len(end_flash_data), 8):
+                curr_data = end_flash_data[end_flash_ptr : end_flash_ptr + 8]
+                checksum = self.set_firmware_data(
+                    module_id, 
+                    seq_num=end_flash_ptr//8, 
+                    bin_data=curr_data, 
+                    checksum=checksum
+                )
+                time.sleep(0.001)
+            # checksum = self.set_firmware_data(module_id, 0, end_flash_data, 0)
 
             # CRC on current page (send CRC request and receive CRC response)
             crc_page_success = self.set_firmware_command("crc", module_id, checksum, 0x0801F800)
@@ -438,7 +456,7 @@ class NetworkFirmwareUpdater(serial.Serial):
                                 self.network_uuid = module_uuid
                                 self.network_id = self.network_uuid & 0xFFF
 
-                            if warning_type == 1:
+                            if warning_type == 0:
                                 self.send_set_module_state(self.network_id, Module.UPDATE_FIRMWARE_READY, Module.PNP_OFF)
                             if  warning_type == 2:
                                 break
@@ -482,13 +500,16 @@ class NetworkFirmwareUpdater(serial.Serial):
         page_retry_max_count = 20
         page_size = 0x800
         flash_memory_addr = 0x08000000
+        erase_page_num = 2
 
         bin_size = sys.getsizeof(bin_buffer)
         bin_begin = page_size
         bin_end = bin_size - ((bin_size - bin_begin) % page_size)
 
         page_offset = 0x8800
-        for page_begin in range(bin_begin, bin_end + 1, page_size):
+        page_begin = bin_begin
+        while page_begin < bin_end :
+        # for page_begin in range(bin_begin, bin_end + 1, page_size):
             progress = 100 * page_begin // bin_end
             self.progress = progress
 
@@ -511,12 +532,13 @@ class NetworkFirmwareUpdater(serial.Serial):
 
             # Skip current page if empty
             if not sum(curr_page):
+                page_begin = page_begin + page_size
                 continue
             
             erase_page_success = self.set_firmware_command(
                 oper_type = "erase",
                 module_id = module_id,
-                crc_val = 0,
+                crc_val = erase_page_num,
                 page_addr = flash_memory_addr + page_begin + page_offset
             )
             if not erase_page_success:
@@ -531,7 +553,7 @@ class NetworkFirmwareUpdater(serial.Serial):
 
                 curr_data = curr_page[curr_ptr : curr_ptr + 8]
                 checksum = self.set_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
-                self.__delay(0.002)
+                self.__delay(0.001)
 
             # CRC on current page (send CRC request / receive CRC response)
             crc_page_success = self.set_firmware_command(
@@ -541,15 +563,15 @@ class NetworkFirmwareUpdater(serial.Serial):
                 page_addr = flash_memory_addr + page_begin + page_offset
             )
             if not crc_page_success:
-                page_begin -= page_size
                 page_retry_count += 1
                 if page_retry_count > page_retry_max_count:
                     self.update_error = -1
                     self.update_error_message = "CRC response error"
                     return False
+                continue
             else:
                 page_retry_count = 0
-
+            page_begin = page_begin + page_size
             time.sleep(0.01)
 
         self.progress = 99
@@ -571,10 +593,14 @@ class NetworkFirmwareUpdater(serial.Serial):
         )
 
         # Set end-flash data to be sent at the end of the firmware update
-        end_flash_data = bytearray(8)
+        end_flash_data = bytearray(16)
         end_flash_data[0] = 0xAA
         end_flash_data[6] = version & 0xFF
         end_flash_data[7] = (version >> 8) & 0xFF
+
+        for xxx in range(4):
+            end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
+
 
         end_flash_success = self.set_end_flash_data(module_id, end_flash_data)
         if not end_flash_success:
@@ -647,9 +673,10 @@ class NetworkFirmwareUpdater(serial.Serial):
 
     @staticmethod
     def __delay(span):
-        init_time = time.perf_counter()
-        while time.perf_counter() - init_time < span:
-            pass
+        time.sleep(span)
+        # init_time = time.perf_counter()
+        # while time.perf_counter() - init_time < span:
+        #     pass
         return
 
     @staticmethod
