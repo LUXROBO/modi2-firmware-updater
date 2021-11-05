@@ -626,12 +626,14 @@ class NetworkFirmwareUpdater(serial.Serial):
             self.close()
 
         if self.ui:
-            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_modules_button.setEnabled(True)
             self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
             self.ui.update_network_esp32_button.setEnabled(True)
             self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
             self.ui.update_network_esp32_interpreter_button.setEnabled(True)
+            self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.change_modules_type_button.setEnabled(True)
+            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_modules_button.setEnabled(True)
             if self.bootloader:
                 self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_button.setEnabled(True)
@@ -869,12 +871,14 @@ class NetworkFirmwareMultiUpdater():
         self.update_in_progress = False
 
         if self.ui:
-            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_modules_button.setEnabled(True)
             self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
             self.ui.update_network_esp32_button.setEnabled(True)
             self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
             self.ui.update_network_esp32_interpreter_button.setEnabled(True)
+            self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.change_modules_type_button.setEnabled(True)
+            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_modules_button.setEnabled(True)
             if bootloader:
                 self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_button.setEnabled(True)
