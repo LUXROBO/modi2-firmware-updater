@@ -704,8 +704,8 @@ class ModuleFirmwareMultiUpdater():
                 break
             try:
                 module_uploader = ModuleFirmwareUpdater(port = modi_port.device)
-                # module_uploader.set_print(False)
-                # module_uploader.set_raise_error(False)
+                module_uploader.set_print(False)
+                module_uploader.set_raise_error(False)
             except:
                 print("open " + modi_port.device + " error")
             else:
