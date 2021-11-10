@@ -15,6 +15,8 @@ from modi2_multi_uploader.util.message_util import (decode_message,
                                                      unpack_data)
 from modi2_multi_uploader.util.module_util import (Module,
                                                     get_module_type_from_uuid)
+from modi2_multi_uploader.util.module_util import (Module,
+                                                    get_module_uuid_from_type)
 
 
 def retry(exception_to_catch):
@@ -42,6 +44,9 @@ class ModuleFirmwareUpdater:
     ERASE_ERROR = 6
     ERASE_COMPLETE = 7
 
+    UPDATE_FIRMWARE_MODE = 0
+    CHNAGE_TYPE_MODE = 1
+
     def __init__(
         self, port=None, is_os_update=True, target_ids=(0xFFF,), conn_type="ser"
     ):
@@ -67,6 +72,11 @@ class ModuleFirmwareUpdater:
         self.update_error = 0
         self.update_error_message = ""
         self.update_index = 0
+        self.update_mode = 0
+        self.current_module_id = 0
+        self.change_type_target = 0
+        self.change_type_success_flag = False
+
 
         self.open(port)
         for device in stl.comports():
@@ -115,12 +125,14 @@ class ModuleFirmwareUpdater:
     def update_module_firmware(self):
         self.request_network_id()
         self.reset_state()
+        self.update_mode = self.UPDATE_FIRMWARE_MODE
         for target in self.__target_ids:
             self.request_to_update_firmware(target)
 
     def change_module_type(self, module_type):
         self.request_network_id()
         self.reset_state()
+        self.update_mode = self.CHNAGE_TYPE_MODE
         for target in self.__target_ids:
             self.request_to_change_module_type(target, module_type)
 
@@ -177,6 +189,16 @@ class ModuleFirmwareUpdater:
 
     def request_to_change_module_type(self, module_id, module_type) -> None:
         # TODO 조셉이 여기서 부터 작업 필요
+        self.change_type_target = get_module_uuid_from_type(module_type)
+        firmware_update_message = self.__set_module_state(
+            module_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF
+        )
+        self.__conn.send_nowait(firmware_update_message)
+        time.sleep(0.01)
+        self.__conn.send_nowait(firmware_update_message)
+        time.sleep(0.01)
+        self.__conn.send_nowait(firmware_update_message)
+        time.sleep(0.01)
         print("Change module type has been requested")
 
     def check_to_update_firmware(self, module_id: int) -> None:
@@ -214,6 +236,19 @@ class ModuleFirmwareUpdater:
         self.update_index = 0
         updater_thread = th.Thread(
             target=self.__update_firmware, args=(module_id, module_type, 0)
+        )
+        updater_thread.daemon = True
+        updater_thread.start()
+
+    def change_type_module(self, module_uuid: int, module_type: str) -> None:
+        if self.update_in_progress:
+            return
+        print("change type start!!!!")
+        self.update_in_progress = True
+        self.current_module_id = module_uuid & 0xFFF
+        self.update_index = 0
+        updater_thread = th.Thread(
+            target=self.__change_type, args=(module_uuid, module_type, 0)
         )
         updater_thread.daemon = True
         updater_thread.start()
@@ -417,6 +452,107 @@ class ModuleFirmwareUpdater:
                 else:
                     self.ui.update_modules_button.setText("모듈 초기화")
 
+    def __change_type(self, module_uuid: int, module_type: str, module_index: int) -> None:
+        self.update_in_progress = True
+        self.module_type = module_type
+        self.modules_updated.append((module_uuid, module_type))
+        module_id = module_uuid & 0xFFF
+
+        # Init base root_path, utilizing local binary files
+        root_path = path.join(
+            path.dirname(__file__), "..", "assets", "firmware", "latest", "module"
+        )
+
+        if self.__is_os_update:
+            self.progress = 0
+            bin_path = path.join(root_path, f"{module_type.lower()}.bin")
+            # Init metadata of the bytes loaded
+
+            progress = 0
+            self.progress = progress
+
+            if self.ui:
+                update_module_num = len(self.modules_to_update)
+                num_updated = len(self.modules_updated)
+                if self.ui.is_english:
+                    self.ui.update_modules_button.setText(
+                        f"Modules update is in progress. "
+                        f"({num_updated} / "
+                        f"{update_module_num})"
+                        f"({progress}%)"
+                    )
+                else:
+                    self.ui.update_modules_button.setText(
+                        f"모듈 초기화가 진행중입니다. "
+                        f"({num_updated} / "
+                        f"{update_module_num})"
+                        f"({progress}%)"
+                    )
+            
+            # send change 
+            uuid_changed_with_type = (module_uuid & 0xFFFFFFFF) | (self.change_type_target << 32)
+            self.send_change_type(module_id, uuid_changed_with_type)
+            time.sleep(0.5)
+            self.progress = 50
+            #reboot
+            reboot_message = self.__set_module_state(
+                0xFFF, Module.REBOOT, Module.PNP_ON
+            )
+            self.__conn.send_nowait(reboot_message)
+            time.sleep(0.5)
+            while self.change_type_success_flag == False:
+                time.sleep(0.001)
+            self.change_type_success_flag = False
+        self.progress = 100
+        self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
+
+        module_index += 1
+        if module_index < len(self.modules_to_update):
+            next_module_id, next_module_type = self.modules_to_update[module_index]
+            self.current_module_id = next_module_id
+            self.__change_type(next_module_id, next_module_type, module_index)
+        else:
+            # Reboot all connected modules
+            time.sleep(1)
+            if module_index < len(self.modules_to_update):
+                next_module_id, next_module_type = self.modules_to_update[module_index]
+                self.current_module_id = next_module_id
+                self.__change_type(next_module_id, next_module_type, module_index)
+            self.modules_to_update.clear()
+            self.update_index = 0
+            # reboot_message = self.__set_module_state(
+            #     0xFFF, Module.REBOOT, Module.PNP_OFF
+            # )
+            # self.__conn.send_nowait(reboot_message)
+            # self.__print("Reboot message has been sent to all connected modules")
+
+            # time.sleep(1)
+
+            self.__print("Module type change have been updated!")
+            self.close()
+
+            self.update_in_progress = False
+            self.update_error = 1
+
+            time.sleep(0.5)
+            self.reset_state()
+
+            if self.ui:
+                self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_button.setEnabled(True)
+                self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_interpreter_button.setEnabled(True)
+                self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.change_modules_type_button.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
+                if self.ui.is_english:
+                    self.ui.update_modules_button.setText("Update Modules.")
+                else:
+                    self.ui.update_modules_button.setText("모듈 초기화")
+
     @staticmethod
     def __delay(span):
         init_time = time.perf_counter()
@@ -543,6 +679,24 @@ class ModuleFirmwareUpdater:
 
         return json.dumps(message, separators=(",", ":"))
 
+    def change_type_command(
+        self,
+        did: int,
+        changed_uuid: int,
+    ) -> str:
+        message = dict()
+        message["c"] = 0x0E
+
+        message["s"] = 0
+        message["d"] = did
+        send_data = int.to_bytes(changed_uuid, byteorder="little", length=8)
+        message["b"] = b64encode(bytes(send_data)).decode(
+            "utf-8"
+        )
+        message["l"] = 8
+
+        return json.dumps(message, separators=(",", ":"))
+
     def calc_crc32(self, data: bytes, crc: int) -> int:
         crc ^= int.from_bytes(data, byteorder="little", signed=False)
 
@@ -560,6 +714,19 @@ class ModuleFirmwareUpdater:
         checksum = self.calc_crc32(data[4:], checksum)
         return checksum
 
+    def send_change_type(
+        self,
+        module_id: int = 0,
+        changed_uuid_: int = 0,
+    ) -> bool:
+        # Send firmware command request
+        request_message = self.change_type_command(
+            did = module_id, changed_uuid = changed_uuid_
+        )
+        self.__conn.send_nowait(request_message)
+
+        #return self.receive_command_response()
+
     def send_firmware_command(
         self,
         oper_type: str,
@@ -576,6 +743,7 @@ class ModuleFirmwareUpdater:
         self.__conn.send_nowait(request_message)
 
         return self.receive_command_response()
+    
 
     def receive_command_response(
         self,
@@ -645,11 +813,18 @@ class ModuleFirmwareUpdater:
             ins, sid, did, data, length = decode_message(msg)
         except:
             return
+        # print("received cmd is ", ins)
+        
         command = {
             0x05: self.__assign_network_id,
             0x0A: self.__update_warning,
             0x0C: self.__update_firmware_state,
         }.get(ins)
+        if self.update_mode == self.CHNAGE_TYPE_MODE:
+            command = {
+                0x05: self.__assign_network_id,
+                0x0A: self.__update_warning_change_type,
+            }.get(ins)
 
         if command:
             command(sid, data)
@@ -689,6 +864,36 @@ class ModuleFirmwareUpdater:
                 module_elem = module_id, module_type
                 self.modules_to_update.append(module_elem)
                 self.update_module(module_id, module_type)
+
+    def __update_warning_change_type(self, sid: int, data: str) -> None:
+        module_uuid = unpack_data(data, (6, 1))[0]
+        module_id = sid
+        module_type = get_module_type_from_uuid(module_uuid)
+        # print("warning! uuid = ", hex(module_uuid))
+        if module_type == "network":
+            self.network_uuid = module_uuid
+
+        if self.update_in_progress:
+            same_flag = False
+            for temp_module_id, temp_module_type in self.modules_to_update:
+                if temp_module_id == module_id:
+                    same_flag = True
+                    # print("same, same_flag = ", same_flag)
+                    break
+            if same_flag == False:
+                self.add_to_waitlist(module_id, module_type)
+            else :
+                # print("current id = ", hex(self.current_module_id), "\tsid = ", hex(sid))
+                if self.current_module_id == sid:
+                    sid_module_type = module_uuid >> 32
+                    # print("same type = ", hex(sid_module_type))
+                    if sid_module_type == self.change_type_target:
+                        self.change_type_success_flag = True#change success
+        else:
+            module_elem = module_id, module_type
+            self.modules_to_update.append(module_elem)
+            
+            self.change_type_module(module_uuid, module_type)
 
     def __print(self, data, end="\n"):
         if self.print:
