@@ -49,8 +49,8 @@ def get_module_uuid_from_type(module_type):
         "tof"       :0x2080,
         #  module :# Output
         "display"   :0x4000,
-        "motorA"     :0x4010,
-        "motorB"     :0x4011,
+        "motor_a"   :0x4010,
+        "motor_b"   :0x4011,
         "led"       :0x4020,
         "speaker"   :0x4030,
     }.get(module_type)
