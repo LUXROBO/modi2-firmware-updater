@@ -235,14 +235,14 @@ class ModuleFirmwareUpdater:
         updater_thread.daemon = True
         updater_thread.start()
 
-    def change_type_module(self, module_uuid: int, module_type: str) -> None:
+    def change_type_module(self, module_id: int, module_type: str) -> None:
         if self.update_in_progress:
             return
         self.update_in_progress = True
-        self.current_module_id = module_uuid & 0xFFF
+        self.current_module_id = module_id
         self.update_index = 0
         updater_thread = th.Thread(
-            target=self.__change_type, args=(module_uuid, module_type, 0)
+            target=self.__change_type, args=(module_id, module_type, 0)
         )
         updater_thread.daemon = True
         updater_thread.start()
@@ -446,10 +446,10 @@ class ModuleFirmwareUpdater:
                 else:
                     self.ui.update_modules_button.setText("모듈 초기화")
 
-    def __change_type(self, module_uuid: int, module_type: str, module_index: int) -> None:
+    def __change_type(self, module_id: int, module_type: str, module_index: int) -> None:
         self.update_in_progress = True
         self.module_type = module_type
-        module_id = module_uuid & 0xFFF
+
         self.modules_updated.append((module_id, module_type))
 
         if self.__is_os_update:
@@ -460,6 +460,7 @@ class ModuleFirmwareUpdater:
             if self.ui:
                 update_module_num = len(self.modules_to_update)
                 num_updated = len(self.modules_updated)
+                print(update_module_num, "\t", num_updated)
                 if self.ui.is_english:
                     self.ui.change_modules_type_button.setText(
                         f"Changing modules type is in progress. "
@@ -476,23 +477,31 @@ class ModuleFirmwareUpdater:
                     )
             
             # send change 
-            uuid_changed_with_type = (module_uuid & 0xFFFFFFFF) | (self.change_type_target << 32)
+            uuid_changed_with_type = self.change_type_target << 32
             self.send_change_type(module_id, uuid_changed_with_type)
             time.sleep(0.5)
             self.progress = 50
 
             #reboot
-            reboot_message = self.__set_module_state(0xFFF, Module.REBOOT, Module.PNP_ON)
+            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_ON)
             self.__conn.send_nowait(reboot_message)
             time.sleep(0.5)
 
             timeout = 0
             while self.change_type_success_flag == False:
                 if ((timeout % 10) == 0) and (timeout != 0):
+                    self.send_change_type(module_id, uuid_changed_with_type)
+                    time.sleep(0.01)
                     self.__conn.send_nowait(reboot_message)
+                if ((timeout >= 50) == 0):
                     timeout = 0
-                else:
-                    timeout += 1
+                    self.update_error_message = "Response timed-out"
+                    if self.raise_error_message:
+                        raise Exception(self.update_error_message)
+                    else:
+                        self.update_error = -1
+                    return False
+                timeout += 1
                 time.sleep(0.1)
             self.change_type_success_flag = False
 
@@ -506,7 +515,7 @@ class ModuleFirmwareUpdater:
             self.__change_type(next_module_id, next_module_type, module_index)
         else:
             # Reboot all connected modules
-            time.sleep(1)
+            time.sleep(2)
             if module_index < len(self.modules_to_update):
                 next_module_id, next_module_type = self.modules_to_update[module_index]
                 self.current_module_id = next_module_id
@@ -876,7 +885,7 @@ class ModuleFirmwareUpdater:
         else:
             module_elem = module_id, module_type
             self.modules_to_update.append(module_elem)
-            self.change_type_module(module_uuid, module_type)
+            self.change_type_module(module_id, module_type)
 
     def __print(self, data, end="\n"):
         if self.print:
@@ -1053,8 +1062,8 @@ class ModuleFirmwareMultiUpdater():
                 break
             try:
                 module_uploader = ModuleFirmwareUpdater(port = modi_port.device)
-                # module_uploader.set_print(False)
-                # module_uploader.set_raise_error(False)
+                module_uploader.set_print(False)
+                module_uploader.set_raise_error(False)
             except:
                 print("open " + modi_port.device + " error")
             else:
