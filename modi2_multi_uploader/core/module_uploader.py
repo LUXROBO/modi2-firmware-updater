@@ -15,6 +15,8 @@ from modi2_multi_uploader.util.message_util import (decode_message,
                                                      unpack_data)
 from modi2_multi_uploader.util.module_util import (Module,
                                                     get_module_type_from_uuid)
+from modi2_multi_uploader.util.module_util import (Module,
+                                                    get_module_uuid_from_type)
 
 
 def retry(exception_to_catch):
@@ -42,6 +44,9 @@ class ModuleFirmwareUpdater:
     ERASE_ERROR = 6
     ERASE_COMPLETE = 7
 
+    UPDATE_FIRMWARE_MODE = 0
+    CHNAGE_TYPE_MODE = 1
+
     def __init__(
         self, port=None, is_os_update=True, target_ids=(0xFFF,), conn_type="ser"
     ):
@@ -67,6 +72,11 @@ class ModuleFirmwareUpdater:
         self.update_error = 0
         self.update_error_message = ""
         self.update_index = 0
+        self.update_mode = 0
+        self.current_module_id = 0
+        self.change_type_target = 0
+        self.change_type_success_flag = False
+
 
         self.open(port)
         for device in stl.comports():
@@ -115,8 +125,16 @@ class ModuleFirmwareUpdater:
     def update_module_firmware(self):
         self.request_network_id()
         self.reset_state()
+        self.update_mode = self.UPDATE_FIRMWARE_MODE
         for target in self.__target_ids:
             self.request_to_update_firmware(target)
+
+    def change_module_type(self, module_type):
+        self.request_network_id()
+        self.reset_state()
+        self.update_mode = self.CHNAGE_TYPE_MODE
+        for target in self.__target_ids:
+            self.request_to_change_module_type(target, module_type)
 
     def close(self):
         self.__running = False
@@ -157,9 +175,7 @@ class ModuleFirmwareUpdater:
             self.modules_updated = []
 
     def request_to_update_firmware(self, module_id) -> None:
-        firmware_update_message = self.__set_module_state(
-            module_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF
-        )
+        firmware_update_message = self.__set_module_state(module_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
         self.__conn.send_nowait(firmware_update_message)
         time.sleep(0.01)
         self.__conn.send_nowait(firmware_update_message)
@@ -168,6 +184,18 @@ class ModuleFirmwareUpdater:
         time.sleep(0.01)
         self.__print("Firmware update has been requested")
         print("Firmware update has been requested")
+
+    def request_to_change_module_type(self, module_id, module_type) -> None:
+        self.change_type_target = get_module_uuid_from_type(module_type)
+        firmware_update_message = self.__set_module_state(module_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
+        self.__conn.send_nowait(firmware_update_message)
+        time.sleep(0.01)
+        self.__conn.send_nowait(firmware_update_message)
+        time.sleep(0.01)
+        self.__conn.send_nowait(firmware_update_message)
+        time.sleep(0.01)
+        self.__print("Change module type has been requested")
+        print("Change module type has been requested")
 
     def check_to_update_firmware(self, module_id: int) -> None:
         firmware_update_ready_message = self.__set_module_state(
@@ -199,11 +227,22 @@ class ModuleFirmwareUpdater:
     def update_module(self, module_id: int, module_type: str) -> None:
         if self.update_in_progress:
             return
-
         self.update_in_progress = True
         self.update_index = 0
         updater_thread = th.Thread(
             target=self.__update_firmware, args=(module_id, module_type, 0)
+        )
+        updater_thread.daemon = True
+        updater_thread.start()
+
+    def change_type_module(self, module_id: int, module_type: str) -> None:
+        if self.update_in_progress:
+            return
+        self.update_in_progress = True
+        self.current_module_id = module_id
+        self.update_index = 0
+        updater_thread = th.Thread(
+            target=self.__change_type, args=(module_id, module_type, 0)
         )
         updater_thread.daemon = True
         updater_thread.start()
@@ -392,18 +431,122 @@ class ModuleFirmwareUpdater:
             self.reset_state()
 
             if self.ui:
-                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_button.setEnabled(True)
-                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_bootloader_button.setEnabled(True)
                 self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_esp32_button.setEnabled(True)
                 self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
                 self.ui.update_network_esp32_interpreter_button.setEnabled(True)
+                self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.change_modules_type_button.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
                 if self.ui.is_english:
                     self.ui.update_modules_button.setText("Update Modules.")
                 else:
                     self.ui.update_modules_button.setText("모듈 초기화")
+
+    def __change_type(self, module_id: int, module_type: str, module_index: int) -> None:
+        self.update_in_progress = True
+        self.module_type = module_type
+
+        self.modules_updated.append((module_id, module_type))
+
+        if self.__is_os_update:
+            # Init metadata of the bytes loaded
+            progress = 0
+            self.progress = progress
+
+            if self.ui:
+                update_module_num = len(self.modules_to_update)
+                num_updated = len(self.modules_updated)
+                print(update_module_num, "\t", num_updated)
+                if self.ui.is_english:
+                    self.ui.change_modules_type_button.setText(
+                        f"Changing modules type is in progress. "
+                        f"({num_updated} / "
+                        f"{update_module_num})"
+                        f"({progress}%)"
+                    )
+                else:
+                    self.ui.change_modules_type_button.setText(
+                        f"모듈 타입 변경이 진행중입니다. "
+                        f"({num_updated} / "
+                        f"{update_module_num})"
+                        f"({progress}%)"
+                    )
+            
+            # send change 
+            uuid_changed_with_type = self.change_type_target << 32
+            self.send_change_type(module_id, uuid_changed_with_type)
+            time.sleep(0.5)
+            self.progress = 50
+
+            #reboot
+            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_ON)
+            self.__conn.send_nowait(reboot_message)
+            time.sleep(0.5)
+
+            timeout = 0
+            while self.change_type_success_flag == False:
+                if ((timeout % 10) == 0) and (timeout != 0):
+                    self.send_change_type(module_id, uuid_changed_with_type)
+                    time.sleep(0.01)
+                    self.__conn.send_nowait(reboot_message)
+                if ((timeout >= 50) == 0):
+                    timeout = 0
+                    self.update_error_message = "Response timed-out"
+                    if self.raise_error_message:
+                        raise Exception(self.update_error_message)
+                    else:
+                        self.update_error = -1
+                    return False
+                timeout += 1
+                time.sleep(0.1)
+            self.change_type_success_flag = False
+
+        self.progress = 100
+        self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
+
+        module_index += 1
+        if module_index < len(self.modules_to_update):
+            next_module_id, next_module_type = self.modules_to_update[module_index]
+            self.current_module_id = next_module_id
+            self.__change_type(next_module_id, next_module_type, module_index)
+        else:
+            # Reboot all connected modules
+            time.sleep(2)
+            if module_index < len(self.modules_to_update):
+                next_module_id, next_module_type = self.modules_to_update[module_index]
+                self.current_module_id = next_module_id
+                self.__change_type(next_module_id, next_module_type, module_index)
+            self.modules_to_update.clear()
+            self.update_index = 0
+
+            self.__print("Module type change have been updated!")
+            self.close()
+
+            self.update_in_progress = False
+            self.update_error = 1
+
+            time.sleep(0.5)
+            self.reset_state()
+
+            if self.ui:
+                self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_button.setEnabled(True)
+                self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_esp32_interpreter_button.setEnabled(True)
+                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_modules_button.setEnabled(True)
+                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_button.setEnabled(True)
+                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+                self.ui.update_network_bootloader_button.setEnabled(True)
+                if self.ui.is_english:
+                    self.ui.change_modules_type_button.setText("Change Modules Type")
+                else:
+                    self.ui.change_modules_type_button.setText("모듈 타입 변경")
 
     @staticmethod
     def __delay(span):
@@ -531,6 +674,24 @@ class ModuleFirmwareUpdater:
 
         return json.dumps(message, separators=(",", ":"))
 
+    def change_type_command(
+        self,
+        did: int,
+        changed_uuid: int,
+    ) -> str:
+        message = dict()
+        message["c"] = 0x0E
+
+        message["s"] = 0
+        message["d"] = did
+        send_data = int.to_bytes(changed_uuid, byteorder="little", length=8)
+        message["b"] = b64encode(bytes(send_data)).decode(
+            "utf-8"
+        )
+        message["l"] = 8
+
+        return json.dumps(message, separators=(",", ":"))
+
     def calc_crc32(self, data: bytes, crc: int) -> int:
         crc ^= int.from_bytes(data, byteorder="little", signed=False)
 
@@ -548,6 +709,19 @@ class ModuleFirmwareUpdater:
         checksum = self.calc_crc32(data[4:], checksum)
         return checksum
 
+    def send_change_type(
+        self,
+        module_id: int = 0,
+        changed_uuid_: int = 0,
+    ) -> bool:
+        # Send firmware command request
+        request_message = self.change_type_command(
+            did = module_id, changed_uuid = changed_uuid_
+        )
+        self.__conn.send_nowait(request_message)
+
+        #return self.receive_command_response()
+
     def send_firmware_command(
         self,
         oper_type: str,
@@ -564,6 +738,7 @@ class ModuleFirmwareUpdater:
         self.__conn.send_nowait(request_message)
 
         return self.receive_command_response()
+    
 
     def receive_command_response(
         self,
@@ -633,11 +808,19 @@ class ModuleFirmwareUpdater:
             ins, sid, did, data, length = decode_message(msg)
         except:
             return
+        # print("received cmd is ", ins)
+        
         command = {
             0x05: self.__assign_network_id,
             0x0A: self.__update_warning,
             0x0C: self.__update_firmware_state,
         }.get(ins)
+
+        if self.update_mode == self.CHNAGE_TYPE_MODE:
+            command = {
+                0x05: self.__assign_network_id,
+                0x0A: self.__update_warning_change_type,
+            }.get(ins)
 
         if command:
             command(sid, data)
@@ -677,6 +860,32 @@ class ModuleFirmwareUpdater:
                 module_elem = module_id, module_type
                 self.modules_to_update.append(module_elem)
                 self.update_module(module_id, module_type)
+
+    def __update_warning_change_type(self, sid: int, data: str) -> None:
+        module_uuid = unpack_data(data, (6, 1))[0]
+        module_id = sid
+        module_type = get_module_type_from_uuid(module_uuid)
+
+        if module_type == "network":
+            self.network_uuid = module_uuid
+
+        if self.update_in_progress:
+            same_flag = False
+            for temp_module_id, temp_module_type in self.modules_to_update:
+                if temp_module_id == module_id:
+                    same_flag = True
+                    break
+            if same_flag == False:
+                self.add_to_waitlist(module_id, module_type)
+            else:
+                if self.current_module_id == sid:
+                    sid_module_type = module_uuid >> 32
+                    if sid_module_type == self.change_type_target:
+                        self.change_type_success_flag = True
+        else:
+            module_elem = module_id, module_type
+            self.modules_to_update.append(module_elem)
+            self.change_type_module(module_id, module_type)
 
     def __print(self, data, end="\n"):
         if self.print:
@@ -817,18 +1026,170 @@ class ModuleFirmwareMultiUpdater():
         self.update_in_progress = False
 
         if self.ui:
-            self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_button.setEnabled(True)
             self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
             self.ui.update_network_esp32_button.setEnabled(True)
-            self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_bootloader_button.setEnabled(True)
             self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
             self.ui.update_network_esp32_interpreter_button.setEnabled(True)
+            self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.change_modules_type_button.setEnabled(True)
+            self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_button.setEnabled(True)
+            self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_bootloader_button.setEnabled(True)
             if self.ui.is_english:
                 self.ui.update_modules_button.setText("Update Modules.")
             else:
                 self.ui.update_modules_button.setText("모듈 초기화")
+
+        if self.list_ui:
+            self.list_ui.ui.close_button.setEnabled(True)
+            self.list_ui.total_status_signal.emit("Complete")
+            self.list_ui.total_progress_signal.emit(100)
+            for index, module_uploader in enumerate(self.module_uploaders):
+                self.list_ui.progress_signal.emit(index, 100, 100)
+
+        print("\nFirmware update is complete!!")
+
+    def change_module_type(self, modi_ports, module_type):
+        self.module_uploaders = []
+        self.network_uuid = []
+        self.state = []
+        self.wait_timeout = []
+        self.update_module_num = []
+
+        for i, modi_port in enumerate(modi_ports):
+            if i > 9:
+                break
+            try:
+                module_uploader = ModuleFirmwareUpdater(port = modi_port.device)
+                module_uploader.set_print(False)
+                module_uploader.set_raise_error(False)
+            except:
+                print("open " + modi_port.device + " error")
+            else:
+                self.module_uploaders.append(module_uploader)
+                self.state.append(-1)
+                self.network_uuid.append('')
+                self.wait_timeout.append(0)
+                self.update_module_num.append(0)
+
+        if self.list_ui:
+            self.list_ui.set_device_num(len(self.module_uploaders))
+            self.list_ui.ui.close_button.setEnabled(False)
+
+        self.update_in_progress = True
+
+        for index, module_uploader in enumerate(self.module_uploaders):
+            th.Thread(
+                target=module_uploader.change_module_type,
+                args=(module_type, ),
+                daemon=True
+            ).start()
+            if self.list_ui:
+                self.list_ui.error_message_signal.emit(index, "Waiting for network uuid")
+
+        delay = 0.1
+        while True:
+            is_done = True
+            total_progress = 0
+            for index, module_uploader in enumerate(self.module_uploaders):
+                if module_uploader.update_in_progress:
+                    if module_uploader.network_uuid:
+                        self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
+                        self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+                if self.state[index] == -1:
+                    # wait module list
+                    is_done = False
+                    if self.list_ui:
+                        self.list_ui.error_message_signal.emit(index, "Waiting for module list")
+                    if module_uploader.update_in_progress:
+                        self.state[index] = 0
+                    else:
+                        self.wait_timeout[index] += delay
+                        if self.wait_timeout[index] > 5:
+                            self.wait_timeout[index] = 0
+                            self.state[index] = 1
+                            module_uploader.update_error = -1
+                            module_uploader.update_error_message = "No modules"
+                if self.state[index] == 0:
+                    # get module update list (only module update)
+                    is_done = False
+                    if self.list_ui:
+                        self.list_ui.error_message_signal.emit(index, "Updating modules")
+                    if module_uploader.update_error == 0:
+                        current_module_progress = 0
+                        total_module_progress = 0
+
+                        if module_uploader.progress:
+                            current_module_progress = module_uploader.progress
+                            if len(module_uploader.modules_to_update) == 0:
+                                total_module_progress = module_uploader.progress
+                            else:
+                                total_module_progress = (module_uploader.progress + (len(module_uploader.modules_updated) - 1) * 100) / (len(module_uploader.modules_to_update) * 100) * 100
+
+                            total_progress += total_module_progress / len(self.module_uploaders)
+
+                        if self.list_ui:
+                            self.list_ui.current_module_changed_signal.emit(index, module_uploader.module_type)
+                            self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
+                    else:
+                        self.state[index] = 1
+
+                elif self.state[index] == 1:
+                    # end
+                    is_done = False
+                    if module_uploader.update_error == 1:
+                        total_progress += 100 / len(self.module_uploaders)
+                        if self.list_ui:
+                            self.list_ui.network_state_signal.emit(index, 0)
+                            self.list_ui.error_message_signal.emit(index, "Update success")
+                    else:
+                        module_uploader.close()
+                        if self.list_ui:
+                            self.list_ui.network_state_signal.emit(index, -1)
+                            self.list_ui.error_message_signal.emit(index, module_uploader.update_error_message)
+
+                    if self.list_ui:
+                        self.list_ui.progress_signal.emit(index, 100, 100)
+                    self.state[index] = 2
+                elif self.state[index] == 2:
+                    total_progress += 100 / len(self.module_uploaders)
+
+            if len(self.module_uploaders):
+                # print(f"\r{self.__progress_bar(total_progress, 100)}", end="")
+
+                if self.ui:
+                    if self.ui.is_english:
+                        self.ui.change_modules_type_button.setText(f"Changing modules type is in progress. ({int(total_progress)}%)")
+                    else:
+                        self.ui.change_modules_type_button.setText(f"모듈 타입 변경이 진행중입니다. ({int(total_progress)}%)")
+
+                if self.list_ui:
+                    self.list_ui.total_progress_signal.emit(total_progress)
+                    self.list_ui.total_status_signal.emit("Uploading...")
+
+            if is_done:
+                break
+
+            time.sleep(delay)
+
+        self.update_in_progress = False
+
+        if self.ui:
+            self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_button.setEnabled(True)
+            self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_esp32_interpreter_button.setEnabled(True)
+            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_modules_button.setEnabled(True)
+            self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_button.setEnabled(True)
+            self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
+            self.ui.update_network_bootloader_button.setEnabled(True)
+            if self.ui.is_english:
+                self.ui.change_modules_type_button.setText("Change Modules Type")
+            else:
+                self.ui.change_modules_type_button.setText("모듈 타입 변경")
 
         if self.list_ui:
             self.list_ui.ui.close_button.setEnabled(True)

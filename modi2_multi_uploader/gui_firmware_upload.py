@@ -179,6 +179,8 @@ class Form(QDialog):
 
         self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.module_type_combobox.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.update_network_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
@@ -203,6 +205,7 @@ class Form(QDialog):
         # Connect up the buttons
         self.ui.update_network_esp32_button.clicked.connect(self.update_network_esp32)
         self.ui.update_network_esp32_interpreter_button.clicked.connect(self.update_network_esp32_interpreter)
+        self.ui.change_modules_type_button.clicked.connect(self.change_modules_type)
         self.ui.update_modules_button.clicked.connect(self.update_modules)
         self.ui.update_network_button.clicked.connect(self.update_network)
         self.ui.update_network_bootloader_button.clicked.connect(self.update_network_bootloader)
@@ -212,6 +215,7 @@ class Form(QDialog):
         self.buttons = [
             self.ui.update_network_esp32_button,
             self.ui.update_network_esp32_interpreter_button,
+            self.ui.change_modules_type_button,
             self.ui.update_modules_button,
             self.ui.update_network_button,
             self.ui.update_network_bootloader_button,
@@ -327,6 +331,35 @@ class Form(QDialog):
         ).start()
         self.firmware_updater = esp32_updater
 
+    def change_modules_type(self):
+        module_type = self.ui.module_type_combobox.currentText()
+        button_start = time.time()
+        if self.firmware_updater and self.firmware_updater.update_in_progress:
+            self.module_upload_list_form.ui.show()
+            return
+        self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.console.clear()
+        print(f"Module Firmware Updater has been initialized for changing module type to {module_type}")
+        th.Thread(
+            target=self.__click_motion, args=(2, button_start), daemon=True
+        ).start()
+
+        modi_ports = list_modi_ports()
+        if not modi_ports:
+            raise Exception("No MODI port is connected")
+
+        self.module_upload_list_form.reset_device_list()
+        self.module_upload_list_form.ui.show()
+        module_updater = ModuleFirmwareMultiUpdater()
+        module_updater.set_ui(self.ui, self.module_upload_list_form)
+        th.Thread(
+            target=module_updater.change_module_type,
+            args=(modi_ports, module_type),
+            daemon=True
+        ).start()
+        self.firmware_updater = module_updater
+
+
     def update_modules(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
@@ -336,7 +369,7 @@ class Form(QDialog):
         self.ui.console.clear()
         print("Module Firmware Updater has been initialized for module update!")
         th.Thread(
-            target=self.__click_motion, args=(2, button_start), daemon=True
+            target=self.__click_motion, args=(3, button_start), daemon=True
         ).start()
 
         modi_ports = list_modi_ports()
@@ -363,7 +396,7 @@ class Form(QDialog):
         self.ui.console.clear()
         print("Network Firmware Updater has been initialized for base update!")
         th.Thread(
-            target=self.__click_motion, args=(3, button_start), daemon=True
+            target=self.__click_motion, args=(4, button_start), daemon=True
         ).start()
 
         modi_ports = list_modi_ports()
@@ -390,7 +423,7 @@ class Form(QDialog):
         self.ui.console.clear()
         print("Network Firmware Updater has been initialized for base update!")
         th.Thread(
-            target=self.__click_motion, args=(4, button_start), daemon=True
+            target=self.__click_motion, args=(5, button_start), daemon=True
         ).start()
 
         modi_ports = list_modi_ports()
@@ -412,7 +445,7 @@ class Form(QDialog):
         button_start = time.time()
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path});font-size: 13px")
         th.Thread(
-            target=self.__click_motion, args=(5, button_start), daemon=True
+            target=self.__click_motion, args=(6, button_start), daemon=True
         ).start()
         if self.console:
             self.ui.console.hide()
@@ -426,11 +459,12 @@ class Form(QDialog):
         button_start = time.time()
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path}); font-size: 13px")
         th.Thread(
-            target=self.__click_motion, args=(6, button_start), daemon=True
+            target=self.__click_motion, args=(7, button_start), daemon=True
         ).start()
         button_en = [
             "Update Network ESP32",
             "Update Network ESP32 Interpreter",
+            "Change Modules Type",
             "Update Modules",
             "Update Network",
             "Set Network Bootloader",
@@ -440,6 +474,7 @@ class Form(QDialog):
         button_kr = [
             "네트워크 모듈 업데이트",
             "네트워크 모듈 인터프리터 초기화",
+            "모듈 타입 변경",
             "모듈 초기화",
             "네트워크 모듈 초기화",
             "네트워크 모듈 부트로더",
@@ -702,12 +737,12 @@ class Form(QDialog):
         while time.time() - start_time < 0.2:
             pass
 
-        if button_type in [5, 6]:
+        if button_type in [6, 7]:
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         else:
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
             for i, q_button in enumerate(self.buttons):
-                if i in [button_type, 5, 6]:
+                if i in [button_type, 6, 7]:
                     continue
                 q_button.setStyleSheet(f"border-image: url({self.inactive_path}); font-size: 16px")
                 q_button.setEnabled(False)
