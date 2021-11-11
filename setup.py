@@ -2,6 +2,9 @@ from os import path
 
 from setuptools import setup, find_packages
 
+version_path = path.join(path.dirname(__file__), "version.txt")
+with open(version_path, "r") as version_file:
+    version_info = version_file.readline().lstrip("v").rstrip("\n")
 
 def get_readme():
     here = path.abspath(path.dirname(__file__))
@@ -18,11 +21,11 @@ def get_requirements():
 
 
 setup(
-    name='modi2-multi-upploader',
-    version='1.0.0',
+    name='MODI+ Multi Upploader',
+    version=version_info,
     author='LUXROBO',
     author_email='tech@luxrobo.com',
-    description='A GUI Form of MODI Firmware Updater utilizing PyMODI as its backend.',
+    description='A GUI Form of MODI+ Multi Uploader utilizing PyMODI as its backend.',
     long_description=get_readme(),
     long_description_content_type='text/markdown',
     license='MIT',
