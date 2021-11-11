@@ -7,6 +7,10 @@ from platform import system
 
 cwd = os.getcwd()
 
+version_path = os.path.join(cwd, "version.txt")
+with open(version_path, "r") as version_file:
+    version_info = version_file.readline().lstrip("v").rstrip("\n")
+
 site_package_paths = [path for path in sys.path if path.endswith('site-packages')]
 if not site_package_paths:
     raise ValueError('There is no valid path for site-packages!')
@@ -19,6 +23,7 @@ a = Analysis(
     # Put data(i.e. assets) under virtual 'modi2_multi_uploader/'
     datas=[
         ('modi2_multi_uploader/assets', 'modi2_multi_uploader/assets'),
+        ('version.txt', '.')
     ],
     hiddenimports=[
         "modi2_multi_uploader.util.connection_util",
@@ -41,7 +46,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='modi2_multi_uploader',
+    name='MODI+ Multi Uploader - v' + version_info,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -53,7 +58,7 @@ exe = EXE(
 )
 app = BUNDLE(
     exe,
-    name='modi2_multi_uploader.app',
+    name='MODI+ Multi Uploader - v' + version_path + '.app',
     icon='network_module.ico',
     bundle_identifier=None,
 )
