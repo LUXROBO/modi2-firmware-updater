@@ -123,7 +123,7 @@ class PopupMessageBox(QtWidgets.QMessageBox):
     #     self.window.stream.thread_signal.emit(True)
     # @pyqtSlot(object)
     # def restart_update(self, click):
-    #     self.window.update_network_stm32.clicked(click)
+    #     self.window.update_network_button.clicked(click)
 
 
 class ThreadSignal(QObject):
@@ -168,7 +168,7 @@ class Form(QDialog):
         self.ui.lux_logo.setPixmap(qPixmapVar)
 
         self.esp32_upload_list_form = ESP32UpdateListForm(esp32_upload_list_ui_path, self.component_path)
-        self.module_upload_list_form = STM32UpdateListForm(module_upload_list_ui_path, self.component_path)
+        self.module_upload_list_form = ModuleUpdateListForm(module_upload_list_ui_path, self.component_path)
 
         # Buttons image
         self.active_path = pathlib.PurePosixPath(self.component_path, "btn_frame_active.png")
@@ -177,16 +177,22 @@ class Form(QDialog):
         self.language_frame_path = pathlib.PurePosixPath(self.component_path, "lang_frame.png")
         self.language_frame_pressed_path = pathlib.PurePosixPath(self.component_path, "lang_frame_pressed.png")
 
-        self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.module_type_combobox.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_network_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         self.ui.console.setStyleSheet("font-size: 10px")
 
-        self.ui.setWindowTitle("MODI2 Multi Uploader")
+        version_path = path.join(path.dirname(__file__), "..", "version.txt")
+        with open(version_path, "r") as version_file:
+            version_info = version_file.readline().lstrip("v").rstrip("\n")
+
+        self.ui.setWindowTitle("MODI+ Multi Uploader - v" + version_info)
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         # Redirect stdout to text browser (i.e. console in our UI)
@@ -201,27 +207,29 @@ class Form(QDialog):
         self.stream = ThreadSignal()
 
         # Connect up the buttons
-        self.ui.update_network_esp32.clicked.connect(self.update_network_esp32)
-        self.ui.update_network_esp32_interpreter.clicked.connect(self.update_network_esp32_interpreter)
-        self.ui.update_stm32_modules.clicked.connect(self.update_stm32_modules)
-        self.ui.update_network_stm32.clicked.connect(self.update_network_stm32)
-        self.ui.update_network_stm32_bootloader.clicked.connect(self.update_network_bootloader_stm32)
+        self.ui.update_network_esp32_button.clicked.connect(self.update_network_esp32)
+        self.ui.update_network_esp32_interpreter_button.clicked.connect(self.update_network_esp32_interpreter)
+        self.ui.change_modules_type_button.clicked.connect(self.change_modules_type)
+        self.ui.update_modules_button.clicked.connect(self.update_modules)
+        self.ui.update_network_button.clicked.connect(self.update_network)
+        self.ui.update_network_bootloader_button.clicked.connect(self.update_network_bootloader)
         self.ui.translate_button.clicked.connect(self.translate_button_text)
         self.ui.devmode_button.clicked.connect(self.dev_mode_button)
 
         self.buttons = [
-            self.ui.update_network_esp32,
-            self.ui.update_network_esp32_interpreter,
-            self.ui.update_stm32_modules,
-            self.ui.update_network_stm32,
-            self.ui.update_network_stm32_bootloader,
+            self.ui.update_network_esp32_button,
+            self.ui.update_network_esp32_interpreter_button,
+            self.ui.change_modules_type_button,
+            self.ui.update_modules_button,
+            self.ui.update_network_button,
+            self.ui.update_network_bootloader_button,
             self.ui.devmode_button,
             self.ui.translate_button,
         ]
 
         # Disable the first button to be focused when UI is loaded
-        self.ui.update_network_esp32.setAutoDefault(False)
-        self.ui.update_network_esp32.setDefault(False)
+        self.ui.update_network_esp32_button.setAutoDefault(False)
+        self.ui.update_network_esp32_button.setDefault(False)
 
         # Print init status
         time_now_str = time.strftime("[%Y/%m/%d@%X]", time.localtime())
@@ -278,7 +286,7 @@ class Form(QDialog):
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.esp32_upload_list_form.ui.show()
             return
-        self.ui.update_network_esp32.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
         print("ESP32 Firmware Updater has been initialized for esp update!")
         th.Thread(
@@ -305,7 +313,7 @@ class Form(QDialog):
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.esp32_upload_list_form.ui.show()
             return
-        self.ui.update_network_esp32_interpreter.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
         print("ESP32 Firmware Updater has been initialized for esp interpreter update!")
         th.Thread(
@@ -327,14 +335,15 @@ class Form(QDialog):
         ).start()
         self.firmware_updater = esp32_updater
 
-    def update_stm32_modules(self):
+    def change_modules_type(self):
+        module_type = self.ui.module_type_combobox.currentText()
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.module_upload_list_form.ui.show()
             return
-        self.ui.update_stm32_modules.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
-        print("STM32 Firmware Updater has been initialized for module update!")
+        print(f"Module Firmware Updater has been initialized for changing module type to {module_type}")
         th.Thread(
             target=self.__click_motion, args=(2, button_start), daemon=True
         ).start()
@@ -345,25 +354,53 @@ class Form(QDialog):
 
         self.module_upload_list_form.reset_device_list()
         self.module_upload_list_form.ui.show()
-        stm32_updater = ModuleFirmwareMultiUpdater()
-        stm32_updater.set_ui(self.ui, self.module_upload_list_form)
+        module_updater = ModuleFirmwareMultiUpdater()
+        module_updater.set_ui(self.ui, self.module_upload_list_form)
         th.Thread(
-            target=stm32_updater.update_module_firmware,
-            args=(modi_ports, ),
+            target=module_updater.change_module_type,
+            args=(modi_ports, module_type),
             daemon=True
         ).start()
-        self.firmware_updater = stm32_updater
+        self.firmware_updater = module_updater
 
-    def update_network_stm32(self):
+
+    def update_modules(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.module_upload_list_form.ui.show()
             return
-        self.ui.update_network_stm32.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
-        print("STM32 Firmware Updater has been initialized for base update!")
+        print("Module Firmware Updater has been initialized for module update!")
         th.Thread(
             target=self.__click_motion, args=(3, button_start), daemon=True
+        ).start()
+
+        modi_ports = list_modi_ports()
+        if not modi_ports:
+            raise Exception("No MODI port is connected")
+
+        self.module_upload_list_form.reset_device_list()
+        self.module_upload_list_form.ui.show()
+        module_updater = ModuleFirmwareMultiUpdater()
+        module_updater.set_ui(self.ui, self.module_upload_list_form)
+        th.Thread(
+            target=module_updater.update_module_firmware,
+            args=(modi_ports, ),
+            daemon=True
+        ).start()
+        self.firmware_updater = module_updater
+
+    def update_network(self):
+        button_start = time.time()
+        if self.firmware_updater and self.firmware_updater.update_in_progress:
+            self.module_upload_list_form.ui.show()
+            return
+        self.ui.update_network_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.console.clear()
+        print("Network Firmware Updater has been initialized for base update!")
+        th.Thread(
+            target=self.__click_motion, args=(4, button_start), daemon=True
         ).start()
 
         modi_ports = list_modi_ports()
@@ -381,16 +418,16 @@ class Form(QDialog):
         ).start()
         self.firmware_updater = network_updater
 
-    def update_network_bootloader_stm32(self):
+    def update_network_bootloader(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             self.module_upload_list_form.ui.show()
             return
-        self.ui.update_network_stm32_bootloader.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
         self.ui.console.clear()
-        print("STM32 Firmware Updater has been initialized for base update!")
+        print("Network Firmware Updater has been initialized for base update!")
         th.Thread(
-            target=self.__click_motion, args=(4, button_start), daemon=True
+            target=self.__click_motion, args=(5, button_start), daemon=True
         ).start()
 
         modi_ports = list_modi_ports()
@@ -412,7 +449,7 @@ class Form(QDialog):
         button_start = time.time()
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path});font-size: 13px")
         th.Thread(
-            target=self.__click_motion, args=(5, button_start), daemon=True
+            target=self.__click_motion, args=(6, button_start), daemon=True
         ).start()
         if self.console:
             self.ui.console.hide()
@@ -426,20 +463,22 @@ class Form(QDialog):
         button_start = time.time()
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path}); font-size: 13px")
         th.Thread(
-            target=self.__click_motion, args=(6, button_start), daemon=True
+            target=self.__click_motion, args=(7, button_start), daemon=True
         ).start()
         button_en = [
             "Update Network ESP32",
             "Update Network ESP32 Interpreter",
-            "Update STM32 Modules",
-            "Update Network STM32",
-            "Set Network Bootloader STM32",
+            "Change Modules Type",
+            "Update Modules",
+            "Update Network",
+            "Set Network Bootloader",
             "Dev Mode",
             "한국어",
         ]
         button_kr = [
             "네트워크 모듈 업데이트",
             "네트워크 모듈 인터프리터 초기화",
+            "모듈 타입 변경",
             "모듈 초기화",
             "네트워크 모듈 초기화",
             "네트워크 모듈 부트로더",
@@ -571,73 +610,82 @@ class Form(QDialog):
             return False
 
     def __check_module_version(self):
-        try:
-            local_version_info = None
-            latest_version_info = None
+        # try:
+        #     local_version_info = None
+        #     latest_version_info = None
 
-            with ur.urlopen(self.latest_module_version_path, timeout=5) as conn:
-                latest_version_name = conn.read().decode("utf8")
-                latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
+        #     with ur.urlopen(self.latest_module_version_path, timeout=5) as conn:
+        #         latest_version_name = conn.read().decode("utf8")
+        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
 
-            if os.path.exists(self.local_module_firmware_path):
-                with open(self.local_module_version_path) as version_file:
-                    local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-            else:
-                os.mkdir(self.local_module_firmware_path)
+        #     if os.path.exists(self.local_module_firmware_path):
+        #         with open(self.local_module_version_path) as version_file:
+        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
+        #     else:
+        #         os.mkdir(self.local_module_firmware_path)
 
-            if (local_version_info == None) or (local_version_info != latest_version_info):
-                self.__download_module_firmware()
+        #     if (local_version_info == None) or (local_version_info != latest_version_info):
+        #         self.__download_module_firmware()
 
-        except URLError:
-            if not os.path.exists(self.local_module_firmware_path):
-                assert_path = path.join(path.dirname(__file__), "assets", "firmware", "stm32")
-                shutil.copytree(assert_path, self.local_module_firmware_path)
+        # except URLError:
+        #     if not os.path.exists(self.local_module_firmware_path):
+        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
+        #         shutil.copytree(assert_path, self.local_module_firmware_path)
+        if not os.path.exists(self.local_module_firmware_path):
+            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
+            shutil.copytree(assert_path, self.local_module_firmware_path)
 
     def __check_network_base_version(self):
-        try:
-            local_version_info = None
-            latest_version_info = None
+        # try:
+        #     local_version_info = None
+        #     latest_version_info = None
 
-            with ur.urlopen(self.latest_network_version_path, timeout=5) as conn:
-                latest_version_name = conn.read().decode("utf8")
-                latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
+        #     with ur.urlopen(self.latest_network_version_path, timeout=5) as conn:
+        #         latest_version_name = conn.read().decode("utf8")
+        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
 
-            if os.path.exists(self.local_network_firmware_path):
-                with open(self.local_module_version_path) as version_file:
-                    local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-            else:
-                os.mkdir(self.local_network_firmware_path)
+        #     if os.path.exists(self.local_network_firmware_path):
+        #         with open(self.local_module_version_path) as version_file:
+        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
+        #     else:
+        #         os.mkdir(self.local_network_firmware_path)
 
-            if (local_version_info == None) or (local_version_info != latest_version_info):
-                self.__download_network_firmware()
+        #     if (local_version_info == None) or (local_version_info != latest_version_info):
+        #         self.__download_network_firmware()
 
-        except URLError:
-            if not os.path.exists(self.local_network_firmware_path):
-                assert_path = path.join(path.dirname(__file__), "assets", "firmware", "stm32")
-                shutil.copytree(assert_path, self.local_network_firmware_path)
+        # except URLError:
+        #     if not os.path.exists(self.local_network_firmware_path):
+        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
+        #         shutil.copytree(assert_path, self.local_network_firmware_path)
+        if not os.path.exists(self.local_network_firmware_path):
+            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
+            shutil.copytree(assert_path, self.local_network_firmware_path)
 
     def __check_esp32_version(self):
-        try:
-            local_version_info = None
-            latest_version_info = None
+        # try:
+        #     local_version_info = None
+        #     latest_version_info = None
 
-            with ur.urlopen(self.latest_esp32_version_path, timeout=5) as conn:
-                latest_version_name = conn.read().decode("utf8")
-                latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
+        #     with ur.urlopen(self.latest_esp32_version_path, timeout=5) as conn:
+        #         latest_version_name = conn.read().decode("utf8")
+        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
 
-            if os.path.exists(self.local_esp32_firmware_path):
-                with open(self.local_module_version_path) as version_file:
-                    local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-            else:
-                os.mkdir(self.local_esp32_firmware_path)
+        #     if os.path.exists(self.local_esp32_firmware_path):
+        #         with open(self.local_module_version_path) as version_file:
+        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
+        #     else:
+        #         os.mkdir(self.local_esp32_firmware_path)
 
-            if (local_version_info == None) or (local_version_info != latest_version_info):
-                self.__download_esp32_firmware()
+        #     if (local_version_info == None) or (local_version_info != latest_version_info):
+        #         self.__download_esp32_firmware()
 
-        except URLError:
-            if not os.path.exists(self.local_esp32_firmware_path):
-                assert_path = path.join(path.dirname(__file__), "assets", "firmware", "esp32")
-                shutil.copytree(assert_path, self.local_esp32_firmware_path)
+        # except URLError:
+        #     if not os.path.exists(self.local_esp32_firmware_path):
+        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "esp32")
+        #         shutil.copytree(assert_path, self.local_esp32_firmware_path)
+        if not os.path.exists(self.local_esp32_firmware_path):
+            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "esp32")
+            shutil.copytree(assert_path, self.local_esp32_firmware_path)
     #
     # Helper functions
     #
@@ -693,12 +741,12 @@ class Form(QDialog):
         while time.time() - start_time < 0.2:
             pass
 
-        if button_type in [5, 6]:
+        if button_type in [6, 7]:
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         else:
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
             for i, q_button in enumerate(self.buttons):
-                if i in [button_type, 5, 6]:
+                if i in [button_type, 6, 7]:
                     continue
                 q_button.setStyleSheet(f"border-image: url({self.inactive_path}); font-size: 16px")
                 q_button.setEnabled(False)
@@ -892,7 +940,7 @@ class ESP32UpdateListForm(QDialog):
         self.ui_error_message_list[index].setText(error_message)
 
 
-class STM32UpdateListForm(QDialog):
+class ModuleUpdateListForm(QDialog):
     network_state_signal = pyqtSignal(int, int)
     network_uuid_signal = pyqtSignal(int, str)
     current_module_changed_signal = pyqtSignal(int, str)
