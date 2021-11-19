@@ -460,7 +460,6 @@ class ModuleFirmwareUpdater:
             if self.ui:
                 update_module_num = len(self.modules_to_update)
                 num_updated = len(self.modules_updated)
-                print(update_module_num, "\t", num_updated)
                 if self.ui.is_english:
                     self.ui.change_modules_type_button.setText(
                         f"Changing modules type is in progress. "
@@ -491,9 +490,9 @@ class ModuleFirmwareUpdater:
             while self.change_type_success_flag == False:
                 if ((timeout % 10) == 0) and (timeout != 0):
                     self.send_change_type(module_id, uuid_changed_with_type)
-                    time.sleep(0.01)
+                    time.sleep(0.1)
                     self.__conn.send_nowait(reboot_message)
-                if ((timeout >= 50) == 0):
+                if timeout >= 50:
                     timeout = 0
                     self.update_error_message = "Response timed-out"
                     if self.raise_error_message:
@@ -865,6 +864,8 @@ class ModuleFirmwareUpdater:
         module_uuid = unpack_data(data, (6, 1))[0]
         module_id = sid
         module_type = get_module_type_from_uuid(module_uuid)
+
+        # print("warning!\tuuid = ", hex(module_uuid))
 
         if module_type == "network":
             self.network_uuid = module_uuid
