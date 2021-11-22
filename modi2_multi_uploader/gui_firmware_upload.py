@@ -319,15 +319,20 @@ class Form(QDialog):
 
         self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32")
         self.esp32_upload_list_form.reset_device_list()
-        esp32_updater = ESP32FirmwareMultiUploder()
-        esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
-        esp32_updater.set_task_end_callback(self.__end_task)
+
+        def run_task(self, modi_ports):
+            esp32_updater = ESP32FirmwareMultiUploder()
+            esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
+            esp32_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = esp32_updater
+            esp32_updater.update_firmware(modi_ports, False)
+
         th.Thread(
-            target=esp32_updater.update_firmware,
-            args=(modi_ports, ),
+            target=run_task,
+            args=(self, modi_ports),
             daemon=True
         ).start()
-        self.firmware_updater = esp32_updater
+
         self.esp32_upload_list_form.ui.exec_()
 
     def update_network_esp32_interpreter(self):
@@ -348,15 +353,20 @@ class Form(QDialog):
 
         self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32 Interpreter")
         self.esp32_upload_list_form.reset_device_list()
-        esp32_updater = ESP32FirmwareMultiUploder()
-        esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
-        esp32_updater.set_task_end_callback(self.__end_task)
+
+        def run_task(self, modi_ports):
+            esp32_updater = ESP32FirmwareMultiUploder()
+            esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
+            esp32_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = esp32_updater
+            esp32_updater.update_firmware(modi_ports, True)
+
         th.Thread(
-            target=esp32_updater.update_firmware,
-            args=(modi_ports, True,),
+            target=run_task,
+            args=(self, modi_ports),
             daemon=True
         ).start()
-        self.firmware_updater = esp32_updater
+
         self.esp32_upload_list_form.ui.exec_()
 
     def change_modules_type(self):
@@ -378,17 +388,21 @@ class Form(QDialog):
 
         self.module_upload_list_form.ui.setWindowTitle("Change Modules Type")
         self.module_upload_list_form.reset_device_list()
-        module_updater = ModuleFirmwareMultiUpdater()
-        module_updater.set_ui(self.ui, self.module_upload_list_form)
-        module_updater.set_task_end_callback(self.__end_task)
+
+        def run_task(self, modi_ports, module_type):
+            module_updater = ModuleFirmwareMultiUpdater()
+            module_updater.set_ui(self.ui, self.module_upload_list_form)
+            module_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = module_updater
+            module_updater.change_module_type(modi_ports, module_type)
+
         th.Thread(
-            target=module_updater.change_module_type,
-            args=(modi_ports, module_type),
+            target=run_task,
+            args=(self, modi_ports, module_type),
             daemon=True
         ).start()
-        self.firmware_updater = module_updater
-        self.module_upload_list_form.ui.exec_()
 
+        self.module_upload_list_form.ui.exec_()
 
     def update_modules(self):
         button_start = time.time()
@@ -404,18 +418,25 @@ class Form(QDialog):
 
         modi_ports = list_modi_ports()
         if not modi_ports:
+            self.__reset_ui(self.module_upload_list_form)
             raise Exception("No MODI port is connected")
+
         self.module_upload_list_form.ui.setWindowTitle("Update Modules")
         self.module_upload_list_form.reset_device_list()
-        module_updater = ModuleFirmwareMultiUpdater()
-        module_updater.set_ui(self.ui, self.module_upload_list_form)
-        module_updater.set_task_end_callback(self.__end_task)
+
+        def run_task(self, modi_ports):
+            module_updater = ModuleFirmwareMultiUpdater()
+            module_updater.set_ui(self.ui, self.module_upload_list_form)
+            module_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = module_updater
+            module_updater.update_module_firmware(modi_ports)
+
         th.Thread(
-            target=module_updater.update_module_firmware,
-            args=(modi_ports, ),
+            target=run_task,
+            args=(self, modi_ports),
             daemon=True
         ).start()
-        self.firmware_updater = module_updater
+
         self.module_upload_list_form.ui.exec_()
 
     def update_network(self):
@@ -436,15 +457,20 @@ class Form(QDialog):
 
         self.module_upload_list_form.ui.setWindowTitle("Update Network Modules")
         self.module_upload_list_form.reset_device_list()
-        network_updater = NetworkFirmwareMultiUpdater()
-        network_updater.set_ui(self.ui, self.module_upload_list_form)
-        network_updater.set_task_end_callback(self.__end_task)
+
+        def run_task(self, modi_ports):
+            network_updater = NetworkFirmwareMultiUpdater()
+            network_updater.set_ui(self.ui, self.module_upload_list_form)
+            network_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = network_updater
+            network_updater.update_module_firmware(modi_ports, False)
+
         th.Thread(
-            target=network_updater.update_module_firmware,
-            args=(modi_ports, False),
-            daemon=True,
+            target=run_task,
+            args=(self, modi_ports),
+            daemon=True
         ).start()
-        self.firmware_updater = network_updater
+
         self.module_upload_list_form.ui.exec_()
 
     def update_network_bootloader(self):
@@ -465,15 +491,20 @@ class Form(QDialog):
 
         self.module_upload_list_form.ui.setWindowTitle("Set Network Bootloader")
         self.module_upload_list_form.reset_device_list()
-        network_updater = NetworkFirmwareMultiUpdater()
-        network_updater.set_ui(self.ui, self.module_upload_list_form)
-        network_updater.set_task_end_callback(self.__end_task)
+
+        def run_task(self, modi_ports):
+            network_updater = NetworkFirmwareMultiUpdater()
+            network_updater.set_ui(self.ui, self.module_upload_list_form)
+            network_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = network_updater
+            network_updater.update_module_firmware(modi_ports, True)
+
         th.Thread(
-            target=network_updater.update_module_firmware,
-            args=(modi_ports, True),
-            daemon=True,
+            target=run_task,
+            args=(self, modi_ports),
+            daemon=True
         ).start()
-        self.firmware_updater = network_updater
+
         self.module_upload_list_form.ui.exec_()
 
     def dev_mode_button(self):
@@ -770,7 +801,7 @@ class Form(QDialog):
                 q_button.setStyleSheet(f"border-image: url({self.inactive_path}); font-size: 16px")
                 q_button.setEnabled(False)
 
-    def __end_task(self, list_ui = None):
+    def __reset_ui(self, list_ui = None):
         self.ui.module_type_combobox.setEnabled(True)
         for i, q_button in enumerate(self.buttons):
             if i in [6, 7]:
