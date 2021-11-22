@@ -196,12 +196,12 @@ class Form(QDialog):
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         # Redirect stdout to text browser (i.e. console in our UI)
-        self.stdout = StdoutRedirect()
-        self.stdout.start()
-        self.stdout.printOccur.connect(
-            lambda line: self.__append_text_line(line)
-        )
-        self.stdout.logger = self.logger
+        # self.stdout = StdoutRedirect()
+        # self.stdout.start()
+        # self.stdout.printOccur.connect(
+        #     lambda line: self.__append_text_line(line)
+        # )
+        # self.stdout.logger = self.logger
 
         # Set signal for thread communication
         self.stream = ThreadSignal()
@@ -298,7 +298,6 @@ class Form(QDialog):
             raise Exception("No MODI port is connected")
 
         self.esp32_upload_list_form.reset_device_list()
-        self.esp32_upload_list_form.ui.show()
         esp32_updater = ESP32FirmwareMultiUploder()
         esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
         th.Thread(
@@ -307,6 +306,7 @@ class Form(QDialog):
             daemon=True
         ).start()
         self.firmware_updater = esp32_updater
+        self.esp32_upload_list_form.ui.exec_()
 
     def update_network_esp32_interpreter(self):
         button_start = time.time()
@@ -325,7 +325,6 @@ class Form(QDialog):
             raise Exception("No MODI port is connected")
 
         self.esp32_upload_list_form.reset_device_list()
-        self.esp32_upload_list_form.ui.show()
         esp32_updater = ESP32FirmwareMultiUploder()
         esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
         th.Thread(
@@ -334,6 +333,7 @@ class Form(QDialog):
             daemon=True
         ).start()
         self.firmware_updater = esp32_updater
+        self.esp32_upload_list_form.ui.exec_()
 
     def change_modules_type(self):
         module_type = self.ui.module_type_combobox.currentText()
@@ -353,7 +353,6 @@ class Form(QDialog):
             raise Exception("No MODI port is connected")
 
         self.module_upload_list_form.reset_device_list()
-        self.module_upload_list_form.ui.show()
         module_updater = ModuleFirmwareMultiUpdater()
         module_updater.set_ui(self.ui, self.module_upload_list_form)
         th.Thread(
@@ -362,6 +361,7 @@ class Form(QDialog):
             daemon=True
         ).start()
         self.firmware_updater = module_updater
+        self.module_upload_list_form.ui.exec_()
 
 
     def update_modules(self):
@@ -381,7 +381,6 @@ class Form(QDialog):
             raise Exception("No MODI port is connected")
 
         self.module_upload_list_form.reset_device_list()
-        self.module_upload_list_form.ui.show()
         module_updater = ModuleFirmwareMultiUpdater()
         module_updater.set_ui(self.ui, self.module_upload_list_form)
         th.Thread(
@@ -390,6 +389,7 @@ class Form(QDialog):
             daemon=True
         ).start()
         self.firmware_updater = module_updater
+        self.module_upload_list_form.ui.exec_()
 
     def update_network(self):
         button_start = time.time()
@@ -408,7 +408,6 @@ class Form(QDialog):
             raise Exception("No MODI port is connected")
 
         self.module_upload_list_form.reset_device_list()
-        self.module_upload_list_form.ui.show()
         network_updater = NetworkFirmwareMultiUpdater()
         network_updater.set_ui(self.ui, self.module_upload_list_form)
         th.Thread(
@@ -417,6 +416,7 @@ class Form(QDialog):
             daemon=True,
         ).start()
         self.firmware_updater = network_updater
+        self.module_upload_list_form.ui.exec_()
 
     def update_network_bootloader(self):
         button_start = time.time()
@@ -435,7 +435,6 @@ class Form(QDialog):
             raise Exception("No MODI port is connected")
 
         self.module_upload_list_form.reset_device_list()
-        self.module_upload_list_form.ui.show()
         network_updater = NetworkFirmwareMultiUpdater()
         network_updater.set_ui(self.ui, self.module_upload_list_form)
         th.Thread(
@@ -444,6 +443,7 @@ class Form(QDialog):
             daemon=True,
         ).start()
         self.firmware_updater = network_updater
+        self.module_upload_list_form.ui.exec_()
 
     def dev_mode_button(self):
         button_start = time.time()

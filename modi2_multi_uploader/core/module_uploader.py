@@ -263,9 +263,7 @@ class ModuleFirmwareUpdater:
         self.modules_updated.append((module_id, module_type))
 
         # Init base root_path, utilizing local binary files
-        root_path = path.join(
-            path.dirname(__file__), "..", "assets", "firmware", "latest", "module"
-        )
+        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest", "module")
 
         if self.__is_os_update:
             bin_path = path.join(root_path, f"{module_type.lower()}.bin")
@@ -653,9 +651,7 @@ class ModuleFirmwareUpdater:
             crc32 >>= 8
             crc32_and_page_addr_data[4 + i] = page_addr & 0xFF
             page_addr >>= 8
-        message["b"] = b64encode(bytes(crc32_and_page_addr_data)).decode(
-            "utf-8"
-        )
+        message["b"] = b64encode(bytes(crc32_and_page_addr_data)).decode("utf-8")
         message["l"] = 8
 
         return json.dumps(message, separators=(",", ":"))
@@ -684,9 +680,7 @@ class ModuleFirmwareUpdater:
         message["s"] = 0
         message["d"] = did
         send_data = int.to_bytes(changed_uuid, byteorder="little", length=8)
-        message["b"] = b64encode(bytes(send_data)).decode(
-            "utf-8"
-        )
+        message["b"] = b64encode(bytes(send_data)).decode("utf-8")
         message["l"] = 8
 
         return json.dumps(message, separators=(",", ":"))
@@ -714,12 +708,8 @@ class ModuleFirmwareUpdater:
         changed_uuid_: int = 0,
     ) -> bool:
         # Send firmware command request
-        request_message = self.change_type_command(
-            did = module_id, changed_uuid = changed_uuid_
-        )
+        request_message = self.change_type_command(did = module_id, changed_uuid = changed_uuid_)
         self.__conn.send_nowait(request_message)
-
-        #return self.receive_command_response()
 
     def send_firmware_command(
         self,
@@ -731,9 +721,7 @@ class ModuleFirmwareUpdater:
     ) -> bool:
         rot_scmd = 2 if oper_type == "erase" else 1
         # Send firmware command request
-        request_message = self.get_firmware_command(
-            module_id, 1, rot_scmd, crc_val, page_addr=dest_addr + page_addr
-        )
+        request_message = self.get_firmware_command(module_id, 1, rot_scmd, crc_val, page_addr=dest_addr + page_addr)
         self.__conn.send_nowait(request_message)
 
         return self.receive_command_response()
@@ -947,7 +935,8 @@ class ModuleFirmwareMultiUpdater():
                 if module_uploader.update_in_progress:
                     if module_uploader.network_uuid:
                         self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
-                        self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+                        if self.list_ui:
+                            self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
                 if self.state[index] == -1:
                     # wait module list
                     is_done = False
@@ -1005,6 +994,8 @@ class ModuleFirmwareMultiUpdater():
                     self.state[index] = 2
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.module_uploaders)
+
+                time.sleep(0.05)
 
             if len(self.module_uploaders):
                 # print(f"\r{self.__progress_bar(total_progress, 100)}", end="")
