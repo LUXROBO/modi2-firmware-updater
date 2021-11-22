@@ -227,6 +227,28 @@ class Form(QDialog):
             self.ui.translate_button,
         ]
 
+        self.button_en = [
+            "Update Network ESP32",
+            "Update Network ESP32 Interpreter",
+            "Change Modules Type",
+            "Update Modules",
+            "Update Network Modules",
+            "Set Network Bootloader",
+            "Dev Mode",
+            "한국어",
+        ]
+
+        self.button_kr = [
+            "네트워크 모듈 업데이트",
+            "네트워크 모듈 인터프리터 초기화",
+            "모듈 타입 변경",
+            "모듈 초기화",
+            "네트워크 모듈 초기화",
+            "네트워크 모듈 부트로더",
+            "개발자 모드",
+            "English",
+        ]
+
         # Disable the first button to be focused when UI is loaded
         self.ui.update_network_esp32_button.setAutoDefault(False)
         self.ui.update_network_esp32_button.setDefault(False)
@@ -272,10 +294,8 @@ class Form(QDialog):
         self.check_module_firmware()
 
         # Set Button Status
-        self.translate_button_text()
-        self.translate_button_text()
-        self.dev_mode_button()
-        self.dev_mode_button()
+        self.refresh_button_text()
+        self.refresh_console()
         self.ui.show()
 
     #
@@ -297,6 +317,7 @@ class Form(QDialog):
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32")
         self.esp32_upload_list_form.reset_device_list()
         esp32_updater = ESP32FirmwareMultiUploder()
         esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
@@ -325,6 +346,7 @@ class Form(QDialog):
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32 Interpreter")
         self.esp32_upload_list_form.reset_device_list()
         esp32_updater = ESP32FirmwareMultiUploder()
         esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
@@ -354,6 +376,7 @@ class Form(QDialog):
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.module_upload_list_form.ui.setWindowTitle("Change Modules Type")
         self.module_upload_list_form.reset_device_list()
         module_updater = ModuleFirmwareMultiUpdater()
         module_updater.set_ui(self.ui, self.module_upload_list_form)
@@ -382,7 +405,7 @@ class Form(QDialog):
         modi_ports = list_modi_ports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
-
+        self.module_upload_list_form.ui.setWindowTitle("Update Modules")
         self.module_upload_list_form.reset_device_list()
         module_updater = ModuleFirmwareMultiUpdater()
         module_updater.set_ui(self.ui, self.module_upload_list_form)
@@ -411,6 +434,7 @@ class Form(QDialog):
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.module_upload_list_form.ui.setWindowTitle("Update Network Modules")
         self.module_upload_list_form.reset_device_list()
         network_updater = NetworkFirmwareMultiUpdater()
         network_updater.set_ui(self.ui, self.module_upload_list_form)
@@ -439,6 +463,7 @@ class Form(QDialog):
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.module_upload_list_form.ui.setWindowTitle("Set Network Bootloader")
         self.module_upload_list_form.reset_device_list()
         network_updater = NetworkFirmwareMultiUpdater()
         network_updater.set_ui(self.ui, self.module_upload_list_form)
@@ -457,13 +482,16 @@ class Form(QDialog):
         th.Thread(
             target=self.__click_motion, args=(6, button_start), daemon=True
         ).start()
-        if self.console:
-            self.ui.console.hide()
-            self.ui.setFixedHeight(600)
-        else:
-            self.ui.console.show()
-            self.ui.setFixedHeight(780)
         self.console = not self.console
+        self.refresh_console()
+
+    def refresh_console(self):
+        if self.console:
+            self.ui.console.show()
+            self.ui.setFixedHeight(720)
+        else:
+            self.ui.console.hide()
+            self.ui.setFixedHeight(640)
 
     def translate_button_text(self):
         button_start = time.time()
@@ -471,31 +499,15 @@ class Form(QDialog):
         th.Thread(
             target=self.__click_motion, args=(7, button_start), daemon=True
         ).start()
-        button_en = [
-            "Update Network ESP32",
-            "Update Network ESP32 Interpreter",
-            "Change Modules Type",
-            "Update Modules",
-            "Update Network",
-            "Set Network Bootloader",
-            "Dev Mode",
-            "한국어",
-        ]
-        button_kr = [
-            "네트워크 모듈 업데이트",
-            "네트워크 모듈 인터프리터 초기화",
-            "모듈 타입 변경",
-            "모듈 초기화",
-            "네트워크 모듈 초기화",
-            "네트워크 모듈 부트로더",
-            "개발자 모드",
-            "English",
-        ]
-        appropriate_translation = (
-            button_kr if self.button_in_english else button_en
-        )
+
         self.button_in_english = not self.button_in_english
         self.ui.is_english = not self.ui.is_english
+        self.refresh_button_text()
+
+    def refresh_button_text(self):
+        appropriate_translation = (
+            self.button_en if self.button_in_english else self.button_kr
+        )
         for i, button in enumerate(self.buttons):
             button.setText(appropriate_translation[i])
 
@@ -750,6 +762,7 @@ class Form(QDialog):
         if button_type in [6, 7]:
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         else:
+            self.ui.module_type_combobox.setEnabled(False)
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
             for i, q_button in enumerate(self.buttons):
                 if i in [button_type, 6, 7]:
@@ -757,7 +770,8 @@ class Form(QDialog):
                 q_button.setStyleSheet(f"border-image: url({self.inactive_path}); font-size: 16px")
                 q_button.setEnabled(False)
 
-    def __end_task(self, list_ui):
+    def __end_task(self, list_ui = None):
+        self.ui.module_type_combobox.setEnabled(True)
         for i, q_button in enumerate(self.buttons):
             if i in [6, 7]:
                 continue
@@ -765,9 +779,9 @@ class Form(QDialog):
             q_button.setEnabled(True)
 
         # refresh language
-        self.translate_button_text()
-        self.translate_button_text()
+        self.refresh_button_text()
 
+        # reset list ui
         if list_ui == self.module_upload_list_form:
             self.module_upload_list_form.ui.close_button.setEnabled(True)
             self.module_upload_list_form.total_status_signal.emit("Complete")

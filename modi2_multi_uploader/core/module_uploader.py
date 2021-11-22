@@ -183,7 +183,6 @@ class ModuleFirmwareUpdater:
         self.__conn.send_nowait(firmware_update_message)
         time.sleep(0.01)
         self.__print("Firmware update has been requested")
-        print("Firmware update has been requested")
 
     def request_to_change_module_type(self, module_id, module_type) -> None:
         self.change_type_target = get_module_uuid_from_type(module_type)
@@ -195,7 +194,6 @@ class ModuleFirmwareUpdater:
         self.__conn.send_nowait(firmware_update_message)
         time.sleep(0.01)
         self.__print("Change module type has been requested")
-        print("Change module type has been requested")
 
     def check_to_update_firmware(self, module_id: int) -> None:
         firmware_update_ready_message = self.__set_module_state(
@@ -978,7 +976,6 @@ class ModuleFirmwareMultiUpdater():
                             self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
                     else:
                         self.state[index] = 1
-
                 elif self.state[index] == 1:
                     # end
                     is_done = False
@@ -999,7 +996,7 @@ class ModuleFirmwareMultiUpdater():
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.module_uploaders)
 
-                time.sleep(0.05)
+                time.sleep(0.001)
 
             if len(self.module_uploaders):
                 print(f"{self.__progress_bar(total_progress, 100)}", end="")
@@ -1110,7 +1107,6 @@ class ModuleFirmwareMultiUpdater():
                             self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
                     else:
                         self.state[index] = 1
-
                 elif self.state[index] == 1:
                     # end
                     is_done = False
@@ -1130,6 +1126,8 @@ class ModuleFirmwareMultiUpdater():
                     self.state[index] = 2
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.module_uploaders)
+
+                time.sleep(0.001)
 
             if len(self.module_uploaders):
                 print(f"{self.__progress_bar(total_progress, 100)}", end="")

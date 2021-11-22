@@ -846,6 +846,7 @@ class NetworkFirmwareMultiUpdater():
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.network_updaters)
 
+                time.sleep(0.001)
 
             if len(self.network_updaters):
                 print(f"{self.__progress_bar(total_progress, 100)}", end="")
