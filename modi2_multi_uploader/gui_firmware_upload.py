@@ -300,6 +300,7 @@ class Form(QDialog):
         self.esp32_upload_list_form.reset_device_list()
         esp32_updater = ESP32FirmwareMultiUploder()
         esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
+        esp32_updater.set_task_end_callback(self.__end_task)
         th.Thread(
             target=esp32_updater.update_firmware,
             args=(modi_ports, ),
@@ -327,6 +328,7 @@ class Form(QDialog):
         self.esp32_upload_list_form.reset_device_list()
         esp32_updater = ESP32FirmwareMultiUploder()
         esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
+        esp32_updater.set_task_end_callback(self.__end_task)
         th.Thread(
             target=esp32_updater.update_firmware,
             args=(modi_ports, True,),
@@ -355,6 +357,7 @@ class Form(QDialog):
         self.module_upload_list_form.reset_device_list()
         module_updater = ModuleFirmwareMultiUpdater()
         module_updater.set_ui(self.ui, self.module_upload_list_form)
+        module_updater.set_task_end_callback(self.__end_task)
         th.Thread(
             target=module_updater.change_module_type,
             args=(modi_ports, module_type),
@@ -383,6 +386,7 @@ class Form(QDialog):
         self.module_upload_list_form.reset_device_list()
         module_updater = ModuleFirmwareMultiUpdater()
         module_updater.set_ui(self.ui, self.module_upload_list_form)
+        module_updater.set_task_end_callback(self.__end_task)
         th.Thread(
             target=module_updater.update_module_firmware,
             args=(modi_ports, ),
@@ -410,6 +414,7 @@ class Form(QDialog):
         self.module_upload_list_form.reset_device_list()
         network_updater = NetworkFirmwareMultiUpdater()
         network_updater.set_ui(self.ui, self.module_upload_list_form)
+        network_updater.set_task_end_callback(self.__end_task)
         th.Thread(
             target=network_updater.update_module_firmware,
             args=(modi_ports, False),
@@ -437,6 +442,7 @@ class Form(QDialog):
         self.module_upload_list_form.reset_device_list()
         network_updater = NetworkFirmwareMultiUpdater()
         network_updater.set_ui(self.ui, self.module_upload_list_form)
+        network_updater.set_task_end_callback(self.__end_task)
         th.Thread(
             target=network_updater.update_module_firmware,
             args=(modi_ports, True),
@@ -750,6 +756,27 @@ class Form(QDialog):
                     continue
                 q_button.setStyleSheet(f"border-image: url({self.inactive_path}); font-size: 16px")
                 q_button.setEnabled(False)
+
+    def __end_task(self, list_ui):
+        for i, q_button in enumerate(self.buttons):
+            if i in [6, 7]:
+                continue
+            q_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+            q_button.setEnabled(True)
+
+        # refresh language
+        self.translate_button_text()
+        self.translate_button_text()
+
+        if list_ui == self.module_upload_list_form:
+            self.module_upload_list_form.ui.close_button.setEnabled(True)
+            self.module_upload_list_form.total_status_signal.emit("Complete")
+            self.module_upload_list_form.total_progress_signal.emit(100)
+            pass
+        elif list_ui == self.esp32_upload_list_form:
+            self.esp32_upload_list_form.ui.close_button.setEnabled(True)
+            self.esp32_upload_list_form.total_status_signal.emit("Complete")
+            pass
 
     def __append_text_line(self, line):
         self.ui.console.moveCursor(

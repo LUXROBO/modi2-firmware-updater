@@ -4540,6 +4540,9 @@ class ESP32FirmwareMultiUploder():
         self.ui = ui
         self.list_ui = list_ui
 
+    def set_task_end_callback(self, task_end_callback):
+        self.task_end_callback = task_end_callback
+
     def update_firmware(self, modi_ports, update_interpreter=False, force=True):
         self.esp32_updaters = []
         self.network_uuid = []
@@ -4654,7 +4657,7 @@ class ESP32FirmwareMultiUploder():
                     self.list_ui.total_progress_signal.emit(current_sequence / total_sequence * 100.0)
                     self.list_ui.total_status_signal.emit("Uploading...")
 
-                print(f"\r{self.__progress_bar(current_sequence, total_sequence)}", end="")
+                print(f"{self.__progress_bar(current_sequence, total_sequence)}", end="")
 
             if is_done:
                 break
@@ -4663,42 +4666,8 @@ class ESP32FirmwareMultiUploder():
 
         self.update_in_progress = False
 
-        if self.list_ui:
-            self.list_ui.ui.close_button.setEnabled(True)
-            self.list_ui.total_status_signal.emit("Complete")
-
-        if update_interpreter:
-            if self.ui:
-                self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32_button.setEnabled(True)
-                self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.change_modules_type_button.setEnabled(True)
-                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_modules_button.setEnabled(True)
-                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_button.setEnabled(True)
-                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_bootloader_button.setEnabled(True)
-                if self.ui.is_english:
-                    self.ui.update_network_esp32_interpreter_button.setText("Update Network ESP32 Interpreter")
-                else:
-                    self.ui.update_network_esp32_interpreter_button.setText("네트워크 모듈 인터프리터 초기화")
-        else:
-            if self.ui:
-                self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32_interpreter_button.setEnabled(True)
-                self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.change_modules_type_button.setEnabled(True)
-                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_modules_button.setEnabled(True)
-                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_button.setEnabled(True)
-                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_bootloader_button.setEnabled(True)
-                if self.ui.is_english:
-                    self.ui.update_network_esp32_button.setText("Update Network ESP32")
-                else:
-                    self.ui.update_network_esp32_button.setText("네트워크 모듈 업데이트")
+        if self.list_ui and self.task_end_callback:
+            self.task_end_callback(self.list_ui)
 
         print("\nESP firmware update is complete!!")
 
@@ -4707,6 +4676,6 @@ class ESP32FirmwareMultiUploder():
         curr_bar = int(50 * current // total)
         rest_bar = int(50 - curr_bar)
         return (
-            f"Firmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] "
+            f"\rFirmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] "
             f"{100 * current / total:3.1f}%"
         )

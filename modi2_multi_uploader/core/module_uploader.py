@@ -885,10 +885,14 @@ class ModuleFirmwareMultiUpdater():
         self.update_in_progress = False
         self.ui = None
         self.list_ui = None
+        self.task_end_callback = None
 
     def set_ui(self, ui, list_ui):
         self.ui = ui
         self.list_ui = list_ui
+
+    def set_task_end_callback(self, task_end_callback):
+        self.task_end_callback = task_end_callback
 
     def update_module_firmware(self, modi_ports):
         self.module_uploaders = []
@@ -998,7 +1002,7 @@ class ModuleFirmwareMultiUpdater():
                 time.sleep(0.05)
 
             if len(self.module_uploaders):
-                # print(f"\r{self.__progress_bar(total_progress, 100)}", end="")
+                print(f"{self.__progress_bar(total_progress, 100)}", end="")
 
                 if self.ui:
                     if self.ui.is_english:
@@ -1017,28 +1021,8 @@ class ModuleFirmwareMultiUpdater():
 
         self.update_in_progress = False
 
-        if self.ui:
-            self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_button.setEnabled(True)
-            self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_interpreter_button.setEnabled(True)
-            self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.change_modules_type_button.setEnabled(True)
-            self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_button.setEnabled(True)
-            self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_bootloader_button.setEnabled(True)
-            if self.ui.is_english:
-                self.ui.update_modules_button.setText("Update Modules.")
-            else:
-                self.ui.update_modules_button.setText("모듈 초기화")
-
-        if self.list_ui:
-            self.list_ui.ui.close_button.setEnabled(True)
-            self.list_ui.total_status_signal.emit("Complete")
-            self.list_ui.total_progress_signal.emit(100)
-            for index, module_uploader in enumerate(self.module_uploaders):
-                self.list_ui.progress_signal.emit(index, 100, 100)
+        if self.list_ui and self.task_end_callback:
+            self.task_end_callback(self.list_ui)
 
         print("\nFirmware update is complete!!")
 
@@ -1148,7 +1132,7 @@ class ModuleFirmwareMultiUpdater():
                     total_progress += 100 / len(self.module_uploaders)
 
             if len(self.module_uploaders):
-                # print(f"\r{self.__progress_bar(total_progress, 100)}", end="")
+                print(f"{self.__progress_bar(total_progress, 100)}", end="")
 
                 if self.ui:
                     if self.ui.is_english:
@@ -1167,28 +1151,8 @@ class ModuleFirmwareMultiUpdater():
 
         self.update_in_progress = False
 
-        if self.ui:
-            self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_button.setEnabled(True)
-            self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_interpreter_button.setEnabled(True)
-            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_modules_button.setEnabled(True)
-            self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_button.setEnabled(True)
-            self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_bootloader_button.setEnabled(True)
-            if self.ui.is_english:
-                self.ui.change_modules_type_button.setText("Change Modules Type")
-            else:
-                self.ui.change_modules_type_button.setText("모듈 타입 변경")
-
-        if self.list_ui:
-            self.list_ui.ui.close_button.setEnabled(True)
-            self.list_ui.total_status_signal.emit("Complete")
-            self.list_ui.total_progress_signal.emit(100)
-            for index, module_uploader in enumerate(self.module_uploaders):
-                self.list_ui.progress_signal.emit(index, 100, 100)
+        if self.list_ui and self.task_end_callback:
+            self.task_end_callback(self.list_ui)
 
         print("\nFirmware update is complete!!")
 
@@ -1197,6 +1161,6 @@ class ModuleFirmwareMultiUpdater():
         curr_bar = int(50 * current // total)
         rest_bar = int(50 - curr_bar)
         return (
-            f"Firmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] "
+            f"\rFirmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] "
             f"{100 * current / total:3.1f}%"
         )
