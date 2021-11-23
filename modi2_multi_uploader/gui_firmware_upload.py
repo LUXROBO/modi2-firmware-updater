@@ -159,7 +159,7 @@ class Form(QDialog):
 
         self.ui.setStyleSheet("background-color: white")
         self.ui.console.hide()
-        self.ui.setFixedHeight(600)
+        self.ui.setFixedHeight(640)
 
         # Set LUXROBO logo image
         logo_path = os.path.join(self.component_path, "luxrobo_logo.png")
@@ -1223,7 +1223,6 @@ class ModuleUpdateListForm(QDialog):
         self.ui_total_progress_list[index].setValue(total)
         self.ui_total_progress_list[index].repaint()
         self.ui_total_progress_value_list[index].setText(str(total) + "%")
-
 
     def total_progress_value_changed(self, value):
         self.ui.progress_bar_total.setValue(value)

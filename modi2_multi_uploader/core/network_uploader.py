@@ -52,18 +52,14 @@ class NetworkFirmwareUpdater(serial.Serial):
     def __init__(self, device=None):
         self.print = True
         if device != None:
-            super().__init__(
-                device, timeout = 0.1, baudrate = 921600
-            )
+            super().__init__(device, timeout = 0.1, baudrate = 921600)
         else:
             modi_ports = list_modi_ports()
             if not modi_ports:
                 raise serial.SerialException("No MODI port is connected")
             for modi_port in modi_ports:
                 try:
-                    super().__init__(
-                        modi_port.device, timeout=0.1, baudrate=921600
-                    )
+                    super().__init__(modi_port.device, timeout=0.1, baudrate=921600)
                 except Exception:
                     self.__print('Next network module')
                     continue
@@ -682,9 +678,7 @@ class NetworkFirmwareUpdater(serial.Serial):
         return
 
     @staticmethod
-    def __compare_version(
-        left: str, right: str
-    ) -> int:
+    def __compare_version(left: str, right: str) -> int:
         left_vars = map(int, left.split('.'))
         right_vars = map(int, right.split('.'))
         for a, b in zip_longest(left_vars, right_vars, fillvalue = 0):
