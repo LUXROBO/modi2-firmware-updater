@@ -159,7 +159,7 @@ class Form(QDialog):
 
         self.ui.setStyleSheet("background-color: white")
         self.ui.console.hide()
-        self.ui.setFixedHeight(600)
+        self.ui.setFixedHeight(640)
 
         # Set LUXROBO logo image
         logo_path = os.path.join(self.component_path, "luxrobo_logo.png")

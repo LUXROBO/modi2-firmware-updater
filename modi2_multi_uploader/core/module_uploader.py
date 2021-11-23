@@ -10,13 +10,9 @@ import serial
 import serial.tools.list_ports as stl
 
 from modi2_multi_uploader.util.connection_util import SerTask
-from modi2_multi_uploader.util.message_util import (decode_message,
-                                                     parse_message,
-                                                     unpack_data)
-from modi2_multi_uploader.util.module_util import (Module,
-                                                    get_module_type_from_uuid)
-from modi2_multi_uploader.util.module_util import (Module,
-                                                    get_module_uuid_from_type)
+from modi2_multi_uploader.util.message_util import (decode_message, parse_message, unpack_data)
+from modi2_multi_uploader.util.module_util import (Module, get_module_type_from_uuid)
+from modi2_multi_uploader.util.module_util import (Module, get_module_uuid_from_type)
 
 
 def retry(exception_to_catch):
@@ -71,12 +67,12 @@ class ModuleFirmwareUpdater:
         self.raise_error_message = True
         self.update_error = 0
         self.update_error_message = ""
+        self.has_update_error = False
         self.update_index = 0
         self.update_mode = 0
         self.current_module_id = 0
         self.change_type_target = 0
         self.change_type_success_flag = False
-
 
         self.open(port)
         for device in stl.comports():
@@ -103,9 +99,7 @@ class ModuleFirmwareUpdater:
         self.raise_error_message = raise_error_message
 
     def request_network_id(self):
-        self.__conn.send_nowait(
-            parse_message(0x28, 0x0, 0xFFF, (0xFF, 0x0F))
-        )
+        self.__conn.send_nowait(parse_message(0x28, 0x0, 0xFFF, (0xFF, 0x0F)))
 
     def __assign_network_id(self, sid, data):
         unpacked_data = unpack_data(data, (6, 2))
@@ -123,6 +117,7 @@ class ModuleFirmwareUpdater:
             self.network_version = ".".join(module_version)
 
     def update_module_firmware(self):
+        self.has_update_error = False
         self.request_network_id()
         self.reset_state()
         self.update_mode = self.UPDATE_FIRMWARE_MODE
@@ -130,6 +125,7 @@ class ModuleFirmwareUpdater:
             self.request_to_update_firmware(target)
 
     def change_module_type(self, module_type):
+        self.has_update_error = False
         self.request_network_id()
         self.reset_state()
         self.update_mode = self.CHNAGE_TYPE_MODE
@@ -196,9 +192,7 @@ class ModuleFirmwareUpdater:
         self.__print("Change module type has been requested")
 
     def check_to_update_firmware(self, module_id: int) -> None:
-        firmware_update_ready_message = self.__set_module_state(
-            module_id, Module.UPDATE_FIRMWARE_READY, Module.PNP_OFF
-        )
+        firmware_update_ready_message = self.__set_module_state(module_id, Module.UPDATE_FIRMWARE_READY, Module.PNP_OFF)
         self.__conn.send_nowait(firmware_update_ready_message)
 
     def add_to_waitlist(self, module_id: int, module_type: str) -> None:
@@ -212,10 +206,7 @@ class ModuleFirmwareUpdater:
             if module_id == curr_module_id:
                 return
 
-        self.__print(
-            f"Adding {module_type} ({module_id}) to waiting list..."
-            f"{' ' * 60}"
-        )
+        self.__print(f"Adding {module_type} ({module_id}) to waiting list...{' ' * 60}")
 
         # Add the module to the waiting list
         module_elem = module_id, module_type
@@ -228,7 +219,8 @@ class ModuleFirmwareUpdater:
         self.update_in_progress = True
         self.update_index = 0
         updater_thread = th.Thread(
-            target=self.__update_firmware, args=(module_id, module_type, 0)
+            target=self.__update_firmware,
+            args=(module_id, module_type, 0)
         )
         updater_thread.daemon = True
         updater_thread.start()
@@ -240,14 +232,13 @@ class ModuleFirmwareUpdater:
         self.current_module_id = module_id
         self.update_index = 0
         updater_thread = th.Thread(
-            target=self.__change_type, args=(module_id, module_type, 0)
+            target=self.__change_type,
+            args=(module_id, module_type, 0)
         )
         updater_thread.daemon = True
         updater_thread.start()
 
-    def update_response(
-        self, response: bool, is_error_response: bool = False
-    ) -> None:
+    def update_response(self, response: bool, is_error_response: bool = False) -> None:
         if not is_error_response:
             self.response_flag = response
             self.response_error_flag = False
@@ -306,19 +297,9 @@ class ModuleFirmwareUpdater:
                         update_module_num = len(self.modules_to_update)
                         num_updated = len(self.modules_updated)
                         if self.ui.is_english:
-                            self.ui.update_modules_button.setText(
-                                f"Modules update is in progress. "
-                                f"({num_updated} / "
-                                f"{update_module_num})"
-                                f"({progress}%)"
-                            )
+                            self.ui.update_modules_button.setText(f"Modules update is in progress. ({num_updated} / {update_module_num})({progress}%)")
                         else:
-                            self.ui.update_modules_button.setText(
-                                f"모듈 초기화가 진행중입니다. "
-                                f"({num_updated} / "
-                                f"{update_module_num})"
-                                f"({progress}%)"
-                            )
+                            self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
                     self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
                     page_end = page_begin + page_size
@@ -344,6 +325,7 @@ class ModuleFirmwareUpdater:
                         erase_error_count = erase_error_count + 1
                         if erase_error_count > erase_error_limit:
                             erase_error_count = 0
+                            self.has_update_error = True
                             break
                         continue
                     else:
@@ -377,6 +359,7 @@ class ModuleFirmwareUpdater:
                         crc_error_count = crc_error_count + 1
                         if crc_error_count > crc_error_limit:
                             crc_error_count = 0
+                            self.has_update_error = True
                             break
                         continue
                     else:
@@ -414,10 +397,10 @@ class ModuleFirmwareUpdater:
                 for xxx in range(4):
                     end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
 
-            self.send_end_flash_data(module_type, module_id, end_flash_data)
-            self.__print(
-                f"Version info (v{version_info}) has been written to its firmware!"
-            )
+            success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
+            if not success_end_flash:
+                self.has_update_error = True
+            self.__print(f"Version info (v{version_info}) has been written to its firmware!")
 
             # Firmware update flag down, resetting used flags
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
@@ -435,9 +418,7 @@ class ModuleFirmwareUpdater:
             # Reboot all connected modules
             self.modules_to_update.clear()
             self.update_index = 0
-            reboot_message = self.__set_module_state(
-                0xFFF, Module.REBOOT, Module.PNP_OFF
-            )
+            reboot_message = self.__set_module_state(0xFFF, Module.REBOOT, Module.PNP_OFF)
             self.__conn.send_nowait(reboot_message)
             self.__print("Reboot message has been sent to all connected modules")
 
@@ -447,7 +428,10 @@ class ModuleFirmwareUpdater:
             self.close()
 
             self.update_in_progress = False
-            self.update_error = 1
+            if self.has_update_error:
+                self.update_error = -1
+            else:
+                 self.update_error = 1
 
             time.sleep(0.5)
             self.reset_state()
@@ -483,20 +467,10 @@ class ModuleFirmwareUpdater:
                 update_module_num = len(self.modules_to_update)
                 num_updated = len(self.modules_updated)
                 if self.ui.is_english:
-                    self.ui.change_modules_type_button.setText(
-                        f"Changing modules type is in progress. "
-                        f"({num_updated} / "
-                        f"{update_module_num})"
-                        f"({progress}%)"
-                    )
+                    self.ui.change_modules_type_button.setText(f"Changing modules type is in progress. ({num_updated} / {update_module_num})({progress}%)")
                 else:
-                    self.ui.change_modules_type_button.setText(
-                        f"모듈 타입 변경이 진행중입니다. "
-                        f"({num_updated} / "
-                        f"{update_module_num})"
-                        f"({progress}%)"
-                    )
-            
+                    self.ui.change_modules_type_button.setText(f"모듈 타입 변경이 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
+
             # send change 
             uuid_changed_with_type = self.change_type_target << 32
             self.send_change_type(module_id, uuid_changed_with_type)
@@ -517,9 +491,10 @@ class ModuleFirmwareUpdater:
                 if timeout >= 50:
                     timeout = 0
                     self.update_error_message = "Response timed-out"
+                    self.has_update_error = True
                     if self.raise_error_message:
                         raise Exception(self.update_error_message)
-                    return False
+                    break
                 timeout += 1
                 time.sleep(0.1)
             self.change_type_success_flag = False
@@ -546,7 +521,10 @@ class ModuleFirmwareUpdater:
             self.close()
 
             self.update_in_progress = False
-            self.update_error = 1
+            if self.has_update_error:
+                self.update_error = -1
+            else:
+                 self.update_error = 1
 
             time.sleep(0.5)
             self.reset_state()
@@ -568,9 +546,7 @@ class ModuleFirmwareUpdater:
                     self.ui.change_modules_type_button.setText("모듈 타입 변경")
 
     @staticmethod
-    def __set_module_state(
-        destination_id: int, module_state: int, pnp_state: int
-    ) -> str:
+    def __set_module_state(destination_id: int, module_state: int, pnp_state: int) -> str:
         message = dict()
 
         message["c"] = 0x09
@@ -588,9 +564,7 @@ class ModuleFirmwareUpdater:
 
     # TODO: Use retry decorator here
     @retry(Exception)
-    def send_end_flash_data(
-        self, module_type: str, module_id: int, end_flash_data: bytearray
-    ) -> None:
+    def send_end_flash_data(self, module_type: str, module_id: int, end_flash_data: bytearray) -> None:
         # Write end-flash data until success
         end_flash_success = False
         end_flash_address = 0x0800f800
@@ -616,6 +590,7 @@ class ModuleFirmwareUpdater:
                 erase_error_count = erase_error_count + 1
                 if erase_error_count > erase_error_limit:
                     erase_error_count = 0
+                    self.update_error_message = "Response timed-out"
                     break
                 continue
             else:
@@ -644,6 +619,7 @@ class ModuleFirmwareUpdater:
                 crc_error_count = crc_error_count + 1
                 if crc_error_count > crc_error_limit:
                     crc_error_count = 0
+                    self.update_error_message = "Response timed-out"
                     break
                 continue
             else:
@@ -652,14 +628,9 @@ class ModuleFirmwareUpdater:
             end_flash_success = True
         self.__print(f"End flash is written for {module_type} ({module_id})")
 
-    def get_firmware_command(
-        self,
-        module_id: int,
-        rot_stype: int,
-        rot_scmd: int,
-        crc32: int,
-        page_addr: int,
-    ) -> str:
+        return end_flash_success
+
+    def get_firmware_command(self, module_id: int, rot_stype: int, rot_scmd: int, crc32: int, page_addr: int,) -> str:
         message = dict()
         message["c"] = 0x0D
 
@@ -686,9 +657,7 @@ class ModuleFirmwareUpdater:
 
         return json.dumps(message, separators=(",", ":"))
 
-    def get_firmware_data(
-        self, module_id: int, seq_num: int, bin_data: bytes
-    ) -> str:
+    def get_firmware_data(self, module_id: int, seq_num: int, bin_data: bytes) -> str:
         message = dict()
         message["c"] = 0x0B
         message["s"] = seq_num
@@ -699,11 +668,7 @@ class ModuleFirmwareUpdater:
 
         return json.dumps(message, separators=(",", ":"))
 
-    def change_type_command(
-        self,
-        did: int,
-        changed_uuid: int,
-    ) -> str:
+    def change_type_command(self, did: int, changed_uuid: int,) -> str:
         message = dict()
         message["c"] = 0x0E
 
@@ -732,37 +697,20 @@ class ModuleFirmwareUpdater:
         checksum = self.calc_crc32(data[4:], checksum)
         return checksum
 
-    def send_change_type(
-        self,
-        module_id: int = 0,
-        changed_uuid_: int = 0,
-    ) -> bool:
+    def send_change_type(self, module_id: int = 0, changed_uuid_: int = 0,) -> bool:
         # Send firmware command request
         request_message = self.change_type_command(did = module_id, changed_uuid = changed_uuid_)
         self.__conn.send_nowait(request_message)
 
-    def send_firmware_command(
-        self,
-        oper_type: str,
-        module_id: int,
-        crc_val: int,
-        dest_addr: int,
-        page_addr: int = 0,
-    ) -> bool:
+    def send_firmware_command(self, oper_type: str, module_id: int, crc_val: int, dest_addr: int, page_addr: int = 0,) -> bool:
         rot_scmd = 2 if oper_type == "erase" else 1
         # Send firmware command request
         request_message = self.get_firmware_command(module_id, 1, rot_scmd, crc_val, page_addr=dest_addr + page_addr)
         self.__conn.send_nowait(request_message)
 
         return self.receive_command_response()
-    
 
-    def receive_command_response(
-        self,
-        response_delay: float = 0.01,
-        response_timeout: float = 0.5,
-        max_response_error_count: int = 10,
-    ) -> bool:
+    def receive_command_response(self, response_delay: float = 0.01, response_timeout: float = 0.5, max_response_error_count: int = 10,) -> bool:
         # Receive firmware command response
         response_wait_time = 0
         while not self.response_flag:
@@ -790,13 +738,9 @@ class ModuleFirmwareUpdater:
         self.response_flag = False
         return True
 
-    def send_firmware_data(
-        self, module_id: int, seq_num: int, bin_data: bytes, crc_val: int
-    ) -> int:
+    def send_firmware_data(self, module_id: int, seq_num: int, bin_data: bytes, crc_val: int) -> int:
         # Send firmware data
-        data_message = self.get_firmware_data(
-            module_id, seq_num=seq_num, bin_data=bin_data
-        )
+        data_message = self.get_firmware_data(module_id, seq_num=seq_num, bin_data=bin_data)
         self.__conn.send_nowait(data_message)
 
         # Calculate crc32 checksum twice
