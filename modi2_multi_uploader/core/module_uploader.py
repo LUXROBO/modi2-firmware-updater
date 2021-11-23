@@ -410,7 +410,6 @@ class ModuleFirmwareUpdater:
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
 
         module_index += 1
-
         if module_index < len(self.modules_to_update):
             next_module_id, next_module_type = self.modules_to_update[module_index]
             self.__update_firmware(next_module_id, next_module_type, module_index)
@@ -453,54 +452,61 @@ class ModuleFirmwareUpdater:
                     self.ui.update_modules_button.setText("모듈 초기화")
 
     def __change_type(self, module_id: int, module_type: str, module_index: int) -> None:
-        self.update_in_progress = True
-        self.module_type = module_type
+        is_already_updated = False
+        # Check if module is already updated
+        for curr_module_id, curr_module_type in self.modules_updated:
+            if module_id == curr_module_id:
+                is_already_updated = True
+        
+        if not is_already_updated:
+            self.update_in_progress = True
+            self.module_type = module_type
 
-        self.modules_updated.append((module_id, module_type))
+            self.modules_updated.append((module_id, module_type))
 
-        if self.__is_os_update:
-            # Init metadata of the bytes loaded
-            progress = 0
-            self.progress = progress
+            if self.__is_os_update:
+                # Init metadata of the bytes loaded
+                progress = 0
+                self.progress = progress
 
-            if self.ui:
-                update_module_num = len(self.modules_to_update)
-                num_updated = len(self.modules_updated)
-                if self.ui.is_english:
-                    self.ui.change_modules_type_button.setText(f"Changing modules type is in progress. ({num_updated} / {update_module_num})({progress}%)")
-                else:
-                    self.ui.change_modules_type_button.setText(f"모듈 타입 변경이 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
+                if self.ui:
+                    update_module_num = len(self.modules_to_update)
+                    num_updated = len(self.modules_updated)
+                    if self.ui.is_english:
+                        self.ui.change_modules_type_button.setText(f"Changing modules type is in progress. ({num_updated} / {update_module_num})({progress}%)")
+                    else:
+                        self.ui.change_modules_type_button.setText(f"모듈 타입 변경이 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-            # send change 
-            uuid_changed_with_type = self.change_type_target << 32
-            self.send_change_type(module_id, uuid_changed_with_type)
-            time.sleep(0.5)
-            self.progress = 50
+                # send change 
+                uuid_changed_with_type = self.change_type_target << 32
+                self.send_change_type(module_id, uuid_changed_with_type)
+                time.sleep(0.5)
+                self.progress = 50
 
-            #reboot
-            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_ON)
-            self.__conn.send_nowait(reboot_message)
-            time.sleep(0.5)
+                #reboot
+                reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_ON)
+                self.__conn.send_nowait(reboot_message)
+                time.sleep(0.5)
 
-            timeout = 0
-            while self.change_type_success_flag == False:
-                if ((timeout % 10) == 0) and (timeout != 0):
-                    self.send_change_type(module_id, uuid_changed_with_type)
+                timeout = 0
+                while self.change_type_success_flag == False:
+                    if ((timeout % 10) == 0) and (timeout != 0):
+                        self.send_change_type(module_id, uuid_changed_with_type)
+                        time.sleep(0.1)
+                        self.__conn.send_nowait(reboot_message)
+                    if timeout >= 50:
+                        timeout = 0
+                        self.update_error_message = "Response timed-out"
+                        self.has_update_error = True
+                        if self.raise_error_message:
+                            raise Exception(self.update_error_message)
+                        break
+                    timeout += 1
                     time.sleep(0.1)
-                    self.__conn.send_nowait(reboot_message)
-                if timeout >= 50:
-                    timeout = 0
-                    self.update_error_message = "Response timed-out"
-                    self.has_update_error = True
-                    if self.raise_error_message:
-                        raise Exception(self.update_error_message)
-                    break
-                timeout += 1
-                time.sleep(0.1)
-            self.change_type_success_flag = False
+                self.change_type_success_flag = False
 
-        self.progress = 100
-        self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
+            self.progress = 100
+            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
 
         module_index += 1
         if module_index < len(self.modules_to_update):

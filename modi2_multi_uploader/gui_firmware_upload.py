@@ -1224,7 +1224,6 @@ class ModuleUpdateListForm(QDialog):
         self.ui_total_progress_list[index].repaint()
         self.ui_total_progress_value_list[index].setText(str(total) + "%")
 
-
     def total_progress_value_changed(self, value):
         self.ui.progress_bar_total.setValue(value)
         self.ui.progress_bar_total.repaint()
