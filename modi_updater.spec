@@ -58,7 +58,7 @@ exe = EXE(
 )
 app = BUNDLE(
     exe,
-    name='MODI+ Multi Uploader - v' + version_path + '.app',
+    name='MODI+ Multi Uploader - v' + version_info + '.app',
     icon='network_module.ico',
     bundle_identifier=None,
 )
