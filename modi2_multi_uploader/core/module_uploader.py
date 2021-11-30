@@ -68,8 +68,9 @@ class ModuleFirmwareUpdater:
         self.ui = None
         self.module_type = None
         self.progress = None
+        self.progress_2 = None
         self.popup_reconnect = False
-        self.raise_error_message = True
+        self.raise_error_message = False
         self.update_error = 0
         self.update_error_message = ""
         self.has_update_error = False
@@ -101,12 +102,22 @@ class ModuleFirmwareUpdater:
     def module_firmware_upload_manager(self):
         timeout = 0
         timeout2 = 0
+        # while self.network_uuid == None:
+        #     timeout += 1
+        #     if (timeout % 10) == 0 and timeout:
+        #         self.request_network_id()
+        #     if (timeout > 500) :
+        #         # TODO error!!!!
+        #         timeout = 0
         while timeout < 30 or len(self.modules_updated) != len(self.modules_to_update_all):
             if self.update_in_progress == True:
                 timeout = 0
                 time.sleep(0.1)
                 continue
+            # print("modules_to_update_all num = ", len(self.modules_to_update_all), "\tmodules_updated num = ", len(self.modules_updated))
+            # print("modules_to_update_bootloader num = ", len(self.modules_to_update_bootloader), "\modules_to_update_2nd bootloader num = ", len(self.modules_to_update_second_bootloader))
             if len(self.modules_to_update_second_bootloader) != 0:
+                self.__conn.send_nowait(parse_message(0x2C, 0x0, 0xFFF, (1,1))) #SWU LEGACY MODE
                 second_bootloader_update_module_id, second_bootloader_update_module_type = self.modules_to_update_second_bootloader[0]
                 self.modules_to_update_second_bootloader.pop(0)
                 updater_thread = th.Thread(
@@ -117,11 +128,12 @@ class ModuleFirmwareUpdater:
                 updater_thread.daemon = True
                 timeout = 0
                 updater_thread.start()
+                time.sleep(0.1)
                 continue
             if len(self.modules_to_update_bootloader) != 0:
+                self.__conn.send_nowait(parse_message(0x2C, 0x0, 0xFFF, (0,0))) #SWU MODE
                 bootloader_update_module_id, bootloader_update_module_type = self.modules_to_update_bootloader[0]
                 self.modules_to_update_bootloader.pop(0)
-                print("firmware_uploade BOOTLOADER start!!!!!!!!!!!!!!!!!!")
                 updater_thread = th.Thread(
                     target=self.__update_firmware_bootloader,
                     args=(bootloader_update_module_id, bootloader_update_module_type, 0)
@@ -130,9 +142,10 @@ class ModuleFirmwareUpdater:
                 updater_thread.daemon = True
                 timeout = 0
                 updater_thread.start()
+                time.sleep(0.1)
                 continue
             if len(self.modules_to_update) != 0:
-                print("firmware_uploade start!!!!!!!!!!!!!!!!!!")
+                self.__conn.send_nowait(parse_message(0x2C, 0x0, 0xFFF, (0,0))) #SWU MODE
                 update_module_id, update_module_type = self.modules_to_update[0]
                 self.modules_to_update.pop(0)
                 updater_thread = th.Thread(
@@ -143,6 +156,7 @@ class ModuleFirmwareUpdater:
                 updater_thread.daemon = True
                 timeout = 0
                 updater_thread.start()
+                time.sleep(0.1)
                 continue
             timeout += 1
             time.sleep(0.1)
@@ -325,26 +339,28 @@ class ModuleFirmwareUpdater:
                 return
 
         if module_section == 0: # module in bootloader
-            print("this module is in bootloader")
             for curr_module_id, curr_module_type in self.modules_to_update:
                 if module_id == curr_module_id:
                     return
             module_elem = module_id, module_type
             self.modules_to_update.append(module_elem)
+            print(f"Adding {module_type} ({module_id}) to update waiting list...{' ' * 60}")
         elif module_section == 1: # module in second bootloader
             for curr_module_id, curr_module_type in self.modules_to_update_bootloader:
                 if module_id == curr_module_id:
                     return
             module_elem = module_id, module_type
             self.modules_to_update_bootloader.append(module_elem)
+            print(f"Adding {module_type} ({module_id}) to bootloader waiting list...{' ' * 60}")
         elif module_section == 2: # this module need to update bootloader
             for curr_module_id, curr_module_type in self.modules_to_update_second_bootloader:
                 if module_id == curr_module_id:
                     return
             module_elem = module_id, module_type
             self.modules_to_update_second_bootloader.append(module_elem)
+            print(f"Adding {module_type} ({module_id}) to second bootloader waiting list...{' ' * 60}")
 
-        self.__print(f"Adding {module_type} ({module_id}) to waiting list...{' ' * 60}")
+        
 
     def update_module(self, module_id: int, module_type: str) -> None:
         if self.update_in_progress:
@@ -389,7 +405,7 @@ class ModuleFirmwareUpdater:
         if not is_already_updated:
             self.update_in_progress = True
             self.module_type = module_type
-            self.modules_updated.append((module_id, module_type))
+            
 
             # Init base root_path, utilizing local binary files
             root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest", "module")
@@ -425,6 +441,7 @@ class ModuleFirmwareUpdater:
                 while page_begin < bin_end :
                     progress = 100 * page_begin // bin_end
                     self.progress = progress
+                    self.progress_2 = progress
 
                     if self.ui:
                         update_module_num = len(self.modules_to_update_all)
@@ -434,7 +451,7 @@ class ModuleFirmwareUpdater:
                         else:
                             self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                    self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                    # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
                     page_end = page_begin + page_size
                     curr_page = bin_buffer[page_begin:page_end]
                     # Skip current page if empty
@@ -459,6 +476,7 @@ class ModuleFirmwareUpdater:
                         if erase_error_count > erase_error_limit:
                             erase_error_count = 0
                             self.has_update_error = True
+                            self.modules_updated.append((module_id, module_type))
                             break
                         continue
                     else:
@@ -493,6 +511,7 @@ class ModuleFirmwareUpdater:
                         if crc_error_count > crc_error_limit:
                             crc_error_count = 0
                             self.has_update_error = True
+                            self.modules_updated.append((module_id, module_type))
                             break
                         continue
                     else:
@@ -501,7 +520,8 @@ class ModuleFirmwareUpdater:
                     page_begin = page_begin + page_size
                     time.sleep(0.01)
             self.progress = 99
-            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+            self.progress_2 = 99
+            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
             version_info, version_file = None, "version.txt"
@@ -539,8 +559,10 @@ class ModuleFirmwareUpdater:
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
             self.reset_state(update_in_progress=True)
 
-            self.progress = 100
+            self.progress = 0
+            self.progress_2 = 100
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
+            self.modules_updated.append((module_id, module_type))
 
     def __update_firmware_bootloader(self, module_id: int, module_type: str, module_index: int) -> None:
         is_already_updated = False
@@ -587,9 +609,11 @@ class ModuleFirmwareUpdater:
                 erase_error_count = 0
                 crc_error_limit = 2
                 crc_error_count = 0
+                self.progress = 1
+                self.has_update_error = False
                 while page_begin < bin_end :
                     progress = 100 * page_begin // bin_end
-                    self.progress = progress
+                    self.progress_2 = progress
 
                     if self.ui:
                         update_module_num = len(self.modules_to_update_all)
@@ -599,7 +623,7 @@ class ModuleFirmwareUpdater:
                         else:
                             self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                    self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                    # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
                     page_end = page_begin + page_size
                     curr_page = bin_buffer[page_begin:page_end]
                     # Skip current page if empty
@@ -612,9 +636,6 @@ class ModuleFirmwareUpdater:
                     if page_begin + page_offset + flash_memory_addr == flash_info_memory_addr:
                         page_begin = page_begin + page_size
                         continue
-
-                    print("now page = ", page_begin + page_offset)
-
                     # Erase page (send erase request and receive its response)
                     erase_page_success = self.send_firmware_command(
                         oper_type="erase",
@@ -670,8 +691,18 @@ class ModuleFirmwareUpdater:
 
                     page_begin = page_begin + page_size
                     time.sleep(0.01)
-            self.progress = 99
-            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+
+            if self.has_update_error == True:
+                self.progress_2 = 0
+                self.progress = 0
+                self.modules_updated.append((module_id, module_type))
+                self.reset_state(update_in_progress=True)
+                self.update_error_message = "error in bootloader upload"
+                self.update_error = -1
+                return
+
+            self.progress_2 = 99
+            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
             version_info, version_file = None, "version.txt"
@@ -704,7 +735,7 @@ class ModuleFirmwareUpdater:
             if not success_end_flash:
                 self.has_update_error = True
 
-            reboot_message = self.__set_module_state(0xFFF, Module.REBOOT, Module.PNP_OFF)
+            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
             self.__conn.send_nowait(reboot_message)
 
             self.__print(f"Version info (v{version_info}) has been written to its firmware!")
@@ -713,7 +744,7 @@ class ModuleFirmwareUpdater:
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
             self.reset_state(update_in_progress=True)
 
-            self.progress = 100
+            self.progress_2 = 100
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
 
     def __update_firmware_second_bootloader(self, module_id: int, module_type: str, module_index: int) -> None:
@@ -761,9 +792,10 @@ class ModuleFirmwareUpdater:
                 erase_error_count = 0
                 crc_error_limit = 2
                 crc_error_count = 0
+                self.progress = 1
                 while page_begin < bin_end :
                     progress = 100 * page_begin // bin_end
-                    self.progress = progress
+                    self.progress_2 = progress
 
                     if self.ui:
                         update_module_num = len(self.modules_to_update_all)
@@ -773,7 +805,7 @@ class ModuleFirmwareUpdater:
                         else:
                             self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                    self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                    # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
                     page_end = page_begin + page_size
                     curr_page = bin_buffer[page_begin:page_end]
                     # Skip current page if empty
@@ -842,8 +874,18 @@ class ModuleFirmwareUpdater:
 
                     page_begin = page_begin + page_size
                     time.sleep(0.01)
-            self.progress = 99
-            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+
+            if self.has_update_error == True:
+                self.progress_2 = 0
+                self.progress = 0
+                self.modules_updated.append((module_id, module_type))
+                self.reset_state(update_in_progress=True)
+                self.update_error_message = "error in second bootloader upload"
+                self.update_error = -1
+                return
+
+            self.progress_2 = 99
+            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
             version_info, version_file = None, "version.txt"
@@ -876,7 +918,7 @@ class ModuleFirmwareUpdater:
             if not success_end_flash:
                 self.has_update_error = True
 
-            reboot_message = self.__set_module_state(0xFFF, Module.REBOOT, Module.PNP_OFF)
+            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
             self.__conn.send_nowait(reboot_message)
 
             self.__print(f"Version info (v{version_info}) has been written to its firmware!")
@@ -885,7 +927,7 @@ class ModuleFirmwareUpdater:
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
             self.reset_state(update_in_progress=True)
 
-            self.progress = 100
+            self.progress_2 = 100
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
 
     def __update_firmware(self, module_id: int, module_type: str, module_index: int) -> None:
@@ -943,7 +985,7 @@ class ModuleFirmwareUpdater:
                         else:
                             self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                    self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                    # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
                     page_end = page_begin + page_size
                     curr_page = bin_buffer[page_begin:page_end]
                     # Skip current page if empty
@@ -1010,7 +1052,7 @@ class ModuleFirmwareUpdater:
                     page_begin = page_begin + page_size
                     time.sleep(0.01)
             self.progress = 99
-            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
             version_info, version_file = None, "version.txt"
@@ -1274,7 +1316,7 @@ class ModuleFirmwareUpdater:
                 crc_error_count = 0
 
             end_flash_success = True
-        self.__print(f"End flash is written for {module_type} ({module_id})")
+        # self.__print(f"End flash is written for {module_type} ({module_id})")
 
         return end_flash_success
 
@@ -1461,11 +1503,14 @@ class ModuleFirmwareUpdater:
         elif warning_type == 2:
             # Note that more than one warning type 2 message can be received
             if length < 10:
-                print("!!!!!!!!!!!!!!!!")
                 self.add_to_module_list(module_id, module_type, 2)
             else:
                 module_section = unpack_data(data, (7, 1))[1]
-                print("module section =", module_section)
+                boot_version = unpack_data(data, (8, 2))[1]
+                # print("bootloader version = ",boot_version, "\tnow section = ",module_section)
+                # if module_section == 0 and boot_version != 1:
+                #     self.add_to_module_list(module_id, module_type, 2)
+                # else :
                 self.add_to_module_list(module_id, module_type, module_section)
 
             # if self.update_in_progress:
@@ -1505,7 +1550,8 @@ class ModuleFirmwareUpdater:
 
     def __print(self, data, end="\n"):
         if self.print:
-            print(data, end)
+            v = 2
+            #print(data, end)
 
 class ModuleFirmwareMultiUpdater():
     def __init__(self):
@@ -1591,12 +1637,12 @@ class ModuleFirmwareMultiUpdater():
                         current_module_progress = 0
                         total_module_progress = 0
 
-                        if module_uploader.progress:
-                            current_module_progress = module_uploader.progress
-                            if len(module_uploader.modules_to_update) == 0:
+                        if module_uploader.progress != None and module_uploader.progress_2 != None:
+                            current_module_progress = module_uploader.progress_2
+                            if len(module_uploader.modules_to_update_all) == 0:
                                 total_module_progress = module_uploader.progress
                             else:
-                                total_module_progress = (module_uploader.progress + (len(module_uploader.modules_updated) - 1) * 100) / (len(module_uploader.modules_to_update) * 100) * 100
+                                total_module_progress = (module_uploader.progress + (len(module_uploader.modules_updated)) * 100) / (len(module_uploader.modules_to_update_all) * 100) * 100
 
                             total_progress += total_module_progress / len(self.module_uploaders)
 
@@ -1624,25 +1670,20 @@ class ModuleFirmwareMultiUpdater():
                     self.state[index] = 2
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.module_uploaders)
-
                 time.sleep(0.001)
 
             if len(self.module_uploaders):
-                print(f"{self.__progress_bar(total_progress, 100)}", end="")
-
+                # print(f"{self.__progress_bar(total_progress, 100)}", end="")
                 if self.ui:
                     if self.ui.is_english:
                         self.ui.update_modules_button.setText(f"Modules update is in progress. ({int(total_progress)}%)")
                     else:
                         self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
-
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(total_progress)
                     self.list_ui.total_status_signal.emit("Uploading...")
-
             if is_done:
                 break
-
             time.sleep(delay)
 
         self.update_in_progress = False
@@ -1759,7 +1800,7 @@ class ModuleFirmwareMultiUpdater():
                 time.sleep(0.001)
 
             if len(self.module_uploaders):
-                print(f"{self.__progress_bar(total_progress, 100)}", end="")
+                # print(f"{self.__progress_bar(total_progress, 100)}", end="")
 
                 if self.ui:
                     if self.ui.is_english:
