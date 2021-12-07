@@ -1508,7 +1508,7 @@ class ModuleFirmwareUpdater:
                 module_section = unpack_data(data, (7, 1))[1]
                 boot_version = unpack_data(data, (8, 2))[1]
                 # print("bootloader version = ",boot_version, "\tnow section = ",module_section)
-                # if module_section == 0 and boot_version != 1:
+                # if module_section == 0 and boot_version != 0:
                 #     self.add_to_module_list(module_id, module_type, 2)
                 # else :
                 self.add_to_module_list(module_id, module_type, module_section)
