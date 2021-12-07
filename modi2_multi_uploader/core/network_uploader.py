@@ -452,7 +452,7 @@ class NetworkFirmwareUpdater(serial.Serial):
                                 self.network_uuid = module_uuid
                                 self.network_id = self.network_uuid & 0xFFF
 
-                            if warning_type == 0:
+                            if warning_type != 2:
                                 self.send_set_module_state(self.network_id, Module.UPDATE_FIRMWARE_READY, Module.PNP_OFF)
                             if  warning_type == 2:
                                 break
