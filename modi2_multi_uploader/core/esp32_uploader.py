@@ -1,7 +1,6 @@
 from __future__ import division, print_function
 import io
 import json
-import pathlib
 import sys
 import threading as th
 import time
@@ -4047,14 +4046,13 @@ Rsy4sdmIbrFkFXXLS6TpOygsr8UtLe/kMaNNrcc57PlDn3t85LDY5Hh/YoeoK0nMiPZyCVbNRhEg48Fv
 FK3JstjaPDbhTnM9u/28uDgYRLjoq1ml/2YEpIIv7cvl/izGpnFh4vn/AOixonk=\
 """)))
 
-import pathlib
 from os import path
 
 class ESP32FirmwareUpdater():
     def __init__(self, port):
         self.port = port
         self.baudrate = 921600
-        self.firmware_path = pathlib.PurePosixPath(pathlib.PurePath(__file__),"..", "..", "assets", "firmware", "latest", "esp32")
+        self.firmware_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest", "esp32")
         self.arg = ['--chip', 'esp32',
                     '--port', self.port,
                     '--baud', str(self.baudrate),
