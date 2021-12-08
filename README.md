@@ -5,9 +5,13 @@
 1. `python3`(파이썬3.6 혹은 그 이상의 버전)를 컴퓨터에 설치
 2. `python3 -m pip install -r requirements.txt`로 의존성 패키지들을 설치
 
-실행 방법
+실행 방법 (개발)
 --
-`python3 main.py`로 GUI 프로그램을 실행한다.
+`python3 main.py --mode develop`로 GUI 프로그램을 실행한다.
+
+실행 방법 (양산 or 배포)
+--
+`python3 main.py --mode native`로 GUI 프로그램을 실행한다.
 
 실행파일 생성
 --
