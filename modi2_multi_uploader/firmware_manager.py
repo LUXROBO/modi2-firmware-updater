@@ -12,10 +12,11 @@ from PyQt5.QtWidgets import QDialog, QMessageBox
 
 class FirmwareManagerForm(QDialog):
 
-    def __init__(self, parent, ui_path, component_path):
-        QDialog.__init__(self, parent=parent)
+    def __init__(self, ui_path, component_path, firmware_version_config_path):
+        QDialog.__init__(self)
 
         self.component_path = component_path
+        self.firmware_version_config_path = firmware_version_config_path
         self.ui = uic.loadUi(ui_path)
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
         self.ui.close_button.clicked.connect(self.ui.close)
@@ -123,8 +124,6 @@ class FirmwareManagerForm(QDialog):
             },
         }
 
-        self.firmware_version_info = {}
-
         mapper = QSignalMapper(self)
         for key in self.module_ui_dic.keys():
             if key in ["network", "esp32_app", "esp32_ota"]:
@@ -149,6 +148,7 @@ class FirmwareManagerForm(QDialog):
         msg.setWindowTitle("download firmware")
         msg.setStandardButtons(QMessageBox.Ok)
         if download_success:
+            self.refresh_firmware_info()
             msg.setIcon(QMessageBox.Icon.Information)
             msg.setText("download successful.")
         else:
@@ -167,13 +167,14 @@ class FirmwareManagerForm(QDialog):
             msg.setText("refresh successful.")
         else:
             msg.setIcon(QMessageBox.Icon.Warning)
-            msg.setText("check internet connection.")
+            msg.setText("download firmware first.")
         msg.exec_()
 
     def apply_button_clicked(self):
         firmware_version_info = self.get_selected_firmware_version_info()
-        self.firmware_version_info = firmware_version_info
-        print(self.firmware_version_info)
+        with open(self.firmware_version_config_path, "w") as config_file:
+            json_msg = json.dumps(firmware_version_info, indent=4)
+            config_file.write(str(json_msg))
 
     def download_firmware(self):
         connection = self.__check_internet_connection()
@@ -184,7 +185,11 @@ class FirmwareManagerForm(QDialog):
             self.__rmtree(self.local_firmware_path)
 
         os.mkdir(self.local_firmware_path)
-        git.Repo.clone_from("https://git.luxrobo.net/modi2/module-binary.git", self.local_firmware_path)
+
+        import base64
+        username = base64.b64decode("bWF0dC5raW0=").decode('utf-8')
+        password = base64.b64decode("TGVnbzA1Mjkh").decode('utf-8')
+        git.Repo.clone_from(f"https://{username}:{password}@git.luxrobo.net/modi2/module-binary.git", self.local_firmware_path)
 
         return True
 
@@ -282,6 +287,22 @@ class FirmwareManagerForm(QDialog):
                 self.module_ui_dic[key]["bootloader"].clear()
                 for version in version_list:
                     self.module_ui_dic[key]["bootloader"].addItem(version)
+
+            config_firmeware_version_info = self.get_config_firmware_version_info()
+            for key in config_firmeware_version_info.keys():
+                app_version = config_firmeware_version_info[key]["app"]
+                all_texts = [self.module_ui_dic[key]["app"].itemText(i) for i in range(self.module_ui_dic[key]["app"].count())]
+                if app_version in all_texts:
+                    self.module_ui_dic[key]["app"].setCurrentText(app_version)
+
+                if key in ["network", "esp32_app", "esp32_ota"]:
+                    continue
+                
+                bootloader_version = config_firmeware_version_info[key]["bootloader"]
+                all_texts = [self.module_ui_dic[key]["bootloader"].itemText(i) for i in range(self.module_ui_dic[key]["bootloader"].count())]
+                if bootloader_version in all_texts:
+                    self.module_ui_dic[key]["bootloader"].setCurrentText(bootloader_version)
+
         except Exception:
             return False
 
@@ -300,8 +321,15 @@ class FirmwareManagerForm(QDialog):
             module_version_dic[key]["bootloader"] = self.module_ui_dic[key]["bootloader"].currentText()
         return module_version_dic
 
+    def get_config_firmware_version_info(self):
+        with open(self.firmware_version_config_path, "r") as config_file:
+            config_info = config_file.read()
+            return json.loads(config_info)
+
     def app_version_combobox_changed(self, module_type):
         selected_app_version = self.module_ui_dic[module_type]["app"].currentText()
+        if len(selected_app_version) == 0:
+            return
 
         self.module_ui_dic[module_type]["os"].clear()
         version_text_path = os.path.join(self.local_firmware_path, module_type, selected_app_version, "version.txt")

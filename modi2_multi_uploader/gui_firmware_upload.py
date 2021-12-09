@@ -1,17 +1,11 @@
-import logging
 import os
-import pathlib
-import sys
-import threading as th
-import time
-import traceback as tb
 import io
-import urllib.request as ur
-import zipfile
-import shutil
-from io import open
-from os import path
-from urllib.error import URLError
+import sys
+import time
+import logging
+import pathlib
+import threading as th
+import traceback as tb
 
 from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
@@ -147,6 +141,7 @@ class Form(QDialog):
         else:
             self.component_path = os.path.join(os.path.dirname(__file__), "assets", "component")
         self.ui = uic.loadUi(ui_path)
+        self.firmware_version_config_path = os.path.join(os.path.dirname(__file__), "assets", "firmware", "firmware_version.json")
 
         self.ui.setStyleSheet("background-color: white")
         self.ui.console.hide()
@@ -158,7 +153,7 @@ class Form(QDialog):
         qPixmapVar.load(logo_path)
         self.ui.lux_logo.setPixmap(qPixmapVar)
 
-        self.firmware_manage_form = FirmwareManagerForm(self, firmware_manager_ui_path, self.component_path)
+        self.firmware_manage_form = FirmwareManagerForm(firmware_manager_ui_path, self.component_path, self.firmware_version_config_path)
         self.esp32_upload_list_form = ESP32UpdateListForm(esp32_upload_list_ui_path, self.component_path)
         self.module_upload_list_form = ModuleUpdateListForm(module_upload_list_ui_path, self.component_path)
 
@@ -181,8 +176,8 @@ class Form(QDialog):
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         self.ui.console.setStyleSheet("font-size: 10px")
 
-        version_path = path.join(path.dirname(__file__), "..", "version.txt")
-        with open(version_path, "r") as version_file:
+        version_path = os.path.join(os.path.dirname(__file__), "..", "version.txt")
+        with io.open(version_path, "r") as version_file:
             version_info = version_file.readline().lstrip("v").rstrip("\n")
 
         self.ui.setWindowTitle("MODI+ Multi Uploader - v" + version_info)
@@ -403,17 +398,18 @@ class Form(QDialog):
 
         self.module_upload_list_form.ui.setWindowTitle("Update Modules")
         self.module_upload_list_form.reset_device_list()
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
-        def run_task(self, modi_ports):
+        def run_task(self, modi_ports, firmware_version_info):
             module_updater = ModuleFirmwareMultiUpdater()
             module_updater.set_ui(self.ui, self.module_upload_list_form)
             module_updater.set_task_end_callback(self.__reset_ui)
             self.firmware_updater = module_updater
-            module_updater.update_module_firmware(modi_ports)
+            module_updater.update_module_firmware(modi_ports, firmware_version_info)
 
         th.Thread(
             target=run_task,
-            args=(self, modi_ports),
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
 
@@ -495,6 +491,7 @@ class Form(QDialog):
             target=self.__click_motion, args=(6, button_start), daemon=True
         ).start()
 
+        self.firmware_manage_form.refresh_firmware_info()
         self.firmware_manage_form.ui.exec_()
 
         self.__reset_ui()
@@ -535,27 +532,29 @@ class Form(QDialog):
             button.setText(appropriate_translation[i])
 
     def check_module_firmware(self):
-        download_error = False
+        check_success = True
         firmware_list = self.firmware_manage_form.check_firmware()
         if len(firmware_list) == 0:
             download_success = self.firmware_manage_form.download_firmware()
             if download_success:
-                firmware_list = self.firmware_manage_form.check_firmware()
-                if len(firmware_list) == 0:
-                    download_error = True
+                refresh_success = self.firmware_manage_form.refresh_firmware_info()
+                if refresh_success:
+                    self.firmware_manage_form.apply_button_clicked()
+                else:
+                    check_success = False
             else:
-                download_error = True
-
-        if download_error:
-            def error_exception():
+                check_success = False
+        
+        if not check_success:
+            def error_exception(message):
                 time.sleep(1)
-                raise Exception("check internet connection.")
+                raise Exception(message)
 
             th.Thread(
                 target=error_exception,
+                args=("download firmware first,\n and select firmware version"),
                 daemon=True
             ).start()
-
     #
     # Helper functions
     #
