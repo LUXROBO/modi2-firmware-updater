@@ -12,11 +12,11 @@ class ESP32UpdateListForm(QDialog):
     total_status_signal = pyqtSignal(str)
     error_message_signal = pyqtSignal(int, str)
 
-    def __init__(self, ui_path, component_path):
+    def __init__(self, path_dict = {}):
         QDialog.__init__(self)
 
-        self.component_path = component_path
-        self.ui = uic.loadUi(ui_path)
+        self.component_path = path_dict["component"]
+        self.ui = uic.loadUi(path_dict["ui"])
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         self.ui_icon_list = [
@@ -175,11 +175,11 @@ class ModuleUpdateListForm(QDialog):
     total_status_signal = pyqtSignal(str)
     error_message_signal = pyqtSignal(int, str)
 
-    def __init__(self, ui_path, component_path):
+    def __init__(self, path_dict = {}):
         QDialog.__init__(self)
 
-        self.component_path = component_path
-        self.ui = uic.loadUi(ui_path)
+        self.component_path = path_dict["component"]
+        self.ui = uic.loadUi(path_dict["ui"])
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         self.ui_icon_list = [

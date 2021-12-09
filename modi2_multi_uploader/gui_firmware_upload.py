@@ -142,6 +142,7 @@ class Form(QDialog):
             self.component_path = os.path.join(os.path.dirname(__file__), "assets", "component")
         self.ui = uic.loadUi(ui_path)
         self.firmware_version_config_path = os.path.join(os.path.dirname(__file__), "assets", "firmware", "firmware_version.json")
+        self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi2 multi uploader")
 
         self.ui.setStyleSheet("background-color: white")
         self.ui.console.hide()
@@ -153,9 +154,20 @@ class Form(QDialog):
         qPixmapVar.load(logo_path)
         self.ui.lux_logo.setPixmap(qPixmapVar)
 
-        self.firmware_manage_form = FirmwareManagerForm(firmware_manager_ui_path, self.component_path, self.firmware_version_config_path)
-        self.esp32_upload_list_form = ESP32UpdateListForm(esp32_upload_list_ui_path, self.component_path)
-        self.module_upload_list_form = ModuleUpdateListForm(module_upload_list_ui_path, self.component_path)
+        self.firmware_manage_form = FirmwareManagerForm(path_dict={
+            "ui": firmware_manager_ui_path,
+            "component": self.component_path,
+            "firmware_version_config": self.firmware_version_config_path,
+            "local_firmware": self.local_firmware_path,
+        })
+        self.esp32_upload_list_form = ESP32UpdateListForm(path_dict={
+            "ui": esp32_upload_list_ui_path,
+            "component": self.component_path,
+        })
+        self.module_upload_list_form = ModuleUpdateListForm(path_dict={
+            "ui": module_upload_list_ui_path,
+            "component": self.component_path,
+        })
 
         # Buttons image
         self.active_path = pathlib.PurePosixPath(self.component_path, "btn_frame_active.png")
@@ -401,7 +413,7 @@ class Form(QDialog):
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
         def run_task(self, modi_ports, firmware_version_info):
-            module_updater = ModuleFirmwareMultiUpdater()
+            module_updater = ModuleFirmwareMultiUpdater(self.local_firmware_path)
             module_updater.set_ui(self.ui, self.module_upload_list_form)
             module_updater.set_task_end_callback(self.__reset_ui)
             self.firmware_updater = module_updater
@@ -544,7 +556,10 @@ class Form(QDialog):
                     check_success = False
             else:
                 check_success = False
-        
+        else:
+            refresh_success = self.firmware_manage_form.refresh_firmware_info()
+            self.firmware_manage_form.apply_button_clicked()
+
         if not check_success:
             def error_exception(message):
                 time.sleep(1)

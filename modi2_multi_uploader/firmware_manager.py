@@ -12,21 +12,20 @@ from PyQt5.QtWidgets import QDialog, QMessageBox
 
 class FirmwareManagerForm(QDialog):
 
-    def __init__(self, ui_path, component_path, firmware_version_config_path):
+    def __init__(self, path_dict = {}):
         QDialog.__init__(self)
 
-        self.component_path = component_path
-        self.firmware_version_config_path = firmware_version_config_path
-        self.ui = uic.loadUi(ui_path)
+        self.component_path = path_dict["component"]
+        self.firmware_version_config_path = path_dict["firmware_version_config"]
+        self.local_firmware_path = path_dict["local_firmware"]
+
+        self.ui = uic.loadUi(path_dict["ui"])
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
         self.ui.close_button.clicked.connect(self.ui.close)
 
         self.ui.download_button.clicked.connect(self.download_button_clicked)
         self.ui.refresh_button.clicked.connect(self.refresh_button_clicked)
         self.ui.apply_button.clicked.connect(self.apply_button_clicked)
-
-        self.doc_dir = os.path.join(os.path.expanduser("~"), "Documents")
-        self.local_firmware_path = os.path.join(self.doc_dir, "modi2 multi uploader")
 
         self.module_list = [
             "battery",

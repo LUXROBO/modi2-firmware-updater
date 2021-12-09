@@ -44,7 +44,7 @@ class ModuleFirmwareUpdater:
     CHNAGE_TYPE_MODE = 1
 
     def __init__(
-        self, port=None, is_os_update=True, target_ids=(0xFFF,), conn_type="ser", firmware_version_info = {}
+        self, port=None, is_os_update=True, target_ids=(0xFFF,), conn_type="ser", local_firmware_path=None, firmware_version_info = {}
     ):
         self.print = True
         self.conn_type = conn_type
@@ -57,7 +57,6 @@ class ModuleFirmwareUpdater:
         self.update_in_progress = False
         self.update_module_num = 0
 
-        self.firmware_version_info = firmware_version_info
         self.modules_to_update_all = [] 
         self.modules_to_update = []
         self.modules_to_update_second_bootloader = []
@@ -80,6 +79,9 @@ class ModuleFirmwareUpdater:
         self.current_module_id = 0
         self.change_type_target = 0
         self.change_type_success_flag = False
+
+        self.firmware_version_info = firmware_version_info
+        self.local_firmware_path = local_firmware_path
 
         self.open(port)
         for device in stl.comports():
@@ -395,9 +397,7 @@ class ModuleFirmwareUpdater:
             self.module_type = module_type
 
             # Init base root_path, utilizing local binary files
-            doc_dir = path.join(path.expanduser("~"), "Documents")
-            local_firmware_path = path.join(doc_dir, "modi2 multi uploader")
-            root_path = path.join(local_firmware_path, module_type, self.firmware_version_info[module_type]["app"])
+            root_path = path.join(self.local_firmware_path, module_type, self.firmware_version_info[module_type]["app"])
 
             if self.__is_os_update:
                 bin_path = path.join(root_path, f"{module_type.lower()}.bin")
@@ -406,7 +406,6 @@ class ModuleFirmwareUpdater:
                     bin_buffer = bin_file.read()
 
                 # Init metadata of the bytes loaded
-
                 flash_memory_addr = 0x08000000
                 bin_size = sys.getsizeof(bin_buffer)
                 page_size = 0x400
@@ -1346,11 +1345,12 @@ class ModuleFirmwareUpdater:
             #print(data, end)
 
 class ModuleFirmwareMultiUpdater():
-    def __init__(self):
+    def __init__(self, local_firmware_path):
         self.update_in_progress = False
         self.ui = None
         self.list_ui = None
         self.task_end_callback = None
+        self.local_firmware_path = local_firmware_path
 
     def set_ui(self, ui, list_ui):
         self.ui = ui
@@ -1370,7 +1370,11 @@ class ModuleFirmwareMultiUpdater():
             if i > 9:
                 break
             try:
-                module_uploader = ModuleFirmwareUpdater(port = modi_port.device, firmware_version_info = firmware_version_info)
+                module_uploader = ModuleFirmwareUpdater(
+                    port = modi_port.device,
+                    firmware_version_info = firmware_version_info,
+                    local_firmware_path = self.local_firmware_path
+                )
                 module_uploader.set_print(False)
                 module_uploader.set_raise_error(False)
             except:
