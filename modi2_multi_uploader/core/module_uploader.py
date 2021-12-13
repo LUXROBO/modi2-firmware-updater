@@ -68,7 +68,6 @@ class ModuleFirmwareUpdater:
         self.ui = None
         self.module_type = None
         self.progress = None
-        self.progress_2 = None
         self.popup_reconnect = False
         self.raise_error_message = False
         self.update_error = 0
@@ -429,7 +428,6 @@ class ModuleFirmwareUpdater:
                 while page_begin < bin_end :
                     progress = 100 * page_begin // bin_end
                     self.progress = progress
-                    self.progress_2 = progress
 
                     if self.ui:
                         update_module_num = len(self.modules_to_update_all)
@@ -508,7 +506,6 @@ class ModuleFirmwareUpdater:
                     page_begin = page_begin + page_size
                     time.sleep(0.01)
             self.progress = 99
-            self.progress_2 = 99
             # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
@@ -555,8 +552,7 @@ class ModuleFirmwareUpdater:
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
             self.reset_state(update_in_progress=True)
 
-            self.progress = 0
-            self.progress_2 = 100
+            self.progress = 100
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
             self.modules_updated.append((module_id, module_type))
 
@@ -568,7 +564,7 @@ class ModuleFirmwareUpdater:
                 is_already_updated = True
 
         if not is_already_updated:
-            print("bootloader_uploade_start")
+            self.__print("bootloader_uploade_start")
             self.update_in_progress = True
             self.module_type = module_type
             # Init base root_path, utilizing local binary files
@@ -611,7 +607,7 @@ class ModuleFirmwareUpdater:
                 self.has_update_error = False
                 while page_begin < bin_end :
                     progress = 100 * page_begin // bin_end
-                    self.progress_2 = progress
+                    self.progress = progress
 
                     if self.ui:
                         update_module_num = len(self.modules_to_update_all)
@@ -691,15 +687,14 @@ class ModuleFirmwareUpdater:
                     time.sleep(0.01)
 
             if self.has_update_error == True:
-                self.progress_2 = 0
-                self.progress = 0
+                self.progress = 100
                 self.modules_updated.append((module_id, module_type))
                 self.reset_state(update_in_progress=True)
                 self.update_error_message = "error in bootloader upload"
                 self.update_error = -1
                 return
 
-            self.progress_2 = 99
+            self.progress = 99
             # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
@@ -731,7 +726,7 @@ class ModuleFirmwareUpdater:
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
             self.reset_state(update_in_progress=True)
 
-            self.progress_2 = 100
+            self.progress = 100
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
 
     def __update_firmware_second_bootloader(self, module_id: int, module_type: str, module_index: int) -> None:
@@ -742,7 +737,7 @@ class ModuleFirmwareUpdater:
                 is_already_updated = True
 
         if not is_already_updated:
-            print("second_bootloader_uploade_start")
+            self.__print("second_bootloader_uploade_start")
             self.update_in_progress = True
             self.module_type = module_type
             # Init base root_path, utilizing local binary files
@@ -784,7 +779,7 @@ class ModuleFirmwareUpdater:
                 self.progress = 1
                 while page_begin < bin_end :
                     progress = 100 * page_begin // bin_end
-                    self.progress_2 = progress
+                    self.progress = progress
 
                     if self.ui:
                         update_module_num = len(self.modules_to_update_all)
@@ -865,15 +860,14 @@ class ModuleFirmwareUpdater:
                     time.sleep(0.01)
 
             if self.has_update_error == True:
-                self.progress_2 = 0
-                self.progress = 0
+                self.progress = 100
                 self.modules_updated.append((module_id, module_type))
                 self.reset_state(update_in_progress=True)
                 self.update_error_message = "error in second bootloader upload"
                 self.update_error = -1
                 return
 
-            self.progress_2 = 99
+            self.progress = 99
             # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
@@ -905,7 +899,7 @@ class ModuleFirmwareUpdater:
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
             self.reset_state(update_in_progress=True)
 
-            self.progress_2 = 100
+            self.progress = 100
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
 
     def __change_type(self, module_id: int, module_type: str, module_index: int) -> None:
@@ -1415,12 +1409,12 @@ class ModuleFirmwareMultiUpdater():
                         current_module_progress = 0
                         total_module_progress = 0
 
-                        if module_uploader.progress != None and module_uploader.progress_2 != None:
-                            current_module_progress = module_uploader.progress_2
-                            if len(module_uploader.modules_to_update_all) == 0:
-                                total_module_progress = module_uploader.progress
+                        if module_uploader.progress != None and len(module_uploader.modules_to_update_all) != 0:
+                            current_module_progress = module_uploader.progress
+                            if len(module_uploader.modules_updated) == 0:
+                                total_module_progress = current_module_progress / (len(module_uploader.modules_to_update_all) * 100)
                             else:
-                                total_module_progress = (module_uploader.progress + (len(module_uploader.modules_updated)) * 100) / (len(module_uploader.modules_to_update_all) * 100) * 100
+                                total_module_progress = (module_uploader.progress + (len(module_uploader.modules_updated) - 1) * 100) / (len(module_uploader.modules_to_update_all) * 100) * 100
 
                             total_progress += total_module_progress / len(self.module_uploaders)
 
@@ -1541,7 +1535,7 @@ class ModuleFirmwareMultiUpdater():
                         current_module_progress = 0
                         total_module_progress = 0
 
-                        if module_uploader.progress:
+                        if module_uploader.progress != None:
                             current_module_progress = module_uploader.progress
                             if len(module_uploader.modules_to_update) == 0:
                                 total_module_progress = module_uploader.progress
