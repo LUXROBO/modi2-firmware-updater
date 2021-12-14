@@ -43,9 +43,7 @@ class ModuleFirmwareUpdater:
     UPDATE_FIRMWARE_MODE = 0
     CHNAGE_TYPE_MODE = 1
 
-    def __init__(
-        self, port=None, is_os_update=True, target_ids=(0xFFF,), conn_type="ser", local_firmware_path=None, firmware_version_info = {}
-    ):
+    def __init__(self, port=None, is_os_update=True, target_ids=(0xFFF,), conn_type="ser", local_firmware_path=None):
         self.print = True
         self.conn_type = conn_type
         self.__target_ids = target_ids
@@ -79,7 +77,6 @@ class ModuleFirmwareUpdater:
         self.change_type_target = 0
         self.change_type_success_flag = False
 
-        self.firmware_version_info = firmware_version_info
         self.local_firmware_path = local_firmware_path
 
         self.open(port)
@@ -217,11 +214,12 @@ class ModuleFirmwareUpdater:
             ]
             self.network_version = ".".join(module_version)
 
-    def update_module_firmware(self):
+    def update_module_firmware(self, firmware_version_info):
         self.has_update_error = False
         self.request_network_id()
         self.reset_state()
         self.update_mode = self.UPDATE_FIRMWARE_MODE
+        self.firmware_version_info = firmware_version_info
         for target in self.__target_ids:
             self.request_to_update_firmware(target)
 
@@ -350,18 +348,6 @@ class ModuleFirmwareUpdater:
             module_elem = module_id, module_type
             self.modules_to_update_second_bootloader.append(module_elem)
             print(f"Adding {module_type} ({module_id}) to second bootloader waiting list...{' ' * 60}")
-
-    # def update_module(self, module_id: int, module_type: str) -> None:
-    #     if self.update_in_progress:
-    #         return
-    #     self.update_in_progress = True
-    #     self.update_index = 0
-    #     updater_thread = th.Thread(
-    #         target=self.__update_firmware,
-    #         args=(module_id, module_type, 0)
-    #     )
-    #     updater_thread.daemon = True
-    #     updater_thread.start()
 
     def change_type_module(self, module_id: int, module_type: str) -> None:
         if self.update_in_progress:
@@ -1348,7 +1334,6 @@ class ModuleFirmwareMultiUpdater():
             try:
                 module_uploader = ModuleFirmwareUpdater(
                     port = modi_port.device,
-                    firmware_version_info = firmware_version_info,
                     local_firmware_path = self.local_firmware_path
                 )
                 module_uploader.set_print(False)
@@ -1371,6 +1356,7 @@ class ModuleFirmwareMultiUpdater():
         for index, module_uploader in enumerate(self.module_uploaders):
             th.Thread(
                 target=module_uploader.update_module_firmware,
+                args=(firmware_version_info, ),
                 daemon=True
             ).start()
             if self.list_ui:
@@ -1476,7 +1462,10 @@ class ModuleFirmwareMultiUpdater():
             if i > 9:
                 break
             try:
-                module_uploader = ModuleFirmwareUpdater(port = modi_port.device)
+                module_uploader = ModuleFirmwareUpdater(
+                    port = modi_port.device,
+                    local_firmware_path = self.local_firmware_path
+                )
                 module_uploader.set_print(False)
                 module_uploader.set_raise_error(False)
             except:

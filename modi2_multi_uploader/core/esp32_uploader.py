@@ -4102,7 +4102,7 @@ class ESP32FirmwareUpdater():
             version_info = version_file.readline().lstrip("v").rstrip("\n")
         return version_info
 
-    def update_firmware(self, update_interpreter, force):
+    def update_firmware(self, update_interpreter):
         if update_interpreter:
             self.esp = SerTask(port=self.port)
             self.esp.open_conn()
@@ -4541,7 +4541,7 @@ class ESP32FirmwareMultiUploder():
     def set_task_end_callback(self, task_end_callback):
         self.task_end_callback = task_end_callback
 
-    def update_firmware(self, modi_ports, update_interpreter=False, force=True):
+    def update_firmware(self, modi_ports, update_interpreter=False):
         self.esp32_updaters = []
         self.network_uuid = []
         self.state = []
@@ -4569,7 +4569,7 @@ class ESP32FirmwareMultiUploder():
         for index, esp32_updater in enumerate(self.esp32_updaters):
             th.Thread(
                 target=esp32_updater.update_firmware,
-                args=(update_interpreter, force),
+                args=(update_interpreter, ),
                 daemon=True
             ).start()
 

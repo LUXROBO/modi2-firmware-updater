@@ -445,17 +445,18 @@ class Form(QDialog):
 
         self.module_upload_list_form.ui.setWindowTitle("Update Network Modules")
         self.module_upload_list_form.reset_device_list()
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
-        def run_task(self, modi_ports):
-            network_updater = NetworkFirmwareMultiUpdater()
+        def run_task(self, modi_ports, firmware_version_info):
+            network_updater = NetworkFirmwareMultiUpdater(self.local_firmware_path)
             network_updater.set_ui(self.ui, self.module_upload_list_form)
             network_updater.set_task_end_callback(self.__reset_ui)
             self.firmware_updater = network_updater
-            network_updater.update_module_firmware(modi_ports, False)
+            network_updater.update_module_firmware(modi_ports, False, firmware_version_info)
 
         th.Thread(
             target=run_task,
-            args=(self, modi_ports),
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
 
@@ -479,17 +480,18 @@ class Form(QDialog):
 
         self.module_upload_list_form.ui.setWindowTitle("Set Network Bootloader")
         self.module_upload_list_form.reset_device_list()
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
-        def run_task(self, modi_ports):
-            network_updater = NetworkFirmwareMultiUpdater()
+        def run_task(self, modi_ports, firmware_version_info):
+            network_updater = NetworkFirmwareMultiUpdater(self.local_firmware_path)
             network_updater.set_ui(self.ui, self.module_upload_list_form)
             network_updater.set_task_end_callback(self.__reset_ui)
             self.firmware_updater = network_updater
-            network_updater.update_module_firmware(modi_ports, True)
+            network_updater.update_module_firmware(modi_ports, True, firmware_version_info)
 
         th.Thread(
             target=run_task,
-            args=(self, modi_ports),
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
 
