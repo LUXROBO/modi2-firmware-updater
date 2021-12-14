@@ -111,7 +111,7 @@ class NetworkFirmwareUpdater(serial.Serial):
             self.__print("wait for request")
             recved = self.wait_for_json(timeout)
 
-            if time.time() - init_time > timeout or not recved:
+            if time.time() - init_time > timeout:
                 return None, None
 
             try:
@@ -135,6 +135,8 @@ class NetworkFirmwareUpdater(serial.Serial):
                         return module_uuid , None
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
+            except:
+                pass
 
             time.sleep(0.2)
 
@@ -727,7 +729,7 @@ class NetworkFirmwareMultiUpdater():
     def set_task_end_callback(self, task_end_callback):
         self.task_end_callback = task_end_callback
 
-    def update_module_firmware(self, modi_ports, bootloader, firmware_version_info):
+    def update_module_firmware(self, modi_ports, bootloader, firmware_version_info = {}):
         self.network_updaters = []
         self.network_uuid = []
         self.state = []

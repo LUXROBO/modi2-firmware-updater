@@ -214,7 +214,7 @@ class ModuleFirmwareUpdater:
             ]
             self.network_version = ".".join(module_version)
 
-    def update_module_firmware(self, firmware_version_info):
+    def update_module_firmware(self, firmware_version_info = {}):
         self.has_update_error = False
         self.request_network_id()
         self.reset_state()
@@ -1397,10 +1397,10 @@ class ModuleFirmwareMultiUpdater():
 
                         if module_uploader.progress != None and len(module_uploader.modules_to_update_all) != 0:
                             current_module_progress = module_uploader.progress
-                            if len(module_uploader.modules_updated) == 0:
-                                total_module_progress = current_module_progress / (len(module_uploader.modules_to_update_all) * 100)
+                            if len(module_uploader.modules_updated) == len(module_uploader.modules_to_update_all):
+                                total_module_progress = 100
                             else:
-                                total_module_progress = (module_uploader.progress + (len(module_uploader.modules_updated) - 1) * 100) / (len(module_uploader.modules_to_update_all) * 100) * 100
+                                total_module_progress = (module_uploader.progress + len(module_uploader.modules_updated) * 100) / (len(module_uploader.modules_to_update_all) * 100) * 100
 
                             total_progress += total_module_progress / len(self.module_uploaders)
 

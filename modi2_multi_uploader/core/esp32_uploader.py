@@ -488,7 +488,8 @@ class ESPLoader(object):
                         return module_uuid
             except json.decoder.JSONDecodeError as jde:
                 # print("json parse error: " + str(jde))
-                return None
+                # return None
+                pass
 
             if time.time() - init_time > 5:
                 return None
@@ -608,12 +609,12 @@ class ESPLoader(object):
             # print("network uuid", f'0x{self.network_uuid:X}')
 
         # print("request esp app version")
-        esp_app_version = self.get_esp_app_version()
+        # esp_app_version = self.get_esp_app_version()
         # if esp_app_version is not None:
             # print("esp app version", esp_app_version)
 
         # print ("request esp ota version")
-        esp_ota_version = self.get_esp_ota_version()
+        # esp_ota_version = self.get_esp_ota_version()
         # if esp_ota_version is not None:
             # print("esp ota version", esp_ota_version)
 
@@ -4049,19 +4050,9 @@ FK3JstjaPDbhTnM9u/28uDgYRLjoq1ml/2YEpIIv7cvl/izGpnFh4vn/AOixonk=\
 from os import path
 
 class ESP32FirmwareUpdater():
-    def __init__(self, port):
+    def __init__(self, port, local_firmware_path=None):
         self.port = port
         self.baudrate = 921600
-        self.firmware_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest", "esp32")
-        self.arg = ['--chip', 'esp32',
-                    '--port', self.port,
-                    '--baud', str(self.baudrate),
-                    'write_flash',
-                    '0xd000', path.join(self.firmware_path,'ota_data_initial.bin'),
-                    '0x1000', path.join(self.firmware_path,'bootloader.bin'),
-                    '0x8000', path.join(self.firmware_path,'partitions.bin'),
-                    '0x00220000', path.join(self.firmware_path,'modi_ota_factory.bin'),
-                    '0x00010000', path.join(self.firmware_path,'esp32.bin')]
 
         self.network_uuid = None
         self.app_version_to_update = None
@@ -4074,6 +4065,9 @@ class ESP32FirmwareUpdater():
         self.update_error_message = ""
 
         self.ui = None
+        self.print = True
+
+        self.local_firmware_path = local_firmware_path
 
     def set_ui(self, ui):
         self.ui = ui
@@ -4088,21 +4082,8 @@ class ESP32FirmwareUpdater():
         if self.print:
             print(data, end)
 
-    def get_latest_app_version(self):
-        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest", "esp32")
-        version_path = path.join(root_path, "esp_app_version.txt")
-        with open(version_path, "r") as version_file:
-            version_info = version_file.readline().lstrip("v").rstrip("\n")
-        return version_info
-
-    def get_latest_ota_version(self):
-        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest", "esp32")
-        version_path = path.join(root_path, "esp_ota_version.txt")
-        with open(version_path, "r") as version_file:
-            version_info = version_file.readline().lstrip("v").rstrip("\n")
-        return version_info
-
-    def update_firmware(self, update_interpreter):
+    def update_firmware(self, update_interpreter, firmware_version_info):
+        self.firmware_version_info = firmware_version_info
         if update_interpreter:
             self.esp = SerTask(port=self.port)
             self.esp.open_conn()
@@ -4199,6 +4180,18 @@ class ESP32FirmwareUpdater():
         else:
             self.__print("update_firmware")
 
+            self.app_firmware_path = path.join(self.local_firmware_path, "esp32", "app", self.firmware_version_info["esp32_app"]["app"])
+            self.ota_firmware_path = path.join(self.local_firmware_path, "esp32", "ota", self.firmware_version_info["esp32_ota"]["app"])
+            self.arg = ['--chip', 'esp32',
+                        '--port', self.port,
+                        '--baud', str(self.baudrate),
+                        'write_flash',
+                        '0xd000', path.join(self.app_firmware_path,'ota_data_initial.bin'),
+                        '0x1000', path.join(self.app_firmware_path,'bootloader.bin'),
+                        '0x8000', path.join(self.app_firmware_path,'partitions.bin'),
+                        '0x00220000', path.join(self.ota_firmware_path,'modi_ota_factory.bin'),
+                        '0x00010000', path.join(self.app_firmware_path,'esp32.bin')]
+
             """
             Main function for esptool
 
@@ -4211,8 +4204,11 @@ class ESP32FirmwareUpdater():
             argv = self.arg
             esp = None
 
-            self.app_version_to_update = self.get_latest_app_version()
-            self.ota_version_to_update = self.get_latest_ota_version()
+            app_version_info = self.firmware_version_info["esp32_app"]["app"]
+            ota_version_info = self.firmware_version_info["esp32_ota"]["app"]
+
+            self.app_version_to_update = app_version_info.lstrip("v").rstrip("\n")
+            self.ota_version_to_update = ota_version_info.lstrip("v").rstrip("\n")
 
             parser = argparse.ArgumentParser(description='esptool.py v%s - ESP8266 ROM Bootloader Utility' % __version__, prog='esptool')
 
@@ -4452,6 +4448,7 @@ class ESP32FirmwareUpdater():
                     operation_func(self.esp, args)
                 except Exception as e:
                     self.update_error_message = str(e)
+                    print(self.update_error_message)
                     if self.raise_error_message:
                         raise Exception(self.update_error_message)
                     else:
@@ -4529,10 +4526,12 @@ class ESP32FirmwareUpdater():
 
 
 class ESP32FirmwareMultiUploder():
-    def __init__(self):
+    def __init__(self, local_firmware_path):
         self.update_in_progress = False
         self.ui = None
         self.list_ui = None
+        self.task_end_callback = None
+        self.local_firmware_path = local_firmware_path
 
     def set_ui(self, ui, list_ui):
         self.ui = ui
@@ -4541,7 +4540,7 @@ class ESP32FirmwareMultiUploder():
     def set_task_end_callback(self, task_end_callback):
         self.task_end_callback = task_end_callback
 
-    def update_firmware(self, modi_ports, update_interpreter=False):
+    def update_firmware(self, modi_ports, update_interpreter=False, firmware_version_info = {}):
         self.esp32_updaters = []
         self.network_uuid = []
         self.state = []
@@ -4550,7 +4549,10 @@ class ESP32FirmwareMultiUploder():
             if i > 9:
                 break
             try:
-                esp32_updater = ESP32FirmwareUpdater(modi_port.device)
+                esp32_updater = ESP32FirmwareUpdater(
+                    port = modi_port.device,
+                    local_firmware_path = self.local_firmware_path
+                )
                 esp32_updater.set_print(False)
                 esp32_updater.set_raise_error(False)
             except Exception as e:
@@ -4569,7 +4571,7 @@ class ESP32FirmwareMultiUploder():
         for index, esp32_updater in enumerate(self.esp32_updaters):
             th.Thread(
                 target=esp32_updater.update_firmware,
-                args=(update_interpreter, ),
+                args=(update_interpreter, firmware_version_info),
                 daemon=True
             ).start()
 

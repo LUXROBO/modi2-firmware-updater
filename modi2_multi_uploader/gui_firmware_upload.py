@@ -306,17 +306,18 @@ class Form(QDialog):
 
         self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32")
         self.esp32_upload_list_form.reset_device_list()
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
-        def run_task(self, modi_ports):
-            esp32_updater = ESP32FirmwareMultiUploder()
+        def run_task(self, modi_ports, firmware_version_info):
+            esp32_updater = ESP32FirmwareMultiUploder(self.local_firmware_path)
             esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
             esp32_updater.set_task_end_callback(self.__reset_ui)
             self.firmware_updater = esp32_updater
-            esp32_updater.update_firmware(modi_ports, False)
+            esp32_updater.update_firmware(modi_ports, False, firmware_version_info)
 
         th.Thread(
             target=run_task,
-            args=(self, modi_ports),
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
 
@@ -340,17 +341,18 @@ class Form(QDialog):
 
         self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32 Interpreter")
         self.esp32_upload_list_form.reset_device_list()
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
-        def run_task(self, modi_ports):
-            esp32_updater = ESP32FirmwareMultiUploder()
+        def run_task(self, modi_ports, firmware_version_info):
+            esp32_updater = ESP32FirmwareMultiUploder(self.local_firmware_path)
             esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
             esp32_updater.set_task_end_callback(self.__reset_ui)
             self.firmware_updater = esp32_updater
-            esp32_updater.update_firmware(modi_ports, True)
+            esp32_updater.update_firmware(modi_ports, True, firmware_version_info)
 
         th.Thread(
             target=run_task,
-            args=(self, modi_ports),
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
 
