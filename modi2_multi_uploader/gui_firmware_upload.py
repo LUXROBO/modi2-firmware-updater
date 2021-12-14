@@ -123,7 +123,7 @@ class Form(QDialog):
     GUI Form of MODI Firmware Updater
     """
 
-    def __init__(self, develop=True, debug=False):
+    def __init__(self, debug=False):
         QDialog.__init__(self)
         self.logger = self.__init_logger()
         self.__excepthook = sys.excepthook
@@ -146,6 +146,7 @@ class Form(QDialog):
 
         self.ui.setStyleSheet("background-color: white")
         self.ui.console.hide()
+        self.ui.firmware_manage_button.setVisible(False)
         self.ui.setFixedHeight(640)
 
         # Set LUXROBO logo image
@@ -280,7 +281,6 @@ class Form(QDialog):
         self.check_module_firmware()
 
         # Set Button Status
-        self.ui.firmware_manage_button.setVisible(develop)
         self.refresh_button_text()
         self.refresh_console()
         self.ui.show()
@@ -524,9 +524,11 @@ class Form(QDialog):
     def refresh_console(self):
         if self.console:
             self.ui.console.show()
+            self.ui.firmware_manage_button.setVisible(True)
             self.ui.setFixedHeight(720)
         else:
             self.ui.console.hide()
+            self.ui.firmware_manage_button.setVisible(False)
             self.ui.setFixedHeight(640)
 
     def translate_button_text(self):

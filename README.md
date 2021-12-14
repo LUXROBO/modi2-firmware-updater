@@ -7,11 +7,11 @@
 
 실행 방법 (개발)
 --
-`python3 main.py --mode develop`로 GUI 프로그램을 실행한다.
+`python3 main.py --debug True`로 GUI 프로그램을 실행한다.
 
-실행 방법 (양산 or 배포)
+실행 방법 (일반)
 --
-`python3 main.py --mode native`로 GUI 프로그램을 실행한다.
+`python3 main.py`로 GUI 프로그램을 실행한다.
 
 실행파일 생성
 --
