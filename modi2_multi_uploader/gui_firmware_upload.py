@@ -557,14 +557,14 @@ class Form(QDialog):
             if download_success:
                 refresh_success = self.firmware_manage_form.refresh_firmware_info()
                 if refresh_success:
-                    self.firmware_manage_form.apply_button_clicked()
+                    self.firmware_manage_form.apply_firmware(show_message=False)
                 else:
                     check_success = False
             else:
                 check_success = False
         else:
             refresh_success = self.firmware_manage_form.refresh_firmware_info()
-            self.firmware_manage_form.apply_button_clicked()
+            self.firmware_manage_form.apply_firmware(show_message=False)
 
         if not check_success:
             def error_exception(message):

@@ -170,10 +170,7 @@ class FirmwareManagerForm(QDialog):
         msg.exec_()
 
     def apply_button_clicked(self):
-        firmware_version_info = self.get_selected_firmware_version_info()
-        with open(self.firmware_version_config_path, "w") as config_file:
-            json_msg = json.dumps(firmware_version_info, indent=4)
-            config_file.write(str(json_msg))
+        self.apply_firmware(show_message = True)
 
     def download_firmware(self):
         connection = self.__check_internet_connection()
@@ -306,6 +303,21 @@ class FirmwareManagerForm(QDialog):
             return False
 
         return True
+
+    def apply_firmware(self, show_message):
+        firmware_version_info = self.get_selected_firmware_version_info()
+        with open(self.firmware_version_config_path, "w") as config_file:
+            json_msg = json.dumps(firmware_version_info, indent=4)
+            config_file.write(str(json_msg))
+
+            if show_message:
+                msg = QMessageBox()
+                msg.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
+                msg.setWindowTitle("apply firmware")
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.setIcon(QMessageBox.Icon.Information)
+                msg.setText("apply successful.")
+                msg.exec_()
 
     def get_selected_firmware_version_info(self):
         module_version_dic = {}
