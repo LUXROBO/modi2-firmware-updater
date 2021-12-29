@@ -66,7 +66,7 @@ class NetworkFirmwareUpdater(serial.Serial):
                 else:
                     break
             self.__print(f"Connecting to MODI network module at {modi_port.device}")
-        
+
         self.bootloader = False
         self.network_version = None
         self.network_uuid = None
@@ -261,7 +261,7 @@ class NetworkFirmwareUpdater(serial.Serial):
                 crc_val = erase_page_num,
                 page_addr = 0x0801f800
             )
-            
+
             # erase_page_success = self.set_firmware_command("erase", module_id, 0, 0x0801F800)
             if not erase_page_success:
                 self.update_error = -1
@@ -273,9 +273,9 @@ class NetworkFirmwareUpdater(serial.Serial):
             for end_flash_ptr in range(0, len(end_flash_data), 8):
                 curr_data = end_flash_data[end_flash_ptr : end_flash_ptr + 8]
                 checksum = self.set_firmware_data(
-                    module_id, 
-                    seq_num=end_flash_ptr//8, 
-                    bin_data=curr_data, 
+                    module_id,
+                    seq_num=end_flash_ptr//8,
+                    bin_data=curr_data,
                     checksum=checksum
                 )
                 time.sleep(0.001)
@@ -335,7 +335,7 @@ class NetworkFirmwareUpdater(serial.Serial):
                 else:
                     is_success = True
                     break
-                
+
                 if time.time() - init_time > retry_timeout:
                     break
                 time.sleep(0.5)
@@ -535,7 +535,7 @@ class NetworkFirmwareUpdater(serial.Serial):
             if not sum(curr_page):
                 page_begin = page_begin + page_size
                 continue
-            
+
             erase_page_success = self.set_firmware_command(
                 oper_type = "erase",
                 module_id = module_id,
@@ -614,7 +614,7 @@ class NetworkFirmwareUpdater(serial.Serial):
         self.__print("Module firmwares have been updated!")
 
         time.sleep(1)
-        
+
         if self.is_open:
             self.flushInput()
             self.flushOutput()

@@ -293,7 +293,7 @@ class FirmwareManagerForm(QDialog):
 
                 if key in ["network", "esp32_app", "esp32_ota"]:
                     continue
-                
+
                 bootloader_version = config_firmeware_version_info[key]["bootloader"]
                 all_texts = [self.module_ui_dic[key]["bootloader"].itemText(i) for i in range(self.module_ui_dic[key]["bootloader"].count())]
                 if bootloader_version in all_texts:

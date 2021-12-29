@@ -55,7 +55,7 @@ class ModuleFirmwareUpdater:
         self.update_in_progress = False
         self.update_module_num = 0
 
-        self.modules_to_update_all = [] 
+        self.modules_to_update_all = []
         self.modules_to_update = []
         self.modules_to_update_second_bootloader = []
         self.modules_to_update_bootloader = []
@@ -314,7 +314,7 @@ class ModuleFirmwareUpdater:
 
     def add_to_module_list(self, module_id: int, module_type: str, module_section: int) -> None:
         modules_update_all_flag = True
-        
+
         for curr_module_id, curr_module_type in self.modules_to_update_all:
             if module_id == curr_module_id:
                 modules_update_all_flag = False
@@ -503,7 +503,7 @@ class ModuleFirmwareUpdater:
                 | os_version_digits[1] << 8
                 | os_version_digits[2]
             )
-            
+
             app_version_info = self.firmware_version_info[module_type]["app"]
             app_version_info = app_version_info.lstrip("v")
             app_version_digits = [int(digit) for digit in app_version_info.split(".")]
@@ -894,7 +894,7 @@ class ModuleFirmwareUpdater:
         for curr_module_id, curr_module_type in self.modules_updated:
             if module_id == curr_module_id:
                 is_already_updated = True
-        
+
         if not is_already_updated:
             self.update_in_progress = True
             self.module_type = module_type
@@ -914,7 +914,7 @@ class ModuleFirmwareUpdater:
                     else:
                         self.ui.change_modules_type_button.setText(f"모듈 타입 변경이 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                # send change 
+                # send change
                 uuid_changed_with_type = self.change_type_target << 32
                 self.send_change_type(module_id, uuid_changed_with_type)
                 time.sleep(0.5)
@@ -1044,9 +1044,9 @@ class ModuleFirmwareUpdater:
             for end_flash_ptr in range(0, len(end_flash_data), 8):
                 curr_data = end_flash_data[end_flash_ptr : end_flash_ptr + 8]
                 checksum = self.send_firmware_data(
-                    module_id, 
-                    seq_num=end_flash_ptr//8, 
-                    bin_data=curr_data, 
+                    module_id,
+                    seq_num=end_flash_ptr//8,
+                    bin_data=curr_data,
                     crc_val=checksum
                 )
                 time.sleep(0.001)
@@ -1210,7 +1210,7 @@ class ModuleFirmwareUpdater:
         except:
             return
         # print("received cmd is ", ins)
-        
+
         command = {
             0x05: self.__assign_network_id,
             0x0A: self.__update_warning,

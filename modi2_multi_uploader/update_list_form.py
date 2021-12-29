@@ -85,7 +85,7 @@ class ESP32UpdateListForm(QDialog):
         ]
 
         self.ui.close_button.clicked.connect(self.ui.close)
-        
+
         self.network_state_signal.connect(self.set_network_state)
         self.network_uuid_signal.connect(self.set_network_uuid)
         self.progress_signal.connect(self.progress_value_changed)
@@ -295,7 +295,7 @@ class ModuleUpdateListForm(QDialog):
         self.total_progress_signal.connect(self.total_progress_value_changed)
         self.total_status_signal.connect(self.total_progress_status_changed)
         self.error_message_signal.connect(self.set_error_message)
-        
+
         self.device_num = 0
         self.device_max_num = 10
 

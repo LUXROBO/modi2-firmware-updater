@@ -4395,7 +4395,7 @@ class ESP32FirmwareUpdater():
                 if self.esp.network_uuid is not None:
                     self.network_uuid = self.esp.network_uuid
                     self.__print("network uuid", f'0x{self.network_uuid:X}')
-            
+
                 self.update_in_progress = True
 
                 if self.esp.secure_download_mode:
