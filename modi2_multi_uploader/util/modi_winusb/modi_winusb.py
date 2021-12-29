@@ -68,7 +68,8 @@ class ModiWinUsb(object):
             if path is None:
                 raise ctypes.WinError()
 
-            device_paths.append(path)
+            if self.find_device(path) and not path in device_paths:
+                device_paths.append(path)
 
             i += 1
             member_index = DWORD(i)
@@ -78,7 +79,7 @@ class ModiWinUsb(object):
         return device_paths
 
     def find_device(self, path):
-        return is_device(self._name, self._vid, self._pid, path)
+        return is_device(None, self.vid, self.pid, path)
 
     def init_winusb_device(self, path):
 
