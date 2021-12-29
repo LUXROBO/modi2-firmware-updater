@@ -1,0 +1,66 @@
+{
+    "button": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "dial": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "env": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "imu": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "joystick": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "tof": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "led": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "display": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "motor": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "speaker": {
+        "app": "v1.0.1",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "battery": {
+        "app": "v1.0.0",
+        "os": "v1.0.0",
+        "bootloader": "v1.0.0"
+    },
+    "network": {
+        "app": "v1.0.0"
+    },
+    "esp32_app": {
+        "app": "v4.0.1"
+    },
+    "esp32_ota": {
+        "app": "v1.0.0"
+    }
+}
