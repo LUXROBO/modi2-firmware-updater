@@ -1333,13 +1333,13 @@ class ModuleFirmwareMultiUpdater():
                 break
             try:
                 module_uploader = ModuleFirmwareUpdater(
-                    port = modi_port.device,
+                    port = modi_port,
                     local_firmware_path = self.local_firmware_path
                 )
                 module_uploader.set_print(False)
                 module_uploader.set_raise_error(False)
             except:
-                print("open " + modi_port.device + " error")
+                print("open " + modi_port + " error")
             else:
                 self.module_uploaders.append(module_uploader)
                 self.state.append(-1)
@@ -1463,13 +1463,13 @@ class ModuleFirmwareMultiUpdater():
                 break
             try:
                 module_uploader = ModuleFirmwareUpdater(
-                    port = modi_port.device,
+                    port = modi_port,
                     local_firmware_path = self.local_firmware_path
                 )
                 module_uploader.set_print(False)
                 module_uploader.set_raise_error(False)
             except:
-                print("open " + modi_port.device + " error")
+                print("open " + modi_port + " error")
             else:
                 self.module_uploaders.append(module_uploader)
                 self.state.append(-1)

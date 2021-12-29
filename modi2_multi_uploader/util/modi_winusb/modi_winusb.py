@@ -388,6 +388,9 @@ class ModiWinUsbComPort:
         self._rxremaining = line[i:]
         return line[0:i]
 
+    def read_all(self):
+        return self.read()
+
     def write(self, data):
         if not self.is_open:
             return None
@@ -517,6 +520,12 @@ class ModiWinUsbComPort:
 
     def close(self):
         self.disconnect()
+
+    def flushInput(self):
+        self.reset_input_buffer()
+
+    def flushOutput(self):
+        self.reset_output_buffer()
 
     def _select_device(self, path):
         api = ModiWinUsb()

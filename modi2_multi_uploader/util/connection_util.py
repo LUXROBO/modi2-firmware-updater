@@ -3,10 +3,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-import serial
-import serial.tools.list_ports as stl
 from serial.serialutil import SerialException
-from serial.tools.list_ports_common import ListPortInfo
+from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialport
 
 
 class ConnTask(ABC):
@@ -80,7 +78,7 @@ class SerTask(ConnTask):
             raise SerialException("No MODI network module is available")
 
         if self.__port:
-            if self.__port not in map(lambda info: info.device, modi_ports):
+            if self.__port not in map(lambda info: info, modi_ports):
                 raise SerialException(
                     f"{self.__port} is not connected "
                     f"to a MODI network module."
@@ -88,15 +86,13 @@ class SerTask(ConnTask):
             else:
                 try:
                     self._bus = self.__init_serial(self.__port)
-                    self._bus.open()
                     return
                 except SerialException:
                     raise SerialException(f"{self.__port} is not available.")
 
         for modi_port in modi_ports:
-            self._bus = self.__init_serial(modi_port.device)
+            self._bus = self.__init_serial(modi_port)
             try:
-                self._bus.open()
                 if self.verbose:
                     print(f'Serial is open at "{modi_port}"')
                 return
@@ -106,10 +102,7 @@ class SerTask(ConnTask):
 
     @staticmethod
     def __init_serial(port):
-        ser = serial.Serial(exclusive=True)
-        ser.baudrate = 921600
-        ser.port = port
-        ser.write_timeout = 0
+        ser = ModiSerialPort(port)
         return ser
 
     def close_conn(self) -> None:
@@ -168,29 +161,12 @@ class SerTask(ConnTask):
             print(f"send: {pkt}")
 
 
-def list_modi_ports() -> List[ListPortInfo]:
+def list_modi_ports() -> List[str]:
     """Returns a list of connected MODI ports
 
-    :return: List[ListPortInfo]
+    :return: List[str]
     """
-
-    def __is_modi_port(port):
-        return (
-            (port.manufacturer and port.manufacturer.upper() == "LUXROBO")
-            or port.product
-            in (
-                "MODI Network Module",
-                "MODI Network Module(BootLoader)",
-                "STM32 Virtual ComPort",
-                "STMicroelectronics Virtual COM Port",
-            )
-            or (port.vid == 0x2FDE and port.pid == 0x1)
-            or (port.vid == 0x2FDE and port.pid == 0x2)
-            or (port.vid == 0x2FDE and port.pid == 0x3)
-            or (port.vid == 0x2FDE and port.pid == 0x4)
-            or (port.vid == 0x483 and port.pid == 0x5740)
-        )
-    modi_ports = [port for port in stl.comports() if __is_modi_port(port)]
+    modi_ports = list_modi_serialport()
     # print(f'{len(modi_ports)} number of network module(s) exist(s)')
     return modi_ports
 
