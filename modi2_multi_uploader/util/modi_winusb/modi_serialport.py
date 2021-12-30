@@ -32,6 +32,7 @@ class ModiSerialPort():
         self.write_timeout = write_timeout
 
         self.serial_port = None
+        self.is_open = False
 
         if self.port is not None:
             self.open(self.port)
@@ -47,22 +48,24 @@ class ModiSerialPort():
             ser = serial.Serial(port = self.port, baudrate=self.baudrate, exclusive=True)
             self.serial_port = ser
 
+        self.is_open = True
+
     def close(self):
-        if self.serial_port is not None:
+        if self.is_open:
             self.serial_port.close()
 
     def write(self, data):
-        if self.serial_port == None:
+        if not self.is_open:
             raise Exception("serialport is not opened")
         self.serial_port.write(data)
 
     def read(self, size=1):
-        if self.serial_port == None:
+        if not self.is_open:
             raise Exception("serialport is not opened")
         return self.serial_port.read(size)
 
     def read_until(self, expected=b"\x0A", size=None):
-        if self.serial_port == None:
+        if not self.is_open:
             raise Exception("serialport is not opened")
 
         lenterm = len(expected)
@@ -83,22 +86,22 @@ class ModiSerialPort():
         return bytes(line)
 
     def read_all(self):
-        if self.serial_port == None:
+        if not self.is_open:
             raise Exception("serialport is not opened")
         return self.serial_port.read_all()
 
     def flush(self):
-        if self.serial_port == None:
+        if not self.is_open:
             raise Exception("serialport is not opened")
         self.serial_port.flush()
 
     def flushInput(self):
-        if self.serial_port == None:
+        if not self.is_open:
             raise Exception("serialport is not opened")
         self.serial_port.flushInput()
 
     def flushOutput(self):
-        if self.serial_port == None:
+        if not self.is_open:
             raise Exception("serialport is not opened")
         self.serial_port.flushOutput()
 
@@ -159,8 +162,6 @@ class ModiSerialPort():
             """
             self.duration = duration
             self.target_time = self.TIME() + duration
-
-
 
 # main
 if __name__ == "__main__":

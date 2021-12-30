@@ -117,21 +117,32 @@ class SerTask(ConnTask):
 
         :return: str
         """
-        buf_temp = self._bus.read_all()
-        self.__json_buffer += buf_temp
-        idx = self.__json_buffer.find(b"{")
-        if idx < 0:
-            self.__json_buffer = b""
-            return None
-        self.__json_buffer = self.__json_buffer[idx:]
-        idx = self.__json_buffer.find(b"}")
-        if idx < 0:
-            return None
-        json_pkt = self.__json_buffer[: idx + 1].decode("utf8")
-        self.__json_buffer = self.__json_buffer[idx + 1 :]
+        json_pkt = self.__wait_for_json()
         if self.verbose or verbose:
             print(f"recv: {json_pkt}")
         return json_pkt
+
+    def __read_json(self) -> Optional[str]:
+        json_pkt = b""
+        while json_pkt != b"{":
+            if not self._bus.is_open:
+                return None
+            json_pkt = self._bus.read()
+            if json_pkt == b"":
+                return None
+            time.sleep(0.1)
+        json_pkt += self._bus.read_until(b"}")
+        return json_pkt.decode("utf8")
+
+    def __wait_for_json(self, timeout=2):
+        json_msg = self.__read_json()
+        init_time = time.time()
+        while not json_msg:
+            json_msg = self.__read_json()
+            time.sleep(0.1)
+            if time.time() - init_time > timeout:
+                return None
+        return json_msg
 
     @ConnTask.wait
     def send(self, pkt: str, verbose=False) -> None:
