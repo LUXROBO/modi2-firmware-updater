@@ -20,10 +20,8 @@ from base64 import b64decode, b64encode
 from io import open
 from os import path
 
-import serial
-import serial.tools.list_ports as list_ports
-
-from modi2_multi_uploader.util.connection_util import SerTask
+from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort
+from modi2_multi_uploader.util.connection_util import SerTask, list_modi_ports
 from modi2_multi_uploader.util.message_util import decode_message, unpack_data
 from modi2_multi_uploader.util.module_util import get_module_type_from_uuid
 
@@ -266,7 +264,7 @@ class ESPLoader(object):
         self.firmware_num = 0
 
         if isinstance(port, basestring):
-            self._port = serial.serial_for_url(port)
+            self._port = ModiSerialPort(port)
         else:
             self._port = port
         self._slip_reader = slip_reader(self._port, self.trace)
@@ -435,24 +433,26 @@ class ESPLoader(object):
             return val
 
     def flush_input(self):
-        self._port.flushInput()
+        # self._port.flushInput()
         self._slip_reader = slip_reader(self._port, self.trace)
 
     def sync(self):
-        self.command(self.ESP_SYNC, b'\x07\x07\x12\x20' + 32 * b'\x55',
-                     timeout=SYNC_TIMEOUT)
+        self.command(self.ESP_SYNC, b'\x07\x07\x12\x20' + 32 * b'\x55', timeout=SYNC_TIMEOUT)
         for i in range(7):
             self.command()
 
     def _setDTR(self, state):
-        self._port.setDTR(state)
+        pass
+        # self._port.setDTR(state)
 
     def _setRTS(self, state):
-        self._port.setRTS(state)
+        pass
+        # self._port.setRTS(state)
+
         # Work-around for adapters on Windows using the usbser.sys driver:
         # generate a dummy change to DTR so that the set-control-line-state
         # request is sent with the updated RTS state and the same DTR state
-        self._port.setDTR(self._port.dtr)
+        # self._port.setDTR(self._port.dtr)
 
     def read_json(self):
         json_pkt = b""
@@ -621,7 +621,7 @@ class ESPLoader(object):
         # print("send network module usb mode")
         self._port.write(str('{"c":43,"s":0,"d":4095,"b":"Kw==","l":1}').encode('utf-8'))
         self.flush_input()
-        self._port.flushOutput()
+        # self._port.flushOutput()
         time.sleep(0.5)
 
         # issue reset-to-bootloader:
@@ -652,7 +652,7 @@ class ESPLoader(object):
         for _ in range(5):
             try:
                 self.flush_input()
-                self._port.flushOutput()
+                # self._port.flushOutput()
                 self.sync()
                 return None
             except FatalError as e:
@@ -2947,8 +2947,7 @@ def slip_reader(port, trace_function):
     partial_packet = None
     in_escape = False
     while True:
-        waiting = port.inWaiting()
-        read_bytes = port.read(1 if waiting == 0 else waiting)
+        read_bytes = port.read()
         if read_bytes == b'':
             waiting_for = "header" if partial_packet is None else "content"
             trace_function("Timed out waiting for packet %s", waiting_for)
@@ -2963,7 +2962,7 @@ def slip_reader(port, trace_function):
                     partial_packet = b""
                 else:
                     trace_function("Read invalid data: %s", HexFormatter(read_bytes))
-                    trace_function("Remaining data in serial buffer: %s", HexFormatter(port.read(port.inWaiting())))
+                    trace_function("Remaining data in serial buffer: %s", HexFormatter(port.read()))
                     raise FatalError('Invalid head of packet (0x%s)' % hexify(b))
             elif in_escape:  # part-way through escape sequence
                 in_escape = False
@@ -2973,7 +2972,7 @@ def slip_reader(port, trace_function):
                     partial_packet += b'\xdb'
                 else:
                     trace_function("Read invalid data: %s", HexFormatter(read_bytes))
-                    trace_function("Remaining data in serial buffer: %s", HexFormatter(port.read(port.inWaiting())))
+                    trace_function("Remaining data in serial buffer: %s", HexFormatter(port.read()))
                     raise FatalError('Invalid SLIP escape (0xdb, 0x%s)' % (hexify(b)))
             elif b == b'\xdb':  # start of escape sequence
                 in_escape = True
@@ -3711,10 +3710,10 @@ def add_spi_flash_subparsers(parent, allow_keep, auto_detect):
         add_spi_connection_arg(parent)
 
 def get_port_list():
-    if list_ports is None:
+    if list_modi_ports is None:
         raise FatalError("Listing all serial ports is currently not available. Please try to specify the port when "
                          "running esptool.py or update the pyserial package to the latest version")
-    return sorted(ports.device for ports in list_ports.comports())
+    return sorted(list_modi_ports())
 
 
 def expand_file_arguments(argv):
@@ -4550,7 +4549,7 @@ class ESP32FirmwareMultiUploder():
                 break
             try:
                 esp32_updater = ESP32FirmwareUpdater(
-                    port = modi_port.device,
+                    port = modi_port,
                     local_firmware_path = self.local_firmware_path
                 )
                 esp32_updater.set_print(False)

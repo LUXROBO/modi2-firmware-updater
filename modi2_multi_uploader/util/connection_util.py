@@ -63,7 +63,6 @@ class SerTask(ConnTask):
             print("Initiating serial connection...")
         super().__init__(verbose)
         self.__port = port
-        self.__json_buffer = b""
 
     #
     # Inherited Methods
