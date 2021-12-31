@@ -293,13 +293,24 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 self.network_id = 0xFFF
 
             self.__print("update network module")
-            self.progress = 50
-            self.send_set_network_module_state(self.network_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
-            time.sleep(5)
+            for i in range(0, 45):
+                self.progress = i
+                time.sleep(0.01)
+
+            for i in range(46, 50):
+                self.progress = i
+                self.send_set_network_module_state(self.network_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
+                time.sleep(0.5)
+
+            for i in range(51, 100):
+                self.progress = i
+                time.sleep(0.01)
+
             self.progress = 100
 
             if self.is_open:
                 self.close()
+
             time.sleep(5)
             self.update_error = 1
             self.update_in_progress = False
@@ -356,14 +367,16 @@ class NetworkFirmwareUpdater(ModiSerialPort):
             # update network module
             self.__print("update network module")
             update_success = self.update_network_module(self.network_id)
-            if not update_success:
-                self.__print("update error - " + self.update_error_message)
 
             if self.is_open:
                 self.close()
 
+            if not update_success:
+                self.__print("update error - " + self.update_error_message)
+            else:
+                self.update_error = 1
+
             self.update_in_progress = False
-            self.update_error = 1
 
     def update_network_module(self, module_id):
         root_path = path.join(self.local_firmware_path, "network", self.firmware_version_info["network"]["app"])
@@ -407,8 +420,9 @@ class NetworkFirmwareUpdater(ModiSerialPort):
             curr_page = bin_buffer[page_begin:page_end]
 
             # Skip current page if empty
-            if not sum(curr_page):
+            if curr_page == bytes(len(curr_page)):
                 page_begin = page_begin + page_size
+                time.sleep(0.2)
                 continue
 
             erase_page_success = self.set_firmware_command(
@@ -419,8 +433,8 @@ class NetworkFirmwareUpdater(ModiSerialPort):
             )
             if not erase_page_success:
                 self.update_error = -1
-                self.update_error_message = "Erase response error"
-                return False
+                self.update_error_message = "Erase flash failed."
+                break
 
             checksum = 0
             for curr_ptr in range(0, page_size, 8):
@@ -438,15 +452,17 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 crc_val = checksum,
                 page_addr = flash_memory_addr + page_begin + page_offset
             )
-            if not crc_page_success:
+
+            if crc_page_success:
+                page_retry_count = 0
+            else:
                 page_retry_count += 1
                 if page_retry_count > page_retry_max_count:
                     self.update_error = -1
-                    self.update_error_message = "CRC response error"
-                    return False
+                    self.update_error_message = "Check crc failed."
+                    break
                 continue
-            else:
-                page_retry_count = 0
+
             page_begin = page_begin + page_size
             time.sleep(0.01)
 
@@ -476,9 +492,11 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         for xxx in range(4):
             end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
 
-        end_flash_success = self.set_end_flash_data(module_id, end_flash_data)
-        if not end_flash_success:
-            return False
+        success_end_flash = self.set_end_flash_data(module_id, end_flash_data)
+        if not success_end_flash:
+            self.update_error_message = "version writing failed."
+            self.update_error = -1
+
         self.__print(f"Version info (v{network_version_info}) has been written to its firmware!")
 
         self.__print(f"Firmware update is done for network ({module_id})")
