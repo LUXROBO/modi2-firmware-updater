@@ -4659,6 +4659,7 @@ class ESP32FirmwareMultiUploder():
 
                     self.state[index] = 3
                 elif self.state[index] == 3:
+                    current_sequence += 100 * esp32_updater.esp.firmware_num
                     total_sequence += 100 * esp32_updater.esp.firmware_num
 
                 time.sleep(0.001)
