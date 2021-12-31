@@ -21,7 +21,8 @@ from io import open
 from os import path
 
 from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort
-from modi2_multi_uploader.util.connection_util import SerTask, list_modi_ports
+
+from modi2_multi_uploader.util.connection_util import list_modi_ports
 from modi2_multi_uploader.util.message_util import decode_message, unpack_data
 from modi2_multi_uploader.util.module_util import get_module_type_from_uuid
 
@@ -4099,21 +4100,43 @@ class ESP32FirmwareUpdater():
     def update_firmware(self, update_interpreter, firmware_version_info):
         self.firmware_version_info = firmware_version_info
         if update_interpreter:
-            self.esp = SerTask(port=self.port)
-            self.esp.open_conn()
+            self.esp = ModiSerialPort(port=self.port)
             time.sleep(1)
+
+            def read_json(esp):
+                json_pkt = b""
+                while json_pkt != b"{":
+                    if not esp.is_open:
+                        return None
+                    json_pkt = esp.read()
+                    if json_pkt == b"":
+                        return None
+                    time.sleep(0.1)
+                json_pkt += esp.read_until(b"}")
+                return json_pkt.decode("utf8")
+
+            def wait_for_json(esp, timeout=2):
+                json_msg = read_json(esp)
+                init_time = time.time()
+                while not json_msg:
+                    json_msg = read_json(esp)
+                    time.sleep(0.1)
+                    if time.time() - init_time > timeout:
+                        return None
+                return json_msg
 
             self.esp.firmware_cnt = 0
             self.esp.firmware_progress = 0
             self.esp.firmware_num = 1
+            self.update_in_progress = True
 
             self.__print("get network uuid")
             init_time = time.time()
             while True:
-                get_uuid_pkt = '{"c":40,"s":0,"d":4095,"b":"//8AAAAAAAA=","l":8}'
-                self.esp.send_nowait(get_uuid_pkt)
+                get_uuid_pkt = b'{"c":40,"s":0,"d":4095,"b":"//8AAAAAAAA=","l":8}'
+                self.esp.write(get_uuid_pkt)
                 try:
-                    msg = self.esp.recv()
+                    msg = wait_for_json(self.esp)
                     if not msg:
                         break
 
@@ -4141,13 +4164,13 @@ class ESP32FirmwareUpdater():
 
             init_time = time.time()
             while True:
-                reset_interpreter_pkt = '{"c":160,"s":80,"d":4095,"b":"AAAAAAAAAA==","l":8}'
-                self.esp.send_nowait(reset_interpreter_pkt)
+                reset_interpreter_pkt = b'{"c":160,"s":80,"d":4095,"b":"AAAAAAAAAA==","l":8}'
+                self.esp.write(reset_interpreter_pkt)
                 self.esp.firmware_progress = self.esp.firmware_progress + 5
                 if self.esp.firmware_progress > 90:
                     self.esp.firmware_progress = 90
                 try:
-                    msg = self.esp.recv()
+                    msg = wait_for_json(self.esp)
                     if not msg:
                         break
 
@@ -4166,7 +4189,7 @@ class ESP32FirmwareUpdater():
 
                 time.sleep(0.2)
             self.__print("ESP interpreter reset is complete!!")
-            self.esp.close_conn()
+            self.esp.close()
 
             self.esp.firmware_progress = 100
 
