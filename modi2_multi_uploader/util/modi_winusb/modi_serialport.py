@@ -57,6 +57,8 @@ class ModiSerialPort():
     def write(self, data):
         if not self.is_open:
             raise Exception("serialport is not opened")
+        if type(data) is str:
+            data = data.encode("utf8")
         self.serial_port.write(data)
 
     def read(self, size=1):

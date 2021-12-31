@@ -39,10 +39,6 @@ class NetworkFirmwareUpdater(ModiSerialPort):
     ERASE_ERROR = 6
     ERASE_COMPLETE = 7
 
-    NO_RECONNECT = 0
-    SOFT_RECONNECT = 1
-    HARD_RECONNECT = 2
-
     def __init__(self, device=None, local_firmware_path=None):
         self.print = True
         if device != None:
