@@ -24,7 +24,7 @@ class ModiSerialPort():
     SERIAL_MODE_COMPORT = 1
     SERIAL_MODI_WINUSB = 2
 
-    def __init__(self, port = None, baudrate = 921600, timeout = 2, write_timeout = None):
+    def __init__(self, port = None, baudrate = 921600, timeout = 0.2, write_timeout = None):
         self.type = self.SERIAL_MODE_COMPORT
         self.port = port
         self.baudrate = baudrate
@@ -42,10 +42,10 @@ class ModiSerialPort():
 
         if sys.platform.startswith("win") and port in list_modi_winusb_paths():
             self.type = self.SERIAL_MODI_WINUSB
-            winusb = ModiWinUsbComPort(path = self.port, baudrate=self.baudrate)
+            winusb = ModiWinUsbComPort(path = self.port, baudrate=self.baudrate, timeout=self.timeout)
             self.serial_port = winusb
         else:
-            ser = serial.Serial(port = self.port, baudrate=self.baudrate, exclusive=True)
+            ser = serial.Serial(port = self.port, baudrate=self.baudrate, timeout=self.timeout, exclusive=True)
             self.serial_port = ser
 
         self.is_open = True
@@ -62,6 +62,8 @@ class ModiSerialPort():
     def read(self, size=1):
         if not self.is_open:
             raise Exception("serialport is not opened")
+        if size == None and self.type == self.SERIAL_MODE_COMPORT:
+            size = 1
         return self.serial_port.read(size)
 
     def read_until(self, expected=b"\x0A", size=None):

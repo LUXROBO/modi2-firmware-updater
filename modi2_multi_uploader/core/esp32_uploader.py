@@ -69,8 +69,7 @@ def get_default_connected_device(serial_list, port, connect_attempts, initial_ba
         # print("Serial port %s" % each_port)
         try:
             if chip == 'auto':
-                _esp = ESPLoader.detect_chip(each_port, initial_baud, before, trace,
-                                             connect_attempts)
+                _esp = ESPLoader.detect_chip(each_port, initial_baud, before, trace, connect_attempts)
             else:
                 chip_class = _chip_to_rom_loader(chip)
                 _esp = chip_class(each_port, initial_baud, trace)
@@ -293,8 +292,7 @@ class ESPLoader(object):
             raise FatalError("Failed to set baud rate %d. The driver may not support this rate." % baud)
 
     @staticmethod
-    def detect_chip(port=DEFAULT_PORT, baud=ESP_ROM_BAUD, connect_mode='default_reset', trace_enabled=False,
-                    connect_attempts=DEFAULT_CONNECT_ATTEMPTS):
+    def detect_chip(port=DEFAULT_PORT, baud=ESP_ROM_BAUD, connect_mode='default_reset', trace_enabled=False, connect_attempts=DEFAULT_CONNECT_ATTEMPTS):
         """ Use serial access to detect the chip type.
 
         We use the UART's datecode register for this, it's mapped at
@@ -457,30 +455,38 @@ class ESPLoader(object):
     def read_json(self):
         json_pkt = b""
         while json_pkt != b"{":
-            json_pkt = self._port.read()
+            json_pkt = self._port.read(1)
             if json_pkt == b"":
-                return ""
+                return None
             time.sleep(0.1)
         json_pkt += self._port.read_until(b"}")
         return json_pkt
 
-    def wait_for_json(self, timeout = 1):
+    def wait_for_json(self, timeout = 3):
         json_msg = self.read_json()
         init_time = time.time()
         while not json_msg:
             json_msg = self.read_json()
             time.sleep(0.1)
             if time.time() - init_time > timeout:
-                return ""
+                return None
         return json_msg
 
     def get_network_uuid(self):
         init_time = time.time()
         while True:
+            if time.time() - init_time > 5:
+                return None
+
             get_uuid_pkt = b'{"c":40,"s":0,"d":4095,"b":"//8AAAAAAAA=","l":8}'
             self._port.write(get_uuid_pkt)
             try:
-                json_msg = json.loads(self.wait_for_json())
+                msg = self.wait_for_json()
+                if not msg:
+                    time.sleep(0.2)
+                    continue
+
+                json_msg = json.loads(msg)
                 if json_msg["c"] == 0x05 or json_msg["c"] == 0x0A:
                     module_uuid = unpack_data(json_msg["b"], (6, 2))[0]
                     module_type = get_module_type_from_uuid(module_uuid)
@@ -489,10 +495,8 @@ class ESPLoader(object):
             except json.decoder.JSONDecodeError as jde:
                 # print("json parse error: " + str(jde))
                 # return None
+                time.sleep(0.2)
                 pass
-
-            if time.time() - init_time > 5:
-                return None
 
             time.sleep(0.2)
 
@@ -622,7 +626,7 @@ class ESPLoader(object):
         self._port.write(str('{"c":43,"s":0,"d":4095,"b":"Kw==","l":1}').encode('utf-8'))
         self.flush_input()
         # self._port.flushOutput()
-        time.sleep(0.5)
+        time.sleep(1)
 
         # issue reset-to-bootloader:
         # RTS = either CH_PD/EN or nRESET (both active low = chip in reset
@@ -656,13 +660,15 @@ class ESPLoader(object):
                 self.sync()
                 return None
             except FatalError as e:
-                # if esp32r0_delay:
-                #     # print('_', end='')
-                # else:
-                #     # print('.', end='')
+                if esp32r0_delay:
+                    print('_', end='')
+                else:
+                    print('.', end='')
                 sys.stdout.flush()
                 time.sleep(0.05)
                 last_error = e
+
+        print(last_error)
         return last_error
 
     def get_memory_region(self, name):
@@ -2946,12 +2952,21 @@ def slip_reader(port, trace_function):
     """
     partial_packet = None
     in_escape = False
+    retry_count = 0
+    max_retry = 5
     while True:
-        read_bytes = port.read()
+        read_bytes = port.read_all()
+        # read_bytes = port.read()
+
         if read_bytes == b'':
-            waiting_for = "header" if partial_packet is None else "content"
-            trace_function("Timed out waiting for packet %s", waiting_for)
-            raise FatalError("Timed out waiting for packet %s" % waiting_for)
+            retry_count += 1
+            if retry_count > max_retry:
+                waiting_for = "header" if partial_packet is None else "content"
+                trace_function("Timed out waiting for packet %s", waiting_for)
+                raise FatalError("Timed out waiting for packet %s" % waiting_for)
+        else:
+            retry_count = 0
+
         trace_function("Read %d bytes: %s", len(read_bytes), HexFormatter(read_bytes))
         for b in read_bytes:
             if type(b) is int:
@@ -4123,7 +4138,6 @@ class ESP32FirmwareUpdater():
 
             time.sleep(1)
             self.__print("Reset interpreter...")
-            self.update_in_progress = True
 
             init_time = time.time()
             while True:
@@ -4581,19 +4595,16 @@ class ESP32FirmwareMultiUploder():
             total_sequence = 0
 
             for index, esp32_updater in enumerate(self.esp32_updaters):
+                if esp32_updater.esp is not None and esp32_updater.network_uuid is not None:
+                    self.network_uuid[index] = f'0x{esp32_updater.network_uuid:X}'
+                    if self.list_ui:
+                        self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+
                 if self.state[index] == 0:
                     # wait for network uuid
                     is_done = False
-                    if esp32_updater.update_in_progress:
-                        if esp32_updater.esp is not None and esp32_updater.network_uuid is not None:
-                            self.network_uuid[index] = f'0x{esp32_updater.network_uuid:X}'
-                            self.state[index] = 1
-                            if self.list_ui:
-                                self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
-                        else:
-                            self.state[index] = 2
-                            esp32_updater.update_error = -1
-                            esp32_updater.update_error_message = "Not response network uuid"
+                    if esp32_updater.update_in_progress and esp32_updater.esp:
+                        self.state[index] = 1
                 elif self.state[index] == 1:
                     # update modules
                     if esp32_updater.update_error == 0:

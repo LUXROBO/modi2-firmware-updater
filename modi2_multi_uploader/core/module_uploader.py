@@ -80,10 +80,6 @@ class ModuleFirmwareUpdater:
         self.local_firmware_path = local_firmware_path
 
         self.open(port)
-        for device in stl.comports():
-            if self.name == device.name:
-                self.location = device.location
-                break
 
         self.network_uuid = None
         self.request_network_id()
@@ -245,16 +241,6 @@ class ModuleFirmwareUpdater:
         self.__running = True
         self.recv_thread = th.Thread(target=self.__read_conn, daemon=True)
         self.recv_thread.start()
-
-    def reinitialize_serial_connection(self, reinit_mode=1):
-        self.__reinitialize_serial_connection()
-
-    def __reinitialize_serial_connection(self):
-        self.__print("Temporally disconnecting the serial connection...")
-        self.close()
-        time.sleep(5)
-        self.__print("Re-init serial connection for the update, in 5 seconds...")
-        self.open()
 
     def reset_state(self, update_in_progress: bool = False) -> None:
         self.response_flag = False
@@ -493,48 +479,50 @@ class ModuleFirmwareUpdater:
                     time.sleep(0.01)
             self.progress = 99
             
-            if not self.has_update_error:
-                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+            verify_header = 0xAA
+            if self.has_update_error:
+                verify_header = 0xFF
+            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
-                # Get version info from version_path, using appropriate methods
-                os_version_info = self.firmware_version_info[module_type]["os"]
-                os_version_info = os_version_info.lstrip("v")
-                os_version_digits = [int(digit) for digit in os_version_info.split(".")]
-                os_version = (
-                    os_version_digits[0] << 13
-                    | os_version_digits[1] << 8
-                    | os_version_digits[2]
-                )
+            # Get version info from version_path, using appropriate methods
+            os_version_info = self.firmware_version_info[module_type]["os"]
+            os_version_info = os_version_info.lstrip("v")
+            os_version_digits = [int(digit) for digit in os_version_info.split(".")]
+            os_version = (
+                os_version_digits[0] << 13
+                | os_version_digits[1] << 8
+                | os_version_digits[2]
+            )
 
-                app_version_info = self.firmware_version_info[module_type]["app"]
-                app_version_info = app_version_info.lstrip("v")
-                app_version_digits = [int(digit) for digit in app_version_info.split(".")]
-                app_version = (
-                    app_version_digits[0] << 13
-                    | app_version_digits[1] << 8
-                    | app_version_digits[2]
-                )
+            app_version_info = self.firmware_version_info[module_type]["app"]
+            app_version_info = app_version_info.lstrip("v")
+            app_version_digits = [int(digit) for digit in app_version_info.split(".")]
+            app_version = (
+                app_version_digits[0] << 13
+                | app_version_digits[1] << 8
+                | app_version_digits[2]
+            )
 
-                # Set end-flash data to be sent at the end of the firmware update
-                end_flash_data = bytearray(16)
-                end_flash_data[0] = 0xAA
-                # appversion
-                end_flash_data[6] = os_version & 0xFF
-                end_flash_data[7] = (os_version >> 8) & 0xFF
-                # app version
-                end_flash_data[8] = app_version & 0xFF
-                end_flash_data[9] = (app_version >> 8) & 0xFF
+            # Set end-flash data to be sent at the end of the firmware update
+            end_flash_data = bytearray(16)
+            end_flash_data[0] = verify_header
+            # appversion
+            end_flash_data[6] = os_version & 0xFF
+            end_flash_data[7] = (os_version >> 8) & 0xFF
+            # app version
+            end_flash_data[8] = app_version & 0xFF
+            end_flash_data[9] = (app_version >> 8) & 0xFF
 
+            for xxx in range(4):
+                end_flash_data[xxx + 12] = ((0x08005000 >> (xxx * 8)) & 0xFF)
+            if module_type == "speaker" or module_type == "display" or module_type == "env":
                 for xxx in range(4):
-                    end_flash_data[xxx + 12] = ((0x08005000 >> (xxx * 8)) & 0xFF)
-                if module_type == "speaker" or module_type == "display" or module_type == "env":
-                    for xxx in range(4):
-                        end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
+                    end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
 
-                success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
-                if not success_end_flash:
-                    self.has_update_error = True
-                self.__print(f"Version info (os: v{os_version_info}, app: v{app_version_info}) has been written to its firmware!")
+            success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
+            if not success_end_flash:
+                self.has_update_error = True
+            self.__print(f"Version info (os: v{os_version_info}, app: v{app_version_info}) has been written to its firmware!")
 
             # Firmware update flag down, resetting used flags
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
@@ -674,34 +662,37 @@ class ModuleFirmwareUpdater:
                     page_begin = page_begin + page_size
                     time.sleep(0.01)
 
-            if self.has_update_error == True:
-                self.progress = 99
-                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+            verify_header = 0xAA
+            if self.has_update_error:
+                verify_header = 0xFF
 
-                # Get version info from version_path, using appropriate methods
-                bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
-                bootloader_version_info = bootloader_version_info.lstrip("v")
+            self.progress = 99
+            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
-                # Set end-flash data to be sent at the end of the firmware update
-                end_flash_data = bytearray(16)
-                end_flash_data[0] = 0xAA
-                end_flash_data[6] = 0
-                end_flash_data[7] = 0
+            # Get version info from version_path, using appropriate methods
+            bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
+            bootloader_version_info = bootloader_version_info.lstrip("v")
 
-                for xxx in range(4):
-                    if module_type in ["speaker", "display", "env"]:
-                        end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
-                    else:
-                        end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
+            # Set end-flash data to be sent at the end of the firmware update
+            end_flash_data = bytearray(16)
+            end_flash_data[0] = verify_header
+            end_flash_data[6] = 0
+            end_flash_data[7] = 0
 
-                success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
-                if not success_end_flash:
-                    self.has_update_error = True
+            for xxx in range(4):
+                if module_type in ["speaker", "display", "env"]:
+                    end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
+                else:
+                    end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
 
-                reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
-                self.__conn.send_nowait(reboot_message)
+            success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
+            if not success_end_flash:
+                self.has_update_error = True
 
-                self.__print(f"Version info (v{bootloader_version_info}) has been written to its firmware!")
+            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
+            self.__conn.send_nowait(reboot_message)
+
+            self.__print(f"Version info (v{bootloader_version_info}) has been written to its firmware!")
 
             # Firmware update flag down, resetting used flags
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
@@ -840,34 +831,37 @@ class ModuleFirmwareUpdater:
                     page_begin = page_begin + page_size
                     time.sleep(0.01)
 
-            if self.has_update_error == False:
-                self.progress = 99
-                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+            verify_header = 0xAA
+            if self.has_update_error:
+                verify_header = 0xFF
 
-                # Get version info from version_path, using appropriate methods
-                second_bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
-                second_bootloader_version_info = second_bootloader_version_info.lstrip("v")
+            self.progress = 99
+            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
-                # Set end-flash data to be sent at the end of the firmware update
-                end_flash_data = bytearray(16)
-                end_flash_data[0] = 0xAA
-                end_flash_data[6] = 0
-                end_flash_data[7] = 0
+            # Get version info from version_path, using appropriate methods
+            second_bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
+            second_bootloader_version_info = second_bootloader_version_info.lstrip("v")
 
-                for xxx in range(4):
-                    if module_type in ["speaker", "display", "env"]:
-                        end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
-                    else:
-                        end_flash_data[xxx + 12] = ((0x08005000 >> (xxx * 8)) & 0xFF)
+            # Set end-flash data to be sent at the end of the firmware update
+            end_flash_data = bytearray(16)
+            end_flash_data[0] = verify_header
+            end_flash_data[6] = 0
+            end_flash_data[7] = 0
 
-                success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
-                if not success_end_flash:
-                    self.has_update_error = True
+            for xxx in range(4):
+                if module_type in ["speaker", "display", "env"]:
+                    end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
+                else:
+                    end_flash_data[xxx + 12] = ((0x08005000 >> (xxx * 8)) & 0xFF)
 
-                reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
-                self.__conn.send_nowait(reboot_message)
+            success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
+            if not success_end_flash:
+                self.has_update_error = True
 
-                self.__print(f"Version info (v{second_bootloader_version_info}) has been written to its firmware!")
+            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
+            self.__conn.send_nowait(reboot_message)
+
+            self.__print(f"Version info (v{second_bootloader_version_info}) has been written to its firmware!")
 
             # Firmware update flag down, resetting used flags
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
@@ -1291,8 +1285,7 @@ class ModuleFirmwareUpdater:
 
     def __print(self, data, end="\n"):
         if self.print:
-            v = 2
-            #print(data, end)
+            print(data, end)
 
 class ModuleFirmwareMultiUpdater():
     def __init__(self, local_firmware_path):
@@ -1355,12 +1348,11 @@ class ModuleFirmwareMultiUpdater():
             is_done = True
             total_progress = 0
             for index, module_uploader in enumerate(self.module_uploaders):
-                if module_uploader.update_in_progress:
-                    if module_uploader.network_uuid:
+                if self.state[index] == -1:
+                    if module_uploader.network_uuid is not None:
                         self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
                         if self.list_ui:
                             self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
-                if self.state[index] == -1:
                     # wait module list
                     is_done = False
                     if self.list_ui:
@@ -1485,10 +1477,9 @@ class ModuleFirmwareMultiUpdater():
             is_done = True
             total_progress = 0
             for index, module_uploader in enumerate(self.module_uploaders):
-                if module_uploader.update_in_progress:
-                    if module_uploader.network_uuid:
-                        self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
-                        self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+                if module_uploader.network_uuid is not None:
+                    self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
+                    self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
                 if self.state[index] == -1:
                     # wait module list
                     is_done = False

@@ -43,12 +43,6 @@ class NetworkFirmwareUpdater(ModiSerialPort):
     SOFT_RECONNECT = 1
     HARD_RECONNECT = 2
 
-    REQUEST_RECONNECT_NONE = 0
-    REQUEST_DISCONNECT = 1
-    REQUEST_RECONNECT = 2
-    REQUEST_SOFT_DISCONNECT = 3
-    REQUEST_SOFT_RECONNECT = 4
-
     def __init__(self, device=None, local_firmware_path=None):
         self.print = True
         if device != None:
@@ -77,11 +71,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
         self.progress = 0
 
-        self.need_to_reconnect = False
-        self.reconnect_start_signal = False
-        self.reconnect_end_signal = False
         self.popup_reconnect = False
-        self.popup_reconnect_mode = self.REQUEST_RECONNECT_NONE
         self.raise_error_message = True
         self.update_error = 0
         self.update_error_message = ""
@@ -467,30 +457,33 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         self.progress = 99
         self.__print(f"\rUpdating network ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
-        if self.update_error != -1:
-            # Get version info from version_path, using appropriate methods
-            network_version_info = self.firmware_version_info["network"]["app"]
-            network_version_info = network_version_info.lstrip("v")
-            network_version_digits = [int(digit) for digit in network_version_info.split(".")]
-            network_version = (
-                network_version_digits[0] << 13
-                | network_version_digits[1] << 8
-                | network_version_digits[2]
-            )
+        verify_header = 0xAA
+        if self.update_error == -1:
+            verify_header = 0xFF
 
-            # Set end-flash data to be sent at the end of the firmware update
-            end_flash_data = bytearray(16)
-            end_flash_data[0] = 0xAA
-            end_flash_data[6] = network_version & 0xFF
-            end_flash_data[7] = (network_version >> 8) & 0xFF
+        # Get version info from version_path, using appropriate methods
+        network_version_info = self.firmware_version_info["network"]["app"]
+        network_version_info = network_version_info.lstrip("v")
+        network_version_digits = [int(digit) for digit in network_version_info.split(".")]
+        network_version = (
+            network_version_digits[0] << 13
+            | network_version_digits[1] << 8
+            | network_version_digits[2]
+        )
 
-            for xxx in range(4):
-                end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
+        # Set end-flash data to be sent at the end of the firmware update
+        end_flash_data = bytearray(16)
+        end_flash_data[0] = verify_header
+        end_flash_data[6] = network_version & 0xFF
+        end_flash_data[7] = (network_version >> 8) & 0xFF
 
-            end_flash_success = self.set_end_flash_data(module_id, end_flash_data)
-            if not end_flash_success:
-                return False
-            self.__print(f"Version info (v{network_version_info}) has been written to its firmware!")
+        for xxx in range(4):
+            end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
+
+        end_flash_success = self.set_end_flash_data(module_id, end_flash_data)
+        if not end_flash_success:
+            return False
+        self.__print(f"Version info (v{network_version_info}) has been written to its firmware!")
 
         self.__print(f"Firmware update is done for network ({module_id})")
 
@@ -660,39 +653,14 @@ class NetworkFirmwareMultiUpdater():
                 self.list_ui.error_message_signal.emit(index, "Wait for network uuid")
 
         delay = 0.1
-        reconnect_device = []
         while True:
             is_done = True
             total_progress = 0
             for index, network_updater in enumerate(self.network_updaters):
                 if network_updater.network_uuid:
                     self.network_uuid[index] = f'0x{network_updater.network_uuid:X}'
-                    self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
-                if self.list_ui:
-                    if network_updater.popup_reconnect_mode == 1:
-                        self.list_ui.error_message_signal.emit(index, "Please disconnect")
-                        self.list_ui.network_state_signal.emit(index, network_updater.popup_reconnect_mode)
-                    elif network_updater.popup_reconnect_mode == 2:
-                        self.list_ui.error_message_signal.emit(index, "Please reconnect")
-                        self.list_ui.network_state_signal.emit(index, network_updater.popup_reconnect_mode)
-                    elif network_updater.popup_reconnect_mode == 3:
-                        self.list_ui.error_message_signal.emit(index, "Disconnecting.....")
-                        self.list_ui.network_state_signal.emit(index, 0)
-                    elif network_updater.popup_reconnect_mode == 4:
-                        self.list_ui.error_message_signal.emit(index, "Reconnecting.....")
-                        self.list_ui.network_state_signal.emit(index, 0)
-
-                if network_updater.need_to_reconnect:
-                    if not index in reconnect_device:
-                        reconnect_device.append(index)
-                if len(reconnect_device):
-                    if index == reconnect_device[0]:
-                        network_updater.reconnect_start_signal = True
-                        if network_updater.reconnect_end_signal:
-                            reconnect_device.pop(0)
-                        else:
-                            if network_updater.update_error != 0:
-                                reconnect_device.pop(0)
+                    if self.list_ui:
+                        self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
 
                 if self.state[index] == 0:
                     # update modules
@@ -704,13 +672,11 @@ class NetworkFirmwareMultiUpdater():
 
                         if self.list_ui:
                             self.list_ui.current_module_changed_signal.emit(index, "network")
+                            self.list_ui.error_message_signal.emit(index, "Updating module")
                             self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
                     else:
                         total_progress += 100 / len(self.network_updaters)
                         self.state[index] = 1
-                    if self.list_ui and network_updater.popup_reconnect_mode == 0:
-                        self.list_ui.error_message_signal.emit(index, "Updating module")
-                        self.list_ui.network_state_signal.emit(index, 0)
                 elif self.state[index] == 1:
                     # end
                     total_progress += 100 / len(self.network_updaters)

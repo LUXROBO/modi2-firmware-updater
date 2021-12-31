@@ -126,7 +126,7 @@ class SerTask(ConnTask):
         while json_pkt != b"{":
             if not self._bus.is_open:
                 return None
-            json_pkt = self._bus.read()
+            json_pkt = self._bus.read(1)
             if json_pkt == b"":
                 return None
             time.sleep(0.1)

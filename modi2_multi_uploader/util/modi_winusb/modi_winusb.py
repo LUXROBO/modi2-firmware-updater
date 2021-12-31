@@ -82,7 +82,6 @@ class ModiWinUsb(object):
         return is_device(None, self.vid, self.pid, path)
 
     def init_winusb_device(self, path):
-
         self.handle_file = self.api.exec_function_kernel32(CreateFile, path, GENERIC_WRITE | GENERIC_READ,
                                                            FILE_SHARE_WRITE | FILE_SHARE_READ, None, OPEN_EXISTING,
                                                            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, None)
@@ -242,7 +241,7 @@ class ModiWinUsb(object):
 
 
 class ModiWinUsbComPort:
-    def __init__(self, path=None, baudrate=921600, start=True):
+    def __init__(self, path=None, baudrate=921600, timeout=0.2, start=True):
         self.device = None
         self.path = path
         self._rxremaining = b''
@@ -252,13 +251,15 @@ class ModiWinUsbComPort:
         self.databits = 8
         self.maximum_packet_size = 0
 
-        self._timeout = 0
+        self._timeout = timeout
 
         self.is_open = False
         if start:
             self.open()
 
     def open(self):
+        self.close()
+
         # Control interface
         api = self._select_device(self.path)
         if not api:
@@ -282,7 +283,7 @@ class ModiWinUsbComPort:
 
         self.setControlLineState(True, True)
         self.setLineCoding()
-        self.device.set_timeout(self._ep_in, 2)
+        self.device.set_timeout(self._ep_in, self._timeout)
         self.reset_input_buffer()
 
     @property
@@ -312,7 +313,7 @@ class ModiWinUsbComPort:
             read = min(l, orig_size)
             buf[0:read] = self._rxremaining[0:read]
             self._rxremaining = self._rxremaining[read:]
-        end_timeout = time.time() + (self.timeout or 0.2)
+        end_timeout = time.time() + (self._timeout or 0.2)
         self.device.set_timeout(self._ep_in, 2)
         while read < orig_size:
             remaining = orig_size-read
@@ -330,15 +331,15 @@ class ModiWinUsbComPort:
                 break
         return read
 
-    def read(self, size=None):
+    def read(self, size=1):
         if not self.is_open:
             return None
         rx = [self._rxremaining]
         length = len(self._rxremaining)
         self._rxremaining = b''
-        end_timeout = time.time() + (self.timeout or 0.2)
+        end_timeout = time.time() + (self._timeout or 0.2)
         if size:
-            self.device.set_timeout(self._ep_in, 2)
+            self.device.set_timeout(self._ep_in, self._timeout)
             while length < size:
                 c = self.device.read(self._ep_in, size-length)
                 if c is not None and len(c):
@@ -390,7 +391,7 @@ class ModiWinUsbComPort:
         return line[0:i]
 
     def read_all(self):
-        return self.read()
+        return self.read(None)
 
     def write(self, data):
         if not self.is_open:
@@ -507,9 +508,7 @@ class ModiWinUsbComPort:
     def reset_input_buffer(self):
         if self.is_open:
             self.device.flush(self._ep_in)
-            while self.read():
-                pass
-        self._rxremaining = b''
+            self._rxremaining = b''
 
     def reset_output_buffer(self):
         pass
