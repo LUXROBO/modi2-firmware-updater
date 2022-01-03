@@ -27,14 +27,14 @@ class NetworkFirmwareUpdater(ModiSerialPort):
     def __init__(self, device=None, local_firmware_path=None):
         self.print = True
         if device != None:
-            super().__init__(device, timeout = 0.1, baudrate = 921600)
+            super().__init__(device, baudrate = 921600, timeout = 0.1, write_timeout = 0)
         else:
             modi_ports = list_modi_serialports()
             if not modi_ports:
                 raise SerialException("No MODI port is connected")
             for modi_port in modi_ports:
                 try:
-                    super().__init__(modi_port, timeout=0.1, baudrate=921600)
+                    super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
                 except Exception:
                     self.__print('Next network module')
                     continue
@@ -282,9 +282,9 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 self.progress = i
                 time.sleep(0.01)
 
+            self.send_set_network_module_state(self.network_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
             for i in range(46, 50):
                 self.progress = i
-                self.send_set_network_module_state(self.network_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
                 time.sleep(0.5)
 
             for i in range(51, 100):

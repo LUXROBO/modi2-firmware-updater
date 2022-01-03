@@ -79,14 +79,14 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.network_uuid = None
 
         if device != None:
-            super().__init__(device, timeout = 0.1, baudrate = 921600)
+            super().__init__(device, baudrate = 921600, timeout = 0.1, write_timeout = 0)
         else:
             modi_ports = list_modi_serialports()
             if not modi_ports:
                 raise SerialException("No MODI port is connected")
             for modi_port in modi_ports:
                 try:
-                    super().__init__(modi_port, timeout=0.1, baudrate=921600)
+                    super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
                 except Exception:
                     self.__print('Next network module')
                     continue

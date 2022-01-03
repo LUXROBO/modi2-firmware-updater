@@ -241,7 +241,7 @@ class ModiWinUsb(object):
 
 
 class ModiWinUsbComPort:
-    def __init__(self, path=None, baudrate=921600, timeout=0.2, start=True):
+    def __init__(self, path=None, baudrate=921600, timeout=0.2, write_timeout = 0, start=True):
         self.device = None
         self.path = path
         self._rxremaining = b''
@@ -252,6 +252,7 @@ class ModiWinUsbComPort:
         self.maximum_packet_size = 0
 
         self._timeout = timeout
+        self._write_timeout = write_timeout
 
         self.is_open = False
         if start:

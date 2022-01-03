@@ -45,7 +45,7 @@ class ModiSerialPort():
             winusb = ModiWinUsbComPort(path = self.port, baudrate=self.baudrate, timeout=self.timeout)
             self.serial_port = winusb
         else:
-            ser = serial.Serial(port = self.port, baudrate=self.baudrate, timeout=self.timeout, exclusive=True)
+            ser = serial.Serial(port = self.port, baudrate=self.baudrate, timeout=self.timeout, write_timeout=self.write_timeout, exclusive=True)
             self.serial_port = ser
 
         self.is_open = True
