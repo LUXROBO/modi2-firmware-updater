@@ -525,10 +525,14 @@ class Form(QDialog):
         if self.console:
             self.ui.console.show()
             self.ui.firmware_manage_button.setVisible(True)
+            self.ui.change_modules_type_button.setVisible(True)
+            self.ui.module_type_combobox.setVisible(True)
             self.ui.setFixedHeight(720)
         else:
             self.ui.console.hide()
             self.ui.firmware_manage_button.setVisible(False)
+            self.ui.change_modules_type_button.setVisible(False)
+            self.ui.module_type_combobox.setVisible(False)
             self.ui.setFixedHeight(640)
 
     def translate_button_text(self):
