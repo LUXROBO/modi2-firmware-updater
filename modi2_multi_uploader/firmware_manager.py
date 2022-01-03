@@ -184,11 +184,22 @@ class FirmwareManagerForm(QDialog):
 
             os.mkdir(self.local_firmware_path)
 
-            import git
-            import base64
-            username = base64.b64decode("bWF0dC5raW0=").decode('utf-8')
-            password = base64.b64decode("TGVnbzA1Mjkh").decode('utf-8')
-            git.Repo.clone_from(f"https://{username}:{password}@git.luxrobo.net/modi2/module-binary.git", self.local_firmware_path)
+            import requests
+            url = "https://github.com/LUXROBO/modi-v2-module-binary/archive/refs/heads/main.zip"
+            content = requests.get(url)
+
+            # unzip the content
+            from io import BytesIO
+            from zipfile import ZipFile
+            zip = ZipFile(BytesIO(content.content))
+            zip.extractall(self.local_firmware_path)
+
+            temp_path = os.path.join(self.local_firmware_path, "modi-v2-module-binary-main")
+
+            import shutil
+            shutil.copytree(temp_path, self.local_firmware_path, dirs_exist_ok=True)
+            if os.path.exists(temp_path):
+                self.__rmtree(temp_path)
         except Exception as e:
             self.copy_assets_firmware()
 
