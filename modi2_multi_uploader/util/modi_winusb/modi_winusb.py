@@ -527,6 +527,12 @@ class ModiWinUsbComPort:
     def flushOutput(self):
         self.reset_output_buffer()
 
+    def setDTR(self, state):
+        pass
+
+    def setRTS(self, state):
+        pass
+
     def _select_device(self, path):
         api = ModiWinUsb()
 

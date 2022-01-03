@@ -4,7 +4,7 @@ import serial
 import serial.tools.list_ports as stl
 from modi2_multi_uploader.util.modi_winusb.modi_winusb import ModiWinUsbComPort, list_modi_winusb_paths
 
-def list_modi_serialport():
+def list_modi_serialports():
     info_list = []
 
     def __is_modi_port(port):
@@ -109,6 +109,16 @@ class ModiSerialPort():
             raise Exception("serialport is not opened")
         self.serial_port.flushOutput()
 
+    def setDTR(self, state):
+        if not self.is_open:
+            raise Exception("serialport is not opened")
+        self.serial_port.setDTR(state)
+
+    def setRTS(self, state):
+        if not self.is_open:
+            raise Exception("serialport is not opened")
+        self.serial_port.setRTS(state)
+
     class Timeout(object):
         """\
         Abstraction for timeout operations. Using time.monotonic() if available
@@ -189,7 +199,7 @@ if __name__ == "__main__":
         serialport.close()
 
     import threading
-    info_list = list_modi_serialport()
+    info_list = list_modi_serialports()
 
     if not info_list:
         raise Exception("No MODI is connected")

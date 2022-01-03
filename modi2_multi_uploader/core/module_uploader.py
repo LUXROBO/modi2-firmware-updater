@@ -7,9 +7,8 @@ from io import open
 from os import path
 
 from serial.serialutil import SerialException
-from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort
+from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.connection_util import list_modi_ports
 from modi2_multi_uploader.util.message_util import (decode_message, parse_message, unpack_data)
 from modi2_multi_uploader.util.module_util import (Module, get_module_type_from_uuid, get_module_uuid_from_type)
 
@@ -82,7 +81,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         if device != None:
             super().__init__(device, timeout = 0.1, baudrate = 921600)
         else:
-            modi_ports = list_modi_ports()
+            modi_ports = list_modi_serialports()
             if not modi_ports:
                 raise SerialException("No MODI port is connected")
             for modi_port in modi_ports:

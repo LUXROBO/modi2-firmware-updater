@@ -16,7 +16,7 @@ from modi2_multi_uploader.update_list_form import ESP32UpdateListForm, ModuleUpd
 from modi2_multi_uploader.core.esp32_uploader import ESP32FirmwareMultiUploder
 from modi2_multi_uploader.core.module_uploader import ModuleFirmwareMultiUpdater
 from modi2_multi_uploader.core.network_uploader import NetworkFirmwareMultiUpdater
-from modi2_multi_uploader.util.connection_util import list_modi_ports
+from modi2_multi_uploader.util.modi_winusb.modi_serialport import list_modi_serialports
 
 
 class StdoutRedirect(QObject):
@@ -300,7 +300,7 @@ class Form(QDialog):
             target=self.__click_motion, args=(0, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
@@ -335,7 +335,7 @@ class Form(QDialog):
             target=self.__click_motion, args=(1, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
@@ -371,7 +371,7 @@ class Form(QDialog):
             target=self.__click_motion, args=(2, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
@@ -405,7 +405,7 @@ class Form(QDialog):
             target=self.__click_motion, args=(3, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             self.__reset_ui(self.module_upload_list_form)
             raise Exception("No MODI port is connected")
@@ -441,7 +441,7 @@ class Form(QDialog):
             target=self.__click_motion, args=(4, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
@@ -476,7 +476,7 @@ class Form(QDialog):
             target=self.__click_motion, args=(5, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
