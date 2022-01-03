@@ -2,15 +2,15 @@ import json
 import sys
 import threading as th
 import time
-from base64 import b64decode, b64encode
+from base64 import b64encode
 from io import open
 from os import path
 
 from serial.serialutil import SerialException
 from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.message_util import (decode_message, parse_message, unpack_data)
-from modi2_multi_uploader.util.module_util import (Module, get_module_type_from_uuid, get_module_uuid_from_type)
+from modi2_multi_uploader.util.message_util import decode_message, parse_message, unpack_data
+from modi2_multi_uploader.util.module_util import Module, get_module_type_from_uuid, get_module_uuid_from_type
 
 
 def retry(exception_to_catch):

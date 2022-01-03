@@ -22,7 +22,7 @@ from os import path
 
 from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.message_util import decode_message, unpack_data
+from modi2_multi_uploader.util.message_util import unpack_data
 from modi2_multi_uploader.util.module_util import get_module_type_from_uuid
 
 __version__ = "3.1-dev"
@@ -440,10 +440,12 @@ class ESPLoader(object):
             self.command()
 
     def _setDTR(self, state):
-        self._port.setDTR(state)
+        pass
+        # self._port.setDTR(state)
 
     def _setRTS(self, state):
-        self._port.setRTS(state)
+        pass
+        # self._port.setRTS(state)
 
         # Work-around for adapters on Windows using the usbser.sys driver:
         # generate a dummy change to DTR so that the set-control-line-state
@@ -2937,13 +2939,15 @@ def slip_reader(port, trace_function):
     retry_count = 0
     max_retry = 10
     while True:
-        read_bytes = port.read_all()
+        waiting = port.inWaiting()
+        read_bytes = port.read(1 if waiting == 0 else waiting)
         if read_bytes == b'':
             retry_count += 1
             if retry_count > max_retry:
                 waiting_for = "header" if partial_packet is None else "content"
                 trace_function("Timed out waiting for packet %s", waiting_for)
                 raise FatalError("Timed out waiting for packet %s" % waiting_for)
+            time.sleep(0.3)
             continue
 
         trace_function("Read %d bytes: %s", len(read_bytes), HexFormatter(read_bytes))
@@ -2956,7 +2960,7 @@ def slip_reader(port, trace_function):
                     partial_packet = b""
                 else:
                     trace_function("Read invalid data: %s", HexFormatter(read_bytes))
-                    trace_function("Remaining data in serial buffer: %s", HexFormatter(port.read()))
+                    trace_function("Remaining data in serial buffer: %s", HexFormatter(port.read(port.inWaiting())))
                     raise FatalError('Invalid head of packet (0x%s)' % hexify(b))
             elif in_escape:  # part-way through escape sequence
                 in_escape = False
@@ -2966,7 +2970,7 @@ def slip_reader(port, trace_function):
                     partial_packet += b'\xdb'
                 else:
                     trace_function("Read invalid data: %s", HexFormatter(read_bytes))
-                    trace_function("Remaining data in serial buffer: %s", HexFormatter(port.read()))
+                    trace_function("Remaining data in serial buffer: %s", HexFormatter(port.read(port.inWaiting())))
                     raise FatalError('Invalid SLIP escape (0xdb, 0x%s)' % (hexify(b)))
             elif b == b'\xdb':  # start of escape sequence
                 in_escape = True

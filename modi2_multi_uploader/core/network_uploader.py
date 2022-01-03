@@ -9,22 +9,8 @@ from itertools import zip_longest
 from serial.serialutil import SerialException
 from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.message_util import (parse_message, unpack_data)
-from modi2_multi_uploader.util.module_util import (Module, get_module_type_from_uuid)
-
-
-def retry(exception_to_catch):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except exception_to_catch:
-                return wrapper(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
+from modi2_multi_uploader.util.message_util import parse_message, unpack_data
+from modi2_multi_uploader.util.module_util import Module, get_module_type_from_uuid
 
 class NetworkFirmwareUpdater(ModiSerialPort):
     """Network Firmware Updater: Updates a firmware of given module"""

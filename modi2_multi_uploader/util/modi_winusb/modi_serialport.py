@@ -119,6 +119,15 @@ class ModiSerialPort():
             raise Exception("serialport is not opened")
         self.serial_port.setRTS(state)
 
+    def inWaiting(self):
+        if not self.is_open:
+            raise Exception("serialport is not opened")
+
+        waiting = None
+        if self.type == self.SERIAL_MODE_COMPORT:
+            waiting = self.serial_port.inWaiting()
+        return waiting
+
     class Timeout(object):
         """\
         Abstraction for timeout operations. Using time.monotonic() if available
