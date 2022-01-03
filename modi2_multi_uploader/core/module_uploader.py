@@ -2,17 +2,15 @@ import json
 import sys
 import threading as th
 import time
-from base64 import b64decode, b64encode
+from base64 import b64encode
 from io import open
 from os import path
 
-import serial
-import serial.tools.list_ports as stl
+from serial.serialutil import SerialException
+from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.connection_util import SerTask
-from modi2_multi_uploader.util.message_util import (decode_message, parse_message, unpack_data)
-from modi2_multi_uploader.util.module_util import (Module, get_module_type_from_uuid)
-from modi2_multi_uploader.util.module_util import (Module, get_module_uuid_from_type)
+from modi2_multi_uploader.util.message_util import decode_message, parse_message, unpack_data
+from modi2_multi_uploader.util.module_util import Module, get_module_type_from_uuid, get_module_uuid_from_type
 
 
 def retry(exception_to_catch):
@@ -28,7 +26,7 @@ def retry(exception_to_catch):
     return decorator
 
 
-class ModuleFirmwareUpdater:
+class ModuleFirmwareUpdater(ModiSerialPort):
     """Module Firmware Updater: Updates a firmware of given module"""
 
     NO_ERROR = 0
@@ -43,15 +41,15 @@ class ModuleFirmwareUpdater:
     UPDATE_FIRMWARE_MODE = 0
     CHNAGE_TYPE_MODE = 1
 
-    def __init__(self, port=None, is_os_update=True, target_ids=(0xFFF,), conn_type="ser", local_firmware_path=None):
+    def __init__(self, device=None, local_firmware_path=None):
         self.print = True
-        self.conn_type = conn_type
-        self.__target_ids = target_ids
+
+        self.__target_ids = (0xFFF, )
         self.response_flag = False
         self.response_error_flag = False
         self.response_error_count = 0
         self.__running = True
-        self.__is_os_update = is_os_update
+
         self.update_in_progress = False
         self.update_module_num = 0
 
@@ -66,7 +64,6 @@ class ModuleFirmwareUpdater:
         self.ui = None
         self.module_type = None
         self.progress = None
-        self.popup_reconnect = False
         self.raise_error_message = False
         self.update_error = 0
         self.update_error_message = ""
@@ -79,86 +76,78 @@ class ModuleFirmwareUpdater:
 
         self.local_firmware_path = local_firmware_path
 
-        self.open(port)
-        for device in stl.comports():
-            if self.name == device.name:
-                self.location = device.location
-                break
-
         self.network_uuid = None
-        self.request_network_id()
+
+        if device != None:
+            super().__init__(device, baudrate = 921600, timeout = 0.1, write_timeout = 0)
+        else:
+            modi_ports = list_modi_serialports()
+            if not modi_ports:
+                raise SerialException("No MODI port is connected")
+            for modi_port in modi_ports:
+                try:
+                    super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
+                except Exception:
+                    self.__print('Next network module')
+                    continue
+                else:
+                    break
+            self.__print(f"Connecting to MODI network module at {modi_port}")
+
+        self.open_recv_thread()
 
         th.Thread(
             target=self.module_firmware_upload_manager, daemon=True
         ).start()
 
-    def __del__(self):
-        try:
-            self.close()
-        except serial.SerialException:
-            self.__print("Magic del is called with an exception")
-
     def module_firmware_upload_manager(self):
-        timeout = 0
-        while timeout < 30 or len(self.modules_updated) != len(self.modules_to_update_all):
-            if self.update_in_progress == True:
-                timeout = 0
-                time.sleep(0.1)
+        timeout_count = 0
+        timeout_delay = 0.1
+        while timeout_count < 10:
+            time.sleep(timeout_delay)
+            timeout_count += timeout_delay
+
+            if self.update_in_progress == False:
+                # 장치 연결까지 대기
                 continue
+
+            if self.has_update_error:
+                # 에러가 발생할 경우, 종료
+                break
+
             if len(self.modules_to_update_second_bootloader) != 0:
-                self.__conn.send_nowait(parse_message(0x2C, 0x0, 0xFFF, (1,1))) #SWU LEGACY MODE
+                self.__send_conn(parse_message(0x2C, 0x0, 0xFFF, (1,1))) #SWU LEGACY MODE
                 second_bootloader_update_module_id, second_bootloader_update_module_type = self.modules_to_update_second_bootloader[0]
                 self.modules_to_update_second_bootloader.pop(0)
-                updater_thread = th.Thread(
-                    target=self.__update_firmware_second_bootloader,
-                    args=(second_bootloader_update_module_id, second_bootloader_update_module_type, 0)
-                )
-                self.update_in_progress = True
-                updater_thread.daemon = True
-                timeout = 0
-                updater_thread.start()
-                time.sleep(0.1)
-                continue
-            if len(self.modules_to_update_bootloader) != 0:
-                self.__conn.send_nowait(parse_message(0x2C, 0x0, 0xFFF, (0,0))) #SWU MODE
+                self.__update_firmware_second_bootloader(second_bootloader_update_module_id, second_bootloader_update_module_type, 0)
+                timeout_count = 0
+            elif len(self.modules_to_update_bootloader) != 0:
+                self.__send_conn(parse_message(0x2C, 0x0, 0xFFF, (0,0))) #SWU MODE
                 bootloader_update_module_id, bootloader_update_module_type = self.modules_to_update_bootloader[0]
                 self.modules_to_update_bootloader.pop(0)
-                updater_thread = th.Thread(
-                    target=self.__update_firmware_bootloader,
-                    args=(bootloader_update_module_id, bootloader_update_module_type, 0)
-                )
-                self.update_in_progress = True
-                updater_thread.daemon = True
-                timeout = 0
-                updater_thread.start()
-                time.sleep(0.1)
-                continue
-            if len(self.modules_to_update) != 0:
-                self.__conn.send_nowait(parse_message(0x2C, 0x0, 0xFFF, (0,0))) #SWU MODE
+                self.__update_firmware_bootloader(bootloader_update_module_id, bootloader_update_module_type, 0)
+                timeout_count = 0
+            elif len(self.modules_to_update) != 0:
+                self.__send_conn(parse_message(0x2C, 0x0, 0xFFF, (0,0))) #SWU MODE
                 update_module_id, update_module_type = self.modules_to_update[0]
                 self.modules_to_update.pop(0)
-                updater_thread = th.Thread(
-                    target=self.__update_firmware,
-                    args=(update_module_id, update_module_type, 0)
-                )
-                self.update_in_progress = True
-                updater_thread.daemon = True
-                timeout = 0
-                updater_thread.start()
-                time.sleep(0.1)
-                continue
-            timeout += 1
-            time.sleep(0.1)
+                self.__update_firmware(update_module_id, update_module_type)
+                timeout_count = 0
 
-        self.modules_to_update.clear()
+            if len(self.modules_updated) != 0 and len(self.modules_to_update_all) != 0:
+                if len(self.modules_updated) == len(self.modules_to_update_all):
+                    # 모든 업데이트가 끝날 경우, 종료
+                    break
+
         self.update_index = 0
         reboot_message = self.__set_module_state(0xFFF, Module.REBOOT, Module.PNP_OFF)
-        self.__conn.send_nowait(reboot_message)
+        self.__send_conn(reboot_message)
         self.__print("Reboot message has been sent to all connected modules")
 
         time.sleep(1)
 
         self.__print("Module firmwares have been updated!")
+        self.close_recv_thread()
         self.close()
 
         self.update_in_progress = False
@@ -185,7 +174,6 @@ class ModuleFirmwareUpdater:
                 self.ui.update_modules_button.setText("Update Modules.")
             else:
                 self.ui.update_modules_button.setText("모듈 초기화")
-        return
 
     def set_ui(self, ui):
         self.ui = ui
@@ -197,7 +185,7 @@ class ModuleFirmwareUpdater:
         self.raise_error_message = raise_error_message
 
     def request_network_id(self):
-        self.__conn.send_nowait(parse_message(0x28, 0x0, 0xFFF, (0xFF, 0x0F)))
+        self.__send_conn(parse_message(0x28, 0x0, 0xFFF, (0xFF, 0x0F)))
 
     def __assign_network_id(self, sid, data, length:int):
         unpacked_data = unpack_data(data, (6, 2))
@@ -215,6 +203,7 @@ class ModuleFirmwareUpdater:
             self.network_version = ".".join(module_version)
 
     def update_module_firmware(self, firmware_version_info = {}):
+        self.update_in_progress = True
         self.has_update_error = False
         self.request_network_id()
         self.reset_state()
@@ -231,36 +220,21 @@ class ModuleFirmwareUpdater:
         for target in self.__target_ids:
             self.request_to_change_module_type(target, module_type)
 
-    def close(self):
+    def close_recv_thread(self):
         self.__running = False
         time.sleep(2)
         if self.recv_thread:
             self.recv_thread.join()
-        self.__conn.close_conn()
 
-    def open(self, port=None):
-        self.__conn = SerTask(port=port)
-        self.__conn.open_conn()
-        self.name = self.__conn._bus.port
+    def open_recv_thread(self):
         self.__running = True
         self.recv_thread = th.Thread(target=self.__read_conn, daemon=True)
         self.recv_thread.start()
-
-    def reinitialize_serial_connection(self, reinit_mode=1):
-        self.__reinitialize_serial_connection()
-
-    def __reinitialize_serial_connection(self):
-        self.__print("Temporally disconnecting the serial connection...")
-        self.close()
-        time.sleep(5)
-        self.__print("Re-init serial connection for the update, in 5 seconds...")
-        self.open()
 
     def reset_state(self, update_in_progress: bool = False) -> None:
         self.response_flag = False
         self.response_error_flag = False
         self.response_error_count = 0
-        self.update_in_progress = False
 
         if not update_in_progress:
             self.__print("Make sure you have connected module(s) to update")
@@ -271,28 +245,28 @@ class ModuleFirmwareUpdater:
 
     def request_to_update_firmware(self, module_id) -> None:
         firmware_update_message = self.__set_module_state(module_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
-        self.__conn.send_nowait(firmware_update_message)
+        self.__send_conn(firmware_update_message)
         time.sleep(0.01)
-        self.__conn.send_nowait(firmware_update_message)
+        self.__send_conn(firmware_update_message)
         time.sleep(0.01)
-        self.__conn.send_nowait(firmware_update_message)
+        self.__send_conn(firmware_update_message)
         time.sleep(0.01)
         self.__print("Firmware update has been requested")
 
     def request_to_change_module_type(self, module_id, module_type) -> None:
         self.change_type_target = get_module_uuid_from_type(module_type)
         firmware_update_message = self.__set_module_state(module_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
-        self.__conn.send_nowait(firmware_update_message)
+        self.__send_conn(firmware_update_message)
         time.sleep(0.01)
-        self.__conn.send_nowait(firmware_update_message)
+        self.__send_conn(firmware_update_message)
         time.sleep(0.01)
-        self.__conn.send_nowait(firmware_update_message)
+        self.__send_conn(firmware_update_message)
         time.sleep(0.01)
         self.__print("Change module type has been requested")
 
     def check_to_update_firmware(self, module_id: int) -> None:
         firmware_update_ready_message = self.__set_module_state(module_id, Module.UPDATE_FIRMWARE_READY, Module.PNP_OFF)
-        self.__conn.send_nowait(firmware_update_ready_message)
+        self.__send_conn(firmware_update_ready_message)
 
     def add_to_waitlist(self, module_id: int, module_type: str) -> None:
         # Check if input module already exist in the list
@@ -319,6 +293,7 @@ class ModuleFirmwareUpdater:
             if module_id == curr_module_id:
                 modules_update_all_flag = False
                 break
+
         if modules_update_all_flag == True:
             module_elem = module_id, module_type
             self.modules_to_update_all.append(module_elem)
@@ -370,7 +345,7 @@ class ModuleFirmwareUpdater:
             self.response_flag = False
             self.response_error_flag = response
 
-    def __update_firmware(self, module_id: int, module_type: str, module_index: int) -> None:
+    def __update_firmware(self, module_id: int, module_type: str) -> None:
         is_already_updated = False
         # Check if module is already updated
         for curr_module_id, curr_module_type in self.modules_updated:
@@ -378,120 +353,123 @@ class ModuleFirmwareUpdater:
                 is_already_updated = True
 
         if not is_already_updated:
-            self.update_in_progress = True
             self.module_type = module_type
 
             # Init base root_path, utilizing local binary files
             root_path = path.join(self.local_firmware_path, module_type, self.firmware_version_info[module_type]["app"])
+            bin_path = path.join(root_path, f"{module_type.lower()}.bin")
 
-            if self.__is_os_update:
-                bin_path = path.join(root_path, f"{module_type.lower()}.bin")
+            with open(bin_path, "rb") as bin_file:
+                bin_buffer = bin_file.read()
 
-                with open(bin_path, "rb") as bin_file:
-                    bin_buffer = bin_file.read()
+            # Init metadata of the bytes loaded
+            flash_memory_addr = 0x08000000
+            bin_size = sys.getsizeof(bin_buffer)
+            page_size = 0x400
+            bin_begin = 0x400
+            page_offset = 0x4C00
+            erase_page_num = 1
+            end_flash_address = 0x0800f800
+            if module_type == "speaker" or module_type == "display" or module_type == "env":
+                page_size = 0x800
+                bin_begin = 0x800
+                page_offset = 0x8800
+                end_flash_address = 0x0801f800
+                erase_page_num = 2
+            bin_end = bin_size - ((bin_size - bin_begin) % page_size)
+            page_begin = bin_begin
 
-                # Init metadata of the bytes loaded
-                flash_memory_addr = 0x08000000
-                bin_size = sys.getsizeof(bin_buffer)
-                page_size = 0x400
-                bin_begin = 0x400
-                page_offset = 0x4C00
-                erase_page_num = 1
-                end_flash_address = 0x0800f800
-                if module_type == "speaker" or module_type == "display" or module_type == "env":
-                    page_size = 0x800
-                    bin_begin = 0x800
-                    page_offset = 0x8800
-                    end_flash_address = 0x0801f800
-                    erase_page_num = 2
-                bin_end = bin_size - ((bin_size - bin_begin) % page_size)
-                page_begin = bin_begin
+            erase_error_limit = 2
+            erase_error_count = 0
+            crc_error_limit = 2
+            crc_error_count = 0
+            while page_begin < bin_end :
+                progress = 100 * page_begin // bin_end
+                self.progress = progress
 
-                erase_error_limit = 2
-                erase_error_count = 0
-                crc_error_limit = 2
-                crc_error_count = 0
-                while page_begin < bin_end :
-                    progress = 100 * page_begin // bin_end
-                    self.progress = progress
-
-                    if self.ui:
-                        update_module_num = len(self.modules_to_update_all)
-                        num_updated = len(self.modules_updated)
-                        if self.ui.is_english:
-                            self.ui.update_modules_button.setText(f"Modules update is in progress. ({num_updated} / {update_module_num})({progress}%)")
-                        else:
-                            self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
-
-                    # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
-                    page_end = page_begin + page_size
-                    curr_page = bin_buffer[page_begin:page_end]
-                    # Skip current page if empty
-                    if not sum(curr_page):
-                        page_begin = page_begin + page_size
-                        continue
-                    if page_begin + page_offset + flash_memory_addr == end_flash_address:
-                        page_begin = page_begin + page_size
-                        continue
-
-                    # Erase page (send erase request and receive its response)
-                    erase_page_success = self.send_firmware_command(
-                        oper_type="erase",
-                        module_id=module_id,
-                        crc_val=erase_page_num, # when page erase, crc value is replaced by data size
-                        dest_addr=flash_memory_addr,
-                        page_addr=page_begin + page_offset,
-                    )
-
-                    if not erase_page_success:
-                        erase_error_count = erase_error_count + 1
-                        if erase_error_count > erase_error_limit:
-                            erase_error_count = 0
-                            self.has_update_error = True
-                            self.modules_updated.append((module_id, module_type))
-                            break
-                        continue
+                if self.ui:
+                    update_module_num = len(self.modules_to_update_all)
+                    num_updated = len(self.modules_updated)
+                    if self.ui.is_english:
+                        self.ui.update_modules_button.setText(f"Modules update is in progress. ({num_updated} / {update_module_num})({progress}%)")
                     else:
-                        erase_error_count = 0
+                        self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                    # Copy current page data to the module's memory
-                    checksum = 0
-                    for curr_ptr in range(0, page_size, 8):
-                        if page_begin + curr_ptr >= bin_size:
-                            break
-
-                        curr_data = curr_page[curr_ptr : curr_ptr + 8]
-                        checksum = self.send_firmware_data(
-                            module_id,
-                            seq_num=curr_ptr // 8,
-                            bin_data=curr_data,
-                            crc_val=checksum,
-                        )
-                        time.sleep(0.001)
-
-                    # CRC on current page (send CRC request / receive CRC response)
-                    crc_page_success = self.send_firmware_command(
-                        oper_type="crc",
-                        module_id=module_id,
-                        crc_val=checksum,
-                        dest_addr=flash_memory_addr,
-                        page_addr=page_begin + page_offset,
-                    )
-
-                    if crc_page_success == False:
-                        crc_error_count = crc_error_count + 1
-                        if crc_error_count > crc_error_limit:
-                            crc_error_count = 0
-                            self.has_update_error = True
-                            self.modules_updated.append((module_id, module_type))
-                            break
-                        continue
-                    else:
-                        crc_error_count = 0
-
+                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                page_end = page_begin + page_size
+                curr_page = bin_buffer[page_begin:page_end]
+                # Skip current page if empty
+                if curr_page == bytes(len(curr_page)):
                     page_begin = page_begin + page_size
-                    time.sleep(0.01)
+                    time.sleep(0.2)
+                    continue
+                if page_begin + page_offset + flash_memory_addr == end_flash_address:
+                    page_begin = page_begin + page_size
+                    continue
+
+                # Erase page (send erase request and receive its response)
+                erase_page_success = self.send_firmware_command(
+                    oper_type="erase",
+                    module_id=module_id,
+                    crc_val=erase_page_num, # when page erase, crc value is replaced by data size
+                    dest_addr=flash_memory_addr,
+                    page_addr=page_begin + page_offset,
+                )
+
+                if not erase_page_success:
+                    erase_error_count = erase_error_count + 1
+                    if erase_error_count > erase_error_limit:
+                        erase_error_count = 0
+                        self.has_update_error = True
+                        self.update_error_message = f"{module_type} ({module_id}) erase flash failed."
+                        break
+                    continue
+                else:
+                    erase_error_count = 0
+
+                # Copy current page data to the module's memory
+                checksum = 0
+                for curr_ptr in range(0, page_size, 8):
+                    if page_begin + curr_ptr >= bin_size:
+                        break
+
+                    curr_data = curr_page[curr_ptr : curr_ptr + 8]
+                    checksum = self.send_firmware_data(
+                        module_id,
+                        seq_num=curr_ptr // 8,
+                        bin_data=curr_data,
+                        crc_val=checksum,
+                    )
+                    time.sleep(0.001)
+
+                # CRC on current page (send CRC request / receive CRC response)
+                crc_page_success = self.send_firmware_command(
+                    oper_type="crc",
+                    module_id=module_id,
+                    crc_val=checksum,
+                    dest_addr=flash_memory_addr,
+                    page_addr=page_begin + page_offset,
+                )
+
+                if crc_page_success == False:
+                    crc_error_count = crc_error_count + 1
+                    if crc_error_count > crc_error_limit:
+                        crc_error_count = 0
+                        self.has_update_error = True
+                        self.update_error_message = f"{module_type} ({module_id}) check crc failed."
+                        break
+                    continue
+                else:
+                    crc_error_count = 0
+
+                page_begin = page_begin + page_size
+                time.sleep(0.01)
+
             self.progress = 99
+            
+            verify_header = 0xAA
+            if self.has_update_error:
+                verify_header = 0xFF
             # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
@@ -515,7 +493,7 @@ class ModuleFirmwareUpdater:
 
             # Set end-flash data to be sent at the end of the firmware update
             end_flash_data = bytearray(16)
-            end_flash_data[0] = 0xAA
+            end_flash_data[0] = verify_header
             # appversion
             end_flash_data[6] = os_version & 0xFF
             end_flash_data[7] = (os_version >> 8) & 0xFF
@@ -531,7 +509,9 @@ class ModuleFirmwareUpdater:
 
             success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
             if not success_end_flash:
+                self.update_error_message = f"{module_type} ({module_id}) version writing failed."
                 self.has_update_error = True
+                print(self.update_error_message)
             self.__print(f"Version info (os: v{os_version_info}, app: v{app_version_info}) has been written to its firmware!")
 
             # Firmware update flag down, resetting used flags
@@ -551,7 +531,6 @@ class ModuleFirmwareUpdater:
 
         if not is_already_updated:
             self.__print("bootloader_uploade_start")
-            self.update_in_progress = True
             self.module_type = module_type
             # Init base root_path, utilizing local binary files
             root_path = path.join(self.local_firmware_path, "bootloader", "e230", self.firmware_version_info[module_type]["bootloader"])
@@ -561,124 +540,122 @@ class ModuleFirmwareUpdater:
                 root_path = path.join(self.local_firmware_path, "bootloader", "e103", self.firmware_version_info[module_type]["bootloader"])
                 bin_path = path.join(root_path, "bootloader_e103.bin")
 
-            if self.__is_os_update:
-                # Init metadata of the bytes loaded
-                flash_memory_addr = 0x08000000
-                page_size = 0x400
+            # Init metadata of the bytes loaded
+            flash_memory_addr = 0x08000000
+            page_size = 0x400
+            bin_begin = 0x0
+            page_offset = 0x1000
+            erase_page_num = 1
+            end_flash_address = 0x0800f800
+            flash_info_memory_addr = 0x08004C00
+            if module_type in ["speaker", "display", "env"]:
+                page_size = 0x800
                 bin_begin = 0x0
                 page_offset = 0x1000
-                erase_page_num = 1
-                end_flash_address = 0x0800f800
-                flash_info_memory_addr = 0x08004C00
-                if module_type in ["speaker", "display", "env"]:
-                    page_size = 0x800
-                    bin_begin = 0x0
-                    page_offset = 0x1000
-                    end_flash_address = 0x0801f800
-                    erase_page_num = 2
-                    flash_info_memory_addr = 0x08008800
+                end_flash_address = 0x0801f800
+                erase_page_num = 2
+                flash_info_memory_addr = 0x08008800
 
-                with open(bin_path, "rb") as bin_file:
-                    bin_buffer = bin_file.read()
+            with open(bin_path, "rb") as bin_file:
+                bin_buffer = bin_file.read()
 
-                bin_size = sys.getsizeof(bin_buffer)
-                bin_end = bin_size - ((bin_size - bin_begin) % page_size)
-                page_begin = bin_begin
+            bin_size = sys.getsizeof(bin_buffer)
+            bin_end = bin_size - ((bin_size - bin_begin) % page_size)
+            page_begin = bin_begin
 
-                erase_error_limit = 2
-                erase_error_count = 0
-                crc_error_limit = 2
-                crc_error_count = 0
-                self.progress = 1
-                self.has_update_error = False
-                while page_begin < bin_end :
-                    progress = 100 * page_begin // bin_end
-                    self.progress = progress
+            erase_error_limit = 2
+            erase_error_count = 0
+            crc_error_limit = 2
+            crc_error_count = 0
+            self.progress = 1
+            while page_begin < bin_end :
+                progress = 100 * page_begin // bin_end
+                self.progress = progress
 
-                    if self.ui:
-                        update_module_num = len(self.modules_to_update_all)
-                        num_updated = len(self.modules_updated)
-                        if self.ui.is_english:
-                            self.ui.update_modules_button.setText(f"Modules update is in progress. ({num_updated} / {update_module_num})({progress}%)")
-                        else:
-                            self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
-
-                    # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
-                    page_end = page_begin + page_size
-                    curr_page = bin_buffer[page_begin:page_end]
-                    # Skip current page if empty
-                    if not sum(curr_page):
-                        page_begin = page_begin + page_size
-                        continue
-                    if page_begin + page_offset + flash_memory_addr == end_flash_address:
-                        page_begin = page_begin + page_size
-                        continue
-                    if page_begin + page_offset + flash_memory_addr == flash_info_memory_addr:
-                        page_begin = page_begin + page_size
-                        continue
-                    # Erase page (send erase request and receive its response)
-                    erase_page_success = self.send_firmware_command(
-                        oper_type="erase",
-                        module_id=module_id,
-                        crc_val=erase_page_num, # when page erase, crc value is replaced by data size
-                        dest_addr=flash_memory_addr,
-                        page_addr=page_begin + page_offset,
-                    )
-
-                    if not erase_page_success:
-                        erase_error_count = erase_error_count + 1
-                        if erase_error_count > erase_error_limit:
-                            erase_error_count = 0
-                            self.has_update_error = True
-                            break
-                        continue
+                if self.ui:
+                    update_module_num = len(self.modules_to_update_all)
+                    num_updated = len(self.modules_updated)
+                    if self.ui.is_english:
+                        self.ui.update_modules_button.setText(f"Modules update is in progress. ({num_updated} / {update_module_num})({progress}%)")
                     else:
-                        erase_error_count = 0
+                        self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                    # Copy current page data to the module's memory
-                    checksum = 0
-                    for curr_ptr in range(0, page_size, 8):
-                        if page_begin + curr_ptr >= bin_size:
-                            break
-
-                        curr_data = curr_page[curr_ptr : curr_ptr + 8]
-                        checksum = self.send_firmware_data(
-                            module_id,
-                            seq_num=curr_ptr // 8,
-                            bin_data=curr_data,
-                            crc_val=checksum,
-                        )
-                        time.sleep(0.001)
-
-                    # CRC on current page (send CRC request / receive CRC response)
-                    crc_page_success = self.send_firmware_command(
-                        oper_type="crc",
-                        module_id=module_id,
-                        crc_val=checksum,
-                        dest_addr=flash_memory_addr,
-                        page_addr=page_begin + page_offset,
-                    )
-
-                    if crc_page_success == False:
-                        crc_error_count = crc_error_count + 1
-                        if crc_error_count > crc_error_limit:
-                            crc_error_count = 0
-                            self.has_update_error = True
-                            break
-                        continue
-                    else:
-                        crc_error_count = 0
-
+                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                page_end = page_begin + page_size
+                curr_page = bin_buffer[page_begin:page_end]
+                # Skip current page if empty
+                if not sum(curr_page):
                     page_begin = page_begin + page_size
-                    time.sleep(0.01)
+                    continue
+                if page_begin + page_offset + flash_memory_addr == end_flash_address:
+                    page_begin = page_begin + page_size
+                    continue
+                if page_begin + page_offset + flash_memory_addr == flash_info_memory_addr:
+                    page_begin = page_begin + page_size
+                    continue
+                # Erase page (send erase request and receive its response)
+                erase_page_success = self.send_firmware_command(
+                    oper_type="erase",
+                    module_id=module_id,
+                    crc_val=erase_page_num, # when page erase, crc value is replaced by data size
+                    dest_addr=flash_memory_addr,
+                    page_addr=page_begin + page_offset,
+                )
 
-            if self.has_update_error == True:
-                self.progress = 100
-                self.modules_updated.append((module_id, module_type))
-                self.reset_state(update_in_progress=True)
-                self.update_error_message = "error in bootloader upload"
-                self.update_error = -1
-                return
+                if not erase_page_success:
+                    erase_error_count = erase_error_count + 1
+                    if erase_error_count > erase_error_limit:
+                        erase_error_count = 0
+                        self.update_error_message = f"{module_type} ({module_id}) erase flash failed."
+                        self.has_update_error = True
+                        print(self.update_error_message)
+                        break
+                    continue
+                else:
+                    erase_error_count = 0
+
+                # Copy current page data to the module's memory
+                checksum = 0
+                for curr_ptr in range(0, page_size, 8):
+                    if page_begin + curr_ptr >= bin_size:
+                        break
+
+                    curr_data = curr_page[curr_ptr : curr_ptr + 8]
+                    checksum = self.send_firmware_data(
+                        module_id,
+                        seq_num=curr_ptr // 8,
+                        bin_data=curr_data,
+                        crc_val=checksum,
+                    )
+                    time.sleep(0.001)
+
+                # CRC on current page (send CRC request / receive CRC response)
+                crc_page_success = self.send_firmware_command(
+                    oper_type="crc",
+                    module_id=module_id,
+                    crc_val=checksum,
+                    dest_addr=flash_memory_addr,
+                    page_addr=page_begin + page_offset,
+                )
+
+                if crc_page_success == False:
+                    crc_error_count = crc_error_count + 1
+                    if crc_error_count > crc_error_limit:
+                        crc_error_count = 0
+                        self.update_error_message = f"{module_type} ({module_id}) check crc failed."
+                        self.has_update_error = True
+                        print(self.update_error_message)
+                        break
+                    continue
+                else:
+                    crc_error_count = 0
+
+                page_begin = page_begin + page_size
+                time.sleep(0.01)
+
+            verify_header = 0xAA
+            if self.has_update_error:
+                verify_header = 0xFF
 
             self.progress = 99
             # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
@@ -689,7 +666,7 @@ class ModuleFirmwareUpdater:
 
             # Set end-flash data to be sent at the end of the firmware update
             end_flash_data = bytearray(16)
-            end_flash_data[0] = 0xAA
+            end_flash_data[0] = verify_header
             end_flash_data[6] = 0
             end_flash_data[7] = 0
 
@@ -701,10 +678,12 @@ class ModuleFirmwareUpdater:
 
             success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
             if not success_end_flash:
+                self.update_error_message = f"{module_type} ({module_id}) version writing failed."
                 self.has_update_error = True
+                print(self.update_error_message)
 
             reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
-            self.__conn.send_nowait(reboot_message)
+            self.__send_conn(reboot_message)
 
             self.__print(f"Version info (v{bootloader_version_info}) has been written to its firmware!")
 
@@ -724,7 +703,6 @@ class ModuleFirmwareUpdater:
 
         if not is_already_updated:
             self.__print("second_bootloader_uploade_start")
-            self.update_in_progress = True
             self.module_type = module_type
             # Init base root_path, utilizing local binary files
             root_path = path.join(self.local_firmware_path, "bootloader", "e230", self.firmware_version_info[module_type]["bootloader"])
@@ -734,124 +712,123 @@ class ModuleFirmwareUpdater:
                 root_path = path.join(self.local_firmware_path, "bootloader", "e103", self.firmware_version_info[module_type]["bootloader"])
                 bin_path = path.join(root_path, "second_bootloader_e103.bin")
 
-            if self.__is_os_update:
-                # Init metadata of the bytes loaded
-                flash_memory_addr = 0x08000000
-                page_size = 0x400
-                bin_begin = 0x400
-                page_offset = 0x4C00
-                erase_page_num = 1
-                end_flash_address = 0x0800f800
-                flash_info_memory_addr = 0x08004C00
-                if module_type in ["speaker", "display", "env"]:
-                    page_size = 0x800
-                    bin_begin = 0x800
-                    page_offset = 0x8800
-                    end_flash_address = 0x0801f800
-                    erase_page_num = 2
-                    flash_info_memory_addr = 0x08008800
+            # Init metadata of the bytes loaded
+            flash_memory_addr = 0x08000000
+            page_size = 0x400
+            bin_begin = 0x400
+            page_offset = 0x4C00
+            erase_page_num = 1
+            end_flash_address = 0x0800f800
+            flash_info_memory_addr = 0x08004C00
+            if module_type in ["speaker", "display", "env"]:
+                page_size = 0x800
+                bin_begin = 0x800
+                page_offset = 0x8800
+                end_flash_address = 0x0801f800
+                erase_page_num = 2
+                flash_info_memory_addr = 0x08008800
 
-                with open(bin_path, "rb") as bin_file:
-                    bin_buffer = bin_file.read()
+            with open(bin_path, "rb") as bin_file:
+                bin_buffer = bin_file.read()
 
-                bin_size = sys.getsizeof(bin_buffer)
-                bin_end = bin_size - ((bin_size - bin_begin) % page_size)
-                page_begin = bin_begin
+            bin_size = sys.getsizeof(bin_buffer)
+            bin_end = bin_size - ((bin_size - bin_begin) % page_size)
+            page_begin = bin_begin
 
-                erase_error_limit = 2
-                erase_error_count = 0
-                crc_error_limit = 2
-                crc_error_count = 0
-                self.progress = 1
-                while page_begin < bin_end :
-                    progress = 100 * page_begin // bin_end
-                    self.progress = progress
+            erase_error_limit = 2
+            erase_error_count = 0
+            crc_error_limit = 2
+            crc_error_count = 0
+            self.progress = 1
+            while page_begin < bin_end :
+                progress = 100 * page_begin // bin_end
+                self.progress = progress
 
-                    if self.ui:
-                        update_module_num = len(self.modules_to_update_all)
-                        num_updated = len(self.modules_updated)
-                        if self.ui.is_english:
-                            self.ui.update_modules_button.setText(f"Modules update is in progress. ({num_updated} / {update_module_num})({progress}%)")
-                        else:
-                            self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
-
-                    # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
-                    page_end = page_begin + page_size
-                    curr_page = bin_buffer[page_begin:page_end]
-                    # Skip current page if empty
-                    if not sum(curr_page):
-                        page_begin = page_begin + page_size
-                        continue
-                    if page_begin + page_offset == end_flash_address:
-                        page_begin = page_begin + page_size
-                        continue
-                    if page_begin + page_offset == flash_info_memory_addr:
-                        page_begin = page_begin + page_size
-                        continue
-
-                    # Erase page (send erase request and receive its response)
-                    erase_page_success = self.send_firmware_command(
-                        oper_type="erase",
-                        module_id=module_id,
-                        crc_val=erase_page_num, # when page erase, crc value is replaced by data size
-                        dest_addr=flash_memory_addr,
-                        page_addr=page_begin + page_offset,
-                    )
-
-                    if not erase_page_success:
-                        erase_error_count = erase_error_count + 1
-                        if erase_error_count > erase_error_limit:
-                            erase_error_count = 0
-                            self.has_update_error = True
-                            break
-                        continue
+                if self.ui:
+                    update_module_num = len(self.modules_to_update_all)
+                    num_updated = len(self.modules_updated)
+                    if self.ui.is_english:
+                        self.ui.update_modules_button.setText(f"Modules update is in progress. ({num_updated} / {update_module_num})({progress}%)")
                     else:
-                        erase_error_count = 0
+                        self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                    # Copy current page data to the module's memory
-                    checksum = 0
-                    for curr_ptr in range(0, page_size, 8):
-                        if page_begin + curr_ptr >= bin_size:
-                            break
-
-                        curr_data = curr_page[curr_ptr : curr_ptr + 8]
-                        checksum = self.send_firmware_data(
-                            module_id,
-                            seq_num=curr_ptr // 8,
-                            bin_data=curr_data,
-                            crc_val=checksum,
-                        )
-                        time.sleep(0.001)
-
-                    # CRC on current page (send CRC request / receive CRC response)
-                    crc_page_success = self.send_firmware_command(
-                        oper_type="crc",
-                        module_id=module_id,
-                        crc_val=checksum,
-                        dest_addr=flash_memory_addr,
-                        page_addr=page_begin + page_offset,
-                    )
-
-                    if crc_page_success == False:
-                        crc_error_count = crc_error_count + 1
-                        if crc_error_count > crc_error_limit:
-                            crc_error_count = 0
-                            self.has_update_error = True
-                            break
-                        continue
-                    else:
-                        crc_error_count = 0
-
+                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                page_end = page_begin + page_size
+                curr_page = bin_buffer[page_begin:page_end]
+                # Skip current page if empty
+                if not sum(curr_page):
                     page_begin = page_begin + page_size
-                    time.sleep(0.01)
+                    continue
+                if page_begin + page_offset == end_flash_address:
+                    page_begin = page_begin + page_size
+                    continue
+                if page_begin + page_offset == flash_info_memory_addr:
+                    page_begin = page_begin + page_size
+                    continue
 
-            if self.has_update_error == True:
-                self.progress = 100
-                self.modules_updated.append((module_id, module_type))
-                self.reset_state(update_in_progress=True)
-                self.update_error_message = "error in second bootloader upload"
-                self.update_error = -1
-                return
+                # Erase page (send erase request and receive its response)
+                erase_page_success = self.send_firmware_command(
+                    oper_type="erase",
+                    module_id=module_id,
+                    crc_val=erase_page_num, # when page erase, crc value is replaced by data size
+                    dest_addr=flash_memory_addr,
+                    page_addr=page_begin + page_offset,
+                )
+
+                if not erase_page_success:
+                    erase_error_count = erase_error_count + 1
+                    if erase_error_count > erase_error_limit:
+                        erase_error_count = 0
+                        self.update_error_message = f"{module_type} ({module_id}) erase flash failed."
+                        self.has_update_error = True
+                        print(self.update_error_message)
+                        break
+                    continue
+                else:
+                    erase_error_count = 0
+
+                # Copy current page data to the module's memory
+                checksum = 0
+                for curr_ptr in range(0, page_size, 8):
+                    if page_begin + curr_ptr >= bin_size:
+                        break
+
+                    curr_data = curr_page[curr_ptr : curr_ptr + 8]
+                    checksum = self.send_firmware_data(
+                        module_id,
+                        seq_num=curr_ptr // 8,
+                        bin_data=curr_data,
+                        crc_val=checksum,
+                    )
+                    time.sleep(0.001)
+
+                # CRC on current page (send CRC request / receive CRC response)
+                crc_page_success = self.send_firmware_command(
+                    oper_type="crc",
+                    module_id=module_id,
+                    crc_val=checksum,
+                    dest_addr=flash_memory_addr,
+                    page_addr=page_begin + page_offset,
+                )
+
+                if crc_page_success == False:
+                    crc_error_count = crc_error_count + 1
+                    if crc_error_count > crc_error_limit:
+                        crc_error_count = 0
+                        self.update_error_message = f"{module_type} ({module_id}) check crc failed."
+                        self.has_update_error = True
+                        print(self.update_error_message)
+                        break
+                    continue
+                else:
+                    crc_error_count = 0
+
+                page_begin = page_begin + page_size
+                time.sleep(0.01)
+
+            verify_header = 0xAA
+            if self.has_update_error:
+                verify_header = 0xFF
 
             self.progress = 99
             # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
@@ -862,7 +839,7 @@ class ModuleFirmwareUpdater:
 
             # Set end-flash data to be sent at the end of the firmware update
             end_flash_data = bytearray(16)
-            end_flash_data[0] = 0xAA
+            end_flash_data[0] = verify_header
             end_flash_data[6] = 0
             end_flash_data[7] = 0
 
@@ -874,10 +851,12 @@ class ModuleFirmwareUpdater:
 
             success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
             if not success_end_flash:
+                self.update_error_message = f"{module_type} ({module_id}) version writing failed."
                 self.has_update_error = True
+                print(self.update_error_message)
 
             reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
-            self.__conn.send_nowait(reboot_message)
+            self.__send_conn(reboot_message)
 
             self.__print(f"Version info (v{second_bootloader_version_info}) has been written to its firmware!")
 
@@ -896,51 +875,49 @@ class ModuleFirmwareUpdater:
                 is_already_updated = True
 
         if not is_already_updated:
-            self.update_in_progress = True
             self.module_type = module_type
 
             self.modules_updated.append((module_id, module_type))
 
-            if self.__is_os_update:
-                # Init metadata of the bytes loaded
-                progress = 0
-                self.progress = progress
+            # Init metadata of the bytes loaded
+            progress = 0
+            self.progress = progress
 
-                if self.ui:
-                    update_module_num = len(self.modules_to_update)
-                    num_updated = len(self.modules_updated)
-                    if self.ui.is_english:
-                        self.ui.change_modules_type_button.setText(f"Changing modules type is in progress. ({num_updated} / {update_module_num})({progress}%)")
-                    else:
-                        self.ui.change_modules_type_button.setText(f"모듈 타입 변경이 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
+            if self.ui:
+                update_module_num = len(self.modules_to_update)
+                num_updated = len(self.modules_updated)
+                if self.ui.is_english:
+                    self.ui.change_modules_type_button.setText(f"Changing modules type is in progress. ({num_updated} / {update_module_num})({progress}%)")
+                else:
+                    self.ui.change_modules_type_button.setText(f"모듈 타입 변경이 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                # send change
-                uuid_changed_with_type = self.change_type_target << 32
-                self.send_change_type(module_id, uuid_changed_with_type)
-                time.sleep(0.5)
-                self.progress = 50
+            # send change
+            uuid_changed_with_type = self.change_type_target << 32
+            self.send_change_type(module_id, uuid_changed_with_type)
+            time.sleep(0.5)
+            self.progress = 50
 
-                #reboot
-                reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_ON)
-                self.__conn.send_nowait(reboot_message)
-                time.sleep(0.5)
+            #reboot
+            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_ON)
+            self.__send_conn(reboot_message)
+            time.sleep(0.5)
 
-                timeout = 0
-                while self.change_type_success_flag == False:
-                    if ((timeout % 10) == 0) and (timeout != 0):
-                        self.send_change_type(module_id, uuid_changed_with_type)
-                        time.sleep(0.1)
-                        self.__conn.send_nowait(reboot_message)
-                    if timeout >= 50:
-                        timeout = 0
-                        self.update_error_message = "Response timed-out"
-                        self.has_update_error = True
-                        if self.raise_error_message:
-                            raise Exception(self.update_error_message)
-                        break
-                    timeout += 1
+            timeout = 0
+            while self.change_type_success_flag == False:
+                if ((timeout % 10) == 0) and (timeout != 0):
+                    self.send_change_type(module_id, uuid_changed_with_type)
                     time.sleep(0.1)
-                self.change_type_success_flag = False
+                    self.__send_conn(reboot_message)
+                if timeout >= 50:
+                    timeout = 0
+                    self.update_error_message = "Change type response timedout"
+                    self.has_update_error = True
+                    if self.raise_error_message:
+                        raise Exception(self.update_error_message)
+                    break
+                timeout += 1
+                time.sleep(0.1)
+            self.change_type_success_flag = False
 
             self.progress = 100
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(1, 1)} 100%")
@@ -961,6 +938,7 @@ class ModuleFirmwareUpdater:
             self.update_index = 0
 
             self.__print("Module type change have been updated!")
+            self.close_recv_thread()
             self.close()
 
             self.update_in_progress = False
@@ -1143,13 +1121,14 @@ class ModuleFirmwareUpdater:
     def send_change_type(self, module_id: int = 0, changed_uuid_: int = 0,) -> bool:
         # Send firmware command request
         request_message = self.change_type_command(did = module_id, changed_uuid = changed_uuid_)
-        self.__conn.send_nowait(request_message)
+        self.__send_conn(request_message)
 
     def send_firmware_command(self, oper_type: str, module_id: int, crc_val: int, dest_addr: int, page_addr: int = 0,) -> bool:
         rot_scmd = 2 if oper_type == "erase" else 1
         # Send firmware command request
+        self.reset_state(True)
         request_message = self.get_firmware_command(module_id, 1, rot_scmd, crc_val, page_addr=dest_addr + page_addr)
-        self.__conn.send_nowait(request_message)
+        self.__send_conn(request_message)
 
         return self.receive_command_response()
 
@@ -1170,11 +1149,9 @@ class ModuleFirmwareUpdater:
 
             # If error is raised
             if self.response_error_flag:
-                self.response_error_count += 1
-                if self.response_error_count > max_response_error_count:
-                    self.update_error_message = "Response Errored"
-                    if self.raise_error_message:
-                        raise Exception(self.update_error_message)
+                self.update_error_message = "Response Errored"
+                if self.raise_error_message:
+                    raise Exception(self.update_error_message)
                 self.response_error_flag = False
                 return False
 
@@ -1184,7 +1161,7 @@ class ModuleFirmwareUpdater:
     def send_firmware_data(self, module_id: int, seq_num: int, bin_data: bytes, crc_val: int) -> int:
         # Send firmware data
         data_message = self.get_firmware_data(module_id, seq_num=seq_num, bin_data=bin_data)
-        self.__conn.send_nowait(data_message)
+        self.__send_conn(data_message)
 
         # Calculate crc32 checksum twice
         checksum = self.calc_crc64(data=bin_data, checksum=crc_val)
@@ -1195,17 +1172,47 @@ class ModuleFirmwareUpdater:
         rest_bar = 50 - curr_bar
         return f"[{'=' * curr_bar}>{'.' * rest_bar}]"
 
+    def __send_conn(self, data):
+        # print("send", data)
+        self.write(data)
+
     def __read_conn(self):
-        self.request_network_id()
+        for _ in range(0, 3):
+            self.request_network_id()
+            time.sleep(0.01)
+
         while self.__running:
             self.__handle_message()
             time.sleep(0.001)
 
+    def read_json(self):
+        json_pkt = b""
+        while json_pkt != b"{":
+            if not self.is_open:
+                return None
+            json_pkt = self.read()
+            if json_pkt == b"":
+                return None
+            time.sleep(0.1)
+        json_pkt += self.read_until(b"}")
+        return json_pkt.decode("utf8")
+
+    def wait_for_json(self, timeout=2):
+        json_msg = self.read_json()
+        init_time = time.time()
+        while not json_msg:
+            json_msg = self.read_json()
+            time.sleep(0.1)
+            if time.time() - init_time > timeout:
+                return None
+        return json_msg
+
     def __handle_message(self):
         try:
-            msg = self.__conn.recv()
+            msg = self.wait_for_json()
             if not msg:
                 return
+            # print("recv", msg)
             ins, sid, did, data, length = decode_message(msg)
         except:
             return
@@ -1303,8 +1310,7 @@ class ModuleFirmwareUpdater:
 
     def __print(self, data, end="\n"):
         if self.print:
-            v = 2
-            #print(data, end)
+            print(data, end)
 
 class ModuleFirmwareMultiUpdater():
     def __init__(self, local_firmware_path):
@@ -1333,13 +1339,13 @@ class ModuleFirmwareMultiUpdater():
                 break
             try:
                 module_uploader = ModuleFirmwareUpdater(
-                    port = modi_port.device,
+                    device = modi_port,
                     local_firmware_path = self.local_firmware_path
                 )
                 module_uploader.set_print(False)
                 module_uploader.set_raise_error(False)
             except:
-                print("open " + modi_port.device + " error")
+                print("open " + modi_port + " error")
             else:
                 self.module_uploaders.append(module_uploader)
                 self.state.append(-1)
@@ -1367,11 +1373,11 @@ class ModuleFirmwareMultiUpdater():
             is_done = True
             total_progress = 0
             for index, module_uploader in enumerate(self.module_uploaders):
-                if module_uploader.update_in_progress:
-                    if module_uploader.network_uuid:
-                        self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
-                        if self.list_ui:
-                            self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+                if module_uploader.network_uuid is not None:
+                    self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
+                    if self.list_ui:
+                        self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+
                 if self.state[index] == -1:
                     # wait module list
                     is_done = False
@@ -1463,13 +1469,13 @@ class ModuleFirmwareMultiUpdater():
                 break
             try:
                 module_uploader = ModuleFirmwareUpdater(
-                    port = modi_port.device,
+                    device = modi_port,
                     local_firmware_path = self.local_firmware_path
                 )
                 module_uploader.set_print(False)
                 module_uploader.set_raise_error(False)
             except:
-                print("open " + modi_port.device + " error")
+                print("open " + modi_port + " error")
             else:
                 self.module_uploaders.append(module_uploader)
                 self.state.append(-1)
@@ -1497,10 +1503,11 @@ class ModuleFirmwareMultiUpdater():
             is_done = True
             total_progress = 0
             for index, module_uploader in enumerate(self.module_uploaders):
-                if module_uploader.update_in_progress:
-                    if module_uploader.network_uuid:
-                        self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
+                if module_uploader.network_uuid is not None:
+                    self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
+                    if self.list_ui:
                         self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+
                 if self.state[index] == -1:
                     # wait module list
                     is_done = False
