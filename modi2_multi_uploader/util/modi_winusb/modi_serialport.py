@@ -2,7 +2,6 @@ import sys
 import time
 import serial
 import serial.tools.list_ports as stl
-from modi2_multi_uploader.util.modi_winusb.modi_winusb import ModiWinUsbComPort, list_modi_winusb_paths
 
 def list_modi_serialports():
     info_list = []
@@ -14,6 +13,7 @@ def list_modi_serialports():
         info_list.append(modi_port.device)
 
     if sys.platform.startswith("win"):
+        from modi2_multi_uploader.util.modi_winusb.modi_winusb import list_modi_winusb_paths
         path_list = list_modi_winusb_paths()
         for index, value in enumerate(path_list):
             info_list.append(value)
@@ -40,10 +40,15 @@ class ModiSerialPort():
     def open(self, port):
         self.port = port
 
-        if sys.platform.startswith("win") and port in list_modi_winusb_paths():
-            self.type = self.SERIAL_MODI_WINUSB
-            winusb = ModiWinUsbComPort(path = self.port, baudrate=self.baudrate, timeout=self.timeout)
-            self.serial_port = winusb
+        if sys.platform.startswith("win"):
+            from modi2_multi_uploader.util.modi_winusb.modi_winusb import ModiWinUsbComPort, list_modi_winusb_paths
+            if port in list_modi_winusb_paths():
+                self.type = self.SERIAL_MODI_WINUSB
+                winusb = ModiWinUsbComPort(path = self.port, baudrate=self.baudrate, timeout=self.timeout)
+                self.serial_port = winusb
+            else:
+                ser = serial.Serial(port = self.port, baudrate=self.baudrate, timeout=self.timeout, write_timeout=self.write_timeout, exclusive=True)
+                self.serial_port = ser
         else:
             ser = serial.Serial(port = self.port, baudrate=self.baudrate, timeout=self.timeout, write_timeout=self.write_timeout, exclusive=True)
             self.serial_port = ser
