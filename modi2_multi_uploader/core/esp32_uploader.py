@@ -507,15 +507,18 @@ class ESPLoader(object):
             get_version_pkt = b'{"c":160,"s":25,"d":4095,"b":"AAAAAAAAAA==","l":8}'
             self._port.write(get_version_pkt)
 
+            if time.time() - init_time > 1:
+                return None
+
             try:
-                json_msg = json.loads(self.wait_for_json())
+                msg = self.wait_for_json()
+                if not msg:
+                    continue
+                json_msg = json.loads(msg)
                 if json_msg["c"] == 0xA1 and json_msg["s"] == 0x09:
                     break
             except json.decoder.JSONDecodeError as jde:
                 # print("json parse error: " + str(jde))
-                return None
-
-            if time.time() - init_time > 1:
                 return None
 
         ver = b64decode(json_msg["b"]).lstrip(b"\x00")
@@ -528,15 +531,18 @@ class ESPLoader(object):
             get_version_pkt = b'{"c":160,"s":71,"d":4095,"b":"AAAAAAAAAA==","l":8}'
             self._port.write(get_version_pkt)
 
+            if time.time() - init_time > 1:
+                return None
+
             try:
-                json_msg = json.loads(self.wait_for_json())
+                msg = self.wait_for_json()
+                if not msg:
+                    continue
+                json_msg = json.loads(msg)
                 if json_msg["c"] == 0xA1 and json_msg["s"] == 71:
                     break
             except json.decoder.JSONDecodeError as jde:
                 # print("json parse error: " + str(jde))
-                return None
-
-            if time.time() - init_time > 1:
                 return None
 
         ver = b64decode(json_msg["b"]).lstrip(b"\x00")
@@ -556,7 +562,10 @@ class ESPLoader(object):
         for _ in range(0, retry):
             self._port.write(version_msg_enc)
             try:
-                json_msg = json.loads(self.wait_for_json())
+                msg = self.wait_for_json()
+                if not msg:
+                    continue
+                json_msg = json.loads(msg)
                 if json_msg["c"] == 0xA1 and json_msg["s"] == 24:
                     break
                 # self.__boot_to_app()
@@ -580,7 +589,10 @@ class ESPLoader(object):
         for _ in range(0, retry):
             self._port.write(version_msg_enc)
             try:
-                json_msg = json.loads(self.wait_for_json())
+                msg = self.wait_for_json()
+                if not msg:
+                    continue
+                json_msg = json.loads(msg)
                 if json_msg["c"] == 0xA1 and json_msg["s"] == 70:
                     break
             except json.decoder.JSONDecodeError as jde:

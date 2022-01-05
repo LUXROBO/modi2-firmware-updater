@@ -81,6 +81,9 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 return None, None
 
             try:
+                if not recved:
+                    continue
+
                 json_msg = json.loads(recved)
                 if json_msg["c"] == 0x05:
                     unpacked_data = unpack_data(json_msg["b"], (6, 2))
@@ -162,6 +165,9 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 return False
 
             try:
+                if not recved:
+                    continue
+
                 json_msg = json.loads(recved)
                 if json_msg["c"] == 0x0C:
                     message_decoded = unpack_data(json_msg["b"], (4, 1))
