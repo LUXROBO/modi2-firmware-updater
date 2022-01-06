@@ -4650,7 +4650,7 @@ class ESP32FirmwareMultiUploder():
                         total_sequence += total
 
                         if self.list_ui:
-                            self.list_ui.progress_signal.emit(index, value)
+                            self.list_ui.progress_signal.emit(index, int(value))
                     else:
                         self.state[index] = 2
                 elif self.state[index] == 2:
@@ -4699,7 +4699,7 @@ class ESP32FirmwareMultiUploder():
                             )
 
                 if self.list_ui:
-                    self.list_ui.total_progress_signal.emit(current_sequence / total_sequence * 100.0)
+                    self.list_ui.total_progress_signal.emit(int(current_sequence / total_sequence * 100.0))
                     self.list_ui.total_status_signal.emit("Uploading...")
 
                 print(f"{self.__progress_bar(current_sequence, total_sequence)}", end="")

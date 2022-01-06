@@ -678,7 +678,7 @@ class NetworkFirmwareMultiUpdater():
                         if self.list_ui:
                             self.list_ui.current_module_changed_signal.emit(index, "network")
                             self.list_ui.error_message_signal.emit(index, "Updating module")
-                            self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
+                            self.list_ui.progress_signal.emit(index, int(current_module_progress), int(total_module_progress))
                     else:
                         total_progress += 100 / len(self.network_updaters)
                         self.state[index] = 1
@@ -722,7 +722,7 @@ class NetworkFirmwareMultiUpdater():
                             self.ui.update_network_button.setText(f"네트워크 모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
-                    self.list_ui.total_progress_signal.emit(total_progress)
+                    self.list_ui.total_progress_signal.emit(int(total_progress))
                     self.list_ui.total_status_signal.emit("Uploading...")
 
             if is_done:
