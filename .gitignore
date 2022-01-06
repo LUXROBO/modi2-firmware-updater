@@ -10,4 +10,4 @@ modi
 dist/
 build/
 .idea/
-modi2_multi_uploader/assets/firmware/latest
+modi2_multi_uploader/assets/firmware/firmware_version.json

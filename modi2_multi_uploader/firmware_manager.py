@@ -1,6 +1,7 @@
 import os
 import json
 import stat
+import shutil
 from functools import cmp_to_key
 from itertools import zip_longest
 import http.client as httplib
@@ -196,7 +197,6 @@ class FirmwareManagerForm(QDialog):
 
             temp_path = os.path.join(self.local_firmware_path, "modi-v2-module-binary-main")
 
-            import shutil
             shutil.copytree(temp_path, self.local_firmware_path, dirs_exist_ok=True)
             if os.path.exists(temp_path):
                 self.__rmtree(temp_path)
@@ -211,7 +211,6 @@ class FirmwareManagerForm(QDialog):
 
         os.mkdir(self.local_firmware_path)
 
-        import shutil
         shutil.copytree(self.assets_firmware_path, self.local_firmware_path, dirs_exist_ok=True)
 
     def check_firmware(self):
@@ -310,19 +309,20 @@ class FirmwareManagerForm(QDialog):
                     self.module_ui_dic[key]["bootloader"].addItem(version)
 
             config_firmeware_version_info = self.get_config_firmware_version_info()
-            for key in config_firmeware_version_info.keys():
-                app_version = config_firmeware_version_info[key]["app"]
-                all_texts = [self.module_ui_dic[key]["app"].itemText(i) for i in range(self.module_ui_dic[key]["app"].count())]
-                if app_version in all_texts:
-                    self.module_ui_dic[key]["app"].setCurrentText(app_version)
+            if config_firmeware_version_info:
+                for key in config_firmeware_version_info.keys():
+                    app_version = config_firmeware_version_info[key]["app"]
+                    all_texts = [self.module_ui_dic[key]["app"].itemText(i) for i in range(self.module_ui_dic[key]["app"].count())]
+                    if app_version in all_texts:
+                        self.module_ui_dic[key]["app"].setCurrentText(app_version)
 
-                if key in ["network", "esp32_app", "esp32_ota"]:
-                    continue
+                    if key in ["network", "esp32_app", "esp32_ota"]:
+                        continue
 
-                bootloader_version = config_firmeware_version_info[key]["bootloader"]
-                all_texts = [self.module_ui_dic[key]["bootloader"].itemText(i) for i in range(self.module_ui_dic[key]["bootloader"].count())]
-                if bootloader_version in all_texts:
-                    self.module_ui_dic[key]["bootloader"].setCurrentText(bootloader_version)
+                    bootloader_version = config_firmeware_version_info[key]["bootloader"]
+                    all_texts = [self.module_ui_dic[key]["bootloader"].itemText(i) for i in range(self.module_ui_dic[key]["bootloader"].count())]
+                    if bootloader_version in all_texts:
+                        self.module_ui_dic[key]["bootloader"].setCurrentText(bootloader_version)
 
         except Exception:
             return False
@@ -358,6 +358,9 @@ class FirmwareManagerForm(QDialog):
         return module_version_dic
 
     def get_config_firmware_version_info(self):
+        if not os.path.isfile(self.firmware_version_config_path):
+            return None
+
         with open(self.firmware_version_config_path, "r") as config_file:
             config_info = config_file.read()
             return json.loads(config_info)
