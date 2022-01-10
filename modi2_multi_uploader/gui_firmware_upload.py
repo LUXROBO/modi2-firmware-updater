@@ -141,8 +141,7 @@ class Form(QDialog):
         else:
             self.component_path = os.path.join(os.path.dirname(__file__), "assets", "component")
         self.ui = uic.loadUi(ui_path)
-        self.assets_firmware_path = os.path.join(os.path.dirname(__file__), "assets", "firmware", "binary")
-        self.firmware_version_config_path = os.path.join(os.path.dirname(__file__), "assets", "firmware", "firmware_version.json")
+        self.assets_firmware_path = os.path.join(os.path.dirname(__file__), "assets", "firmware")
         self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi2 multi uploader")
 
         self.ui.setStyleSheet("background-color: white")
@@ -159,7 +158,6 @@ class Form(QDialog):
         self.firmware_manage_form = FirmwareManagerForm(path_dict={
             "ui": firmware_manager_ui_path,
             "component": self.component_path,
-            "firmware_version_config": self.firmware_version_config_path,
             "assets_firmware": self.assets_firmware_path,
             "local_firmware": self.local_firmware_path,
         })

@@ -474,7 +474,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
             # Get version info from version_path, using appropriate methods
             os_version_info = self.firmware_version_info[module_type]["os"]
-            os_version_info = os_version_info.lstrip("v")
+            os_version_info = os_version_info.lstrip("v").split("-")[0]
             os_version_digits = [int(digit) for digit in os_version_info.split(".")]
             os_version = (
                 os_version_digits[0] << 13
@@ -483,7 +483,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             )
 
             app_version_info = self.firmware_version_info[module_type]["app"]
-            app_version_info = app_version_info.lstrip("v")
+            app_version_info = app_version_info.lstrip("v").split("-")[0]
             app_version_digits = [int(digit) for digit in app_version_info.split(".")]
             app_version = (
                 app_version_digits[0] << 13
@@ -662,7 +662,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
             # Get version info from version_path, using appropriate methods
             bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
-            bootloader_version_info = bootloader_version_info.lstrip("v")
+            bootloader_version_info = bootloader_version_info.lstrip("v").split("-")[0]
 
             # Set end-flash data to be sent at the end of the firmware update
             end_flash_data = bytearray(16)
@@ -835,7 +835,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
             # Get version info from version_path, using appropriate methods
             second_bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
-            second_bootloader_version_info = second_bootloader_version_info.lstrip("v")
+            second_bootloader_version_info = second_bootloader_version_info.lstrip("v").split("-")[0]
 
             # Set end-flash data to be sent at the end of the firmware update
             end_flash_data = bytearray(16)
@@ -1318,7 +1318,7 @@ class ModuleFirmwareMultiUpdater():
         self.ui = None
         self.list_ui = None
         self.task_end_callback = None
-        self.local_firmware_path = local_firmware_path
+        self.local_firmware_path = path.join(local_firmware_path, "modi-v2-module-binary-main")
 
     def set_ui(self, ui, list_ui):
         self.ui = ui

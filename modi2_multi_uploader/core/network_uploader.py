@@ -466,7 +466,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
         # Get version info from version_path, using appropriate methods
         network_version_info = self.firmware_version_info["network"]["app"]
-        network_version_info = network_version_info.lstrip("v")
+        network_version_info = network_version_info.lstrip("v").split("-")[0]
         network_version_digits = [int(digit) for digit in network_version_info.split(".")]
         network_version = (
             network_version_digits[0] << 13
@@ -607,7 +607,7 @@ class NetworkFirmwareMultiUpdater():
         self.ui = None
         self.list_ui = None
         self.task_end_callback = None
-        self.local_firmware_path = local_firmware_path
+        self.local_firmware_path = path.join(local_firmware_path, "modi-v2-module-binary-main")
 
     def set_ui(self, ui, list_ui):
         self.ui = ui

@@ -16,9 +16,11 @@ class FirmwareManagerForm(QDialog):
         QDialog.__init__(self)
 
         self.component_path = path_dict["component"]
-        self.firmware_version_config_path = path_dict["firmware_version_config"]
         self.assets_firmware_path = path_dict["assets_firmware"]
         self.local_firmware_path = path_dict["local_firmware"]
+
+        self.local_firmware_binary_path = os.path.join(self.local_firmware_path, "modi-v2-module-binary-main")
+        self.local_firmware_version_path = os.path.join(self.local_firmware_path, "firmware_version.json")
 
         self.ui = uic.loadUi(path_dict["ui"])
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
@@ -180,10 +182,8 @@ class FirmwareManagerForm(QDialog):
             return True
 
         try:
-            if os.path.exists(self.local_firmware_path):
-                self.__rmtree(self.local_firmware_path)
-
-            os.mkdir(self.local_firmware_path)
+            if os.path.exists(self.local_firmware_binary_path):
+                self.__rmtree(self.local_firmware_binary_path)
 
             import requests
             url = "https://github.com/LUXROBO/modi-v2-module-binary/archive/refs/heads/main.zip"
@@ -194,12 +194,6 @@ class FirmwareManagerForm(QDialog):
             from zipfile import ZipFile
             zip = ZipFile(BytesIO(content.content))
             zip.extractall(self.local_firmware_path)
-
-            temp_path = os.path.join(self.local_firmware_path, "modi-v2-module-binary-main")
-
-            shutil.copytree(temp_path, self.local_firmware_path, dirs_exist_ok=True)
-            if os.path.exists(temp_path):
-                self.__rmtree(temp_path)
         except Exception as e:
             self.copy_assets_firmware()
 
@@ -214,17 +208,17 @@ class FirmwareManagerForm(QDialog):
         shutil.copytree(self.assets_firmware_path, self.local_firmware_path, dirs_exist_ok=True)
 
     def check_firmware(self):
-        if not os.path.exists(self.local_firmware_path):
+        if not os.path.exists(self.local_firmware_binary_path):
             return {}
 
-        file_list = os.listdir(self.local_firmware_path)
+        file_list = os.listdir(self.local_firmware_binary_path)
         firmware_list = {}
         for ele in file_list:
             if not os.path.isfile(ele) and ele != ".git":
                 if ele in self.module_list:
                     # modules - barrey, button, ...., network
                     module_type = ele
-                    version_dir = os.path.join(self.local_firmware_path, module_type)
+                    version_dir = os.path.join(self.local_firmware_binary_path, module_type)
                     version_list = os.listdir(version_dir)
                     if len(version_list):
                         firmware_list[module_type] = []
@@ -234,7 +228,7 @@ class FirmwareManagerForm(QDialog):
                                 firmware_list[module_type].append(version)
                 elif ele == "bootloader":
                     # check e230
-                    bootloader_e230_version_dir = os.path.join(self.local_firmware_path, ele, "e230")
+                    bootloader_e230_version_dir = os.path.join(self.local_firmware_binary_path, ele, "e230")
                     bootloader_e230_version_list = os.listdir(bootloader_e230_version_dir)
                     if len(bootloader_e230_version_list):
                         firmware_list["bootloader_e230"] = []
@@ -244,7 +238,7 @@ class FirmwareManagerForm(QDialog):
                             if os.path.exists(bootloader_path) and os.path.exists(second_bootloader_path):
                                 firmware_list["bootloader_e230"].append(version)
                     # check e103
-                    bootloader_e103_version_dir = os.path.join(self.local_firmware_path, ele, "e103")
+                    bootloader_e103_version_dir = os.path.join(self.local_firmware_binary_path, ele, "e103")
                     bootloader_e103_version_list = os.listdir(bootloader_e103_version_dir)
                     if len(bootloader_e103_version_list):
                         firmware_list["bootloader_e103"] = []
@@ -255,7 +249,7 @@ class FirmwareManagerForm(QDialog):
                                 firmware_list["bootloader_e103"].append(version)
                 elif ele == "esp32":
                     # check esp32 app
-                    esp32_app_version_dir = os.path.join(self.local_firmware_path, ele, "app")
+                    esp32_app_version_dir = os.path.join(self.local_firmware_binary_path, ele, "app")
                     esp32_app_version_list = os.listdir(esp32_app_version_dir)
                     if len(esp32_app_version_list):
                         firmware_list["esp32_app"] = []
@@ -267,7 +261,7 @@ class FirmwareManagerForm(QDialog):
                             if os.path.exists(bootloader_path) and os.path.exists(eps32_path) and os.path.exists(ota_data_initial_path) and os.path.exists(partitions_path):
                                 firmware_list["esp32_app"].append(version)
                     # check esp32 ota
-                    esp32_ota_version_dir = os.path.join(self.local_firmware_path, ele, "ota")
+                    esp32_ota_version_dir = os.path.join(self.local_firmware_binary_path, ele, "ota")
                     esp32_ota_version_list = os.listdir(esp32_ota_version_dir)
                     if len(esp32_ota_version_list):
                         firmware_list["esp32_ota"] = []
@@ -331,7 +325,7 @@ class FirmwareManagerForm(QDialog):
 
     def apply_firmware(self, show_message):
         firmware_version_info = self.get_selected_firmware_version_info()
-        with open(self.firmware_version_config_path, "w") as config_file:
+        with open(self.local_firmware_version_path, "w") as config_file:
             json_msg = json.dumps(firmware_version_info, indent=4)
             config_file.write(str(json_msg))
 
@@ -358,10 +352,10 @@ class FirmwareManagerForm(QDialog):
         return module_version_dic
 
     def get_config_firmware_version_info(self):
-        if not os.path.isfile(self.firmware_version_config_path):
+        if not os.path.isfile(self.local_firmware_version_path):
             return None
 
-        with open(self.firmware_version_config_path, "r") as config_file:
+        with open(self.local_firmware_version_path, "r") as config_file:
             config_info = config_file.read()
             return json.loads(config_info)
 
@@ -371,7 +365,7 @@ class FirmwareManagerForm(QDialog):
             return
 
         self.module_ui_dic[module_type]["os"].clear()
-        version_text_path = os.path.join(self.local_firmware_path, module_type, selected_app_version, "version.txt")
+        version_text_path = os.path.join(self.local_firmware_binary_path, module_type, selected_app_version, "version.txt")
         with open(version_text_path, "r") as version_text_file:
             version_text = version_text_file.read()
             version_info = json.loads(version_text)
@@ -401,11 +395,11 @@ class FirmwareManagerForm(QDialog):
 
     @staticmethod
     def __compare_version(left, right):
-        left_vars = map(int, left.lstrip("v").rstrip("\n").split('.'))
-        right_vars = map(int, right.lstrip("v").rstrip("\n").split('.'))
-        for a, b in zip_longest(left_vars, right_vars, fillvalue = 0):
-            if a > b:
-                return 1
-            elif a < b:
-                return -1
-        return 0
+        from packaging import version
+        
+        if version.parse(left) > version.parse(right):
+            return 1
+        elif version.parse(left) == version.parse(right):
+            return 0
+        else:
+            return -1

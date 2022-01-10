@@ -4256,8 +4256,8 @@ class ESP32FirmwareUpdater():
             app_version_info = self.firmware_version_info["esp32_app"]["app"]
             ota_version_info = self.firmware_version_info["esp32_ota"]["app"]
 
-            self.app_version_to_update = app_version_info.lstrip("v").rstrip("\n")
-            self.ota_version_to_update = ota_version_info.lstrip("v").rstrip("\n")
+            self.app_version_to_update = app_version_info.lstrip("v").rstrip("\n").split("-")[0]
+            self.ota_version_to_update = ota_version_info.lstrip("v").rstrip("\n").split("-")[0]
 
             parser = argparse.ArgumentParser(description='esptool.py v%s - ESP8266 ROM Bootloader Utility' % __version__, prog='esptool')
 
@@ -4576,7 +4576,7 @@ class ESP32FirmwareMultiUploder():
         self.ui = None
         self.list_ui = None
         self.task_end_callback = None
-        self.local_firmware_path = local_firmware_path
+        self.local_firmware_path = path.join(local_firmware_path, "modi-v2-module-binary-main")
 
     def set_ui(self, ui, list_ui):
         self.ui = ui

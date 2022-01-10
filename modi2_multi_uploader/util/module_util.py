@@ -154,7 +154,7 @@ class Module:
         )
         version_path = path.join(root_path, "version.txt")
         with open(version_path) as version_file:
-            version_info = version_file.readline().lstrip("v").rstrip("\n")
+            version_info = version_file.readline().lstrip("v").rstrip("\n").split("-")[0]
         version_digits = [int(digit) for digit in version_info.split(".")]
         latest_version = (
             version_digits[0] << 13
