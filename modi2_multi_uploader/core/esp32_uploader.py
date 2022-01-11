@@ -472,82 +472,6 @@ class ESPLoader(object):
                 return None
         return json_msg
 
-    def get_network_uuid(self):
-        init_time = time.time()
-        while True:
-            if time.time() - init_time > 5:
-                return None
-
-            get_uuid_pkt = b'{"c":40,"s":0,"d":4095,"b":"//8AAAAAAAA=","l":8}'
-            self._port.write(get_uuid_pkt)
-            try:
-                msg = self.wait_for_json()
-                if not msg:
-                    time.sleep(0.2)
-                    continue
-
-                json_msg = json.loads(msg)
-                if json_msg["c"] == 0x05 or json_msg["c"] == 0x0A:
-                    module_uuid = unpack_data(json_msg["b"], (6, 2))[0]
-                    module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network":
-                        return module_uuid
-            except json.decoder.JSONDecodeError as jde:
-                # print("json parse error: " + str(jde))
-                # return None
-                time.sleep(0.2)
-                pass
-
-            time.sleep(0.2)
-
-    def get_esp_app_version(self):
-        init_time = time.time()
-
-        while True:
-            get_version_pkt = b'{"c":160,"s":25,"d":4095,"b":"AAAAAAAAAA==","l":8}'
-            self._port.write(get_version_pkt)
-
-            if time.time() - init_time > 1:
-                return None
-
-            try:
-                msg = self.wait_for_json()
-                if not msg:
-                    continue
-                json_msg = json.loads(msg)
-                if json_msg["c"] == 0xA1 and json_msg["s"] == 0x09:
-                    break
-            except json.decoder.JSONDecodeError as jde:
-                # print("json parse error: " + str(jde))
-                return None
-
-        ver = b64decode(json_msg["b"]).lstrip(b"\x00")
-        return ver.decode("ascii")
-
-    def get_esp_ota_version(self):
-        init_time = time.time()
-
-        while True:
-            get_version_pkt = b'{"c":160,"s":71,"d":4095,"b":"AAAAAAAAAA==","l":8}'
-            self._port.write(get_version_pkt)
-
-            if time.time() - init_time > 1:
-                return None
-
-            try:
-                msg = self.wait_for_json()
-                if not msg:
-                    continue
-                json_msg = json.loads(msg)
-                if json_msg["c"] == 0xA1 and json_msg["s"] == 71:
-                    break
-            except json.decoder.JSONDecodeError as jde:
-                # print("json parse error: " + str(jde))
-                return None
-
-        ver = b64decode(json_msg["b"]).lstrip(b"\x00")
-        return ver.decode("ascii")
-
     def set_esp_app_version(self, version_text: str, retry = 5):
         # print(f"Writing esp app version info (v{version_text})")
         version_byte = version_text.encode("ascii")
@@ -623,7 +547,7 @@ class ESPLoader(object):
         self._port.write(b'{"c":43,"s":0,"d":4095,"b":"Kw==","l":1}')
         self.flush_input()
         self._port.flushOutput()
-        time.sleep(1)
+        time.sleep(0.5)
 
         # issue reset-to-bootloader:
         # RTS = either CH_PD/EN or nRESET (both active low = chip in reset
@@ -658,9 +582,9 @@ class ESPLoader(object):
                 return None
             except FatalError as e:
                 # if esp32r0_delay:
-                #     print('_', end='')
+                #     # print('_', end='')
                 # else:
-                #     print('.', end='')
+                #     # print('.', end='')
                 sys.stdout.flush()
                 time.sleep(0.05)
                 last_error = e
@@ -4110,8 +4034,8 @@ class ESP32FirmwareUpdater():
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
                 None
-            except:
-                self.__print("error")
+            except Exception as e:
+                self.__print("error", str(e))
                 None
 
             if time.time() - init_time > timeout:
