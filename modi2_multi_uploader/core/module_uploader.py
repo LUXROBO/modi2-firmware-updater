@@ -1193,7 +1193,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             json_pkt = self.read()
             if json_pkt == b"":
                 return None
-            time.sleep(0.1)
+            time.sleep(0.001)
         json_pkt += self.read_until(b"}")
         return json_pkt.decode("utf8")
 
@@ -1202,7 +1202,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         init_time = time.time()
         while not json_msg:
             json_msg = self.read_json()
-            time.sleep(0.1)
+            time.sleep(0.001)
             if time.time() - init_time > timeout:
                 return None
         return json_msg
