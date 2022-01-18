@@ -9,7 +9,7 @@ import traceback as tb
 
 from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QDialog, QMessageBox
 
 from modi2_multi_uploader.firmware_manager import FirmwareManagerForm
 from modi2_multi_uploader.update_list_form import ESP32UpdateListForm, ModuleUpdateListForm
@@ -141,8 +141,7 @@ class Form(QDialog):
         else:
             self.component_path = os.path.join(os.path.dirname(__file__), "assets", "component")
         self.ui = uic.loadUi(ui_path)
-        self.assets_firmware_path = os.path.join(os.path.dirname(__file__), "assets", "firmware", "binary")
-        self.firmware_version_config_path = os.path.join(os.path.dirname(__file__), "assets", "firmware", "firmware_version.json")
+        self.assets_firmware_path = os.path.join(os.path.dirname(__file__), "assets", "firmware")
         self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi2 multi uploader")
 
         self.ui.setStyleSheet("background-color: white")
@@ -159,7 +158,6 @@ class Form(QDialog):
         self.firmware_manage_form = FirmwareManagerForm(path_dict={
             "ui": firmware_manager_ui_path,
             "component": self.component_path,
-            "firmware_version_config": self.firmware_version_config_path,
             "assets_firmware": self.assets_firmware_path,
             "local_firmware": self.local_firmware_path,
         })
@@ -193,9 +191,9 @@ class Form(QDialog):
 
         version_path = os.path.join(os.path.dirname(__file__), "..", "version.txt")
         with io.open(version_path, "r") as version_file:
-            version_info = version_file.readline().lstrip("v").rstrip("\n")
+            self.version_info = version_file.readline().rstrip("\n")
 
-        self.ui.setWindowTitle("MODI+ Multi Uploader - v" + version_info)
+        self.ui.setWindowTitle("MODI+ Multi Uploader - " + self.version_info)
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         # Redirect stdout to text browser (i.e. console in our UI)
@@ -286,6 +284,9 @@ class Form(QDialog):
         self.refresh_button_text()
         self.refresh_console()
         self.ui.show()
+
+        # check app update
+        self.check_app_update()
 
     #
     # Main methods
@@ -561,7 +562,7 @@ class Form(QDialog):
         if len(firmware_list) == 0:
             download_success = self.firmware_manage_form.download_firmware()
             if download_success:
-                refresh_success = self.firmware_manage_form.refresh_firmware_info()
+                refresh_success = self.firmware_manage_form.refresh_firmware_info(preset=False)
                 if refresh_success:
                     self.firmware_manage_form.apply_firmware(show_message=False)
                 else:
@@ -582,6 +583,32 @@ class Form(QDialog):
                 args=("download firmware first,\n and select firmware version"),
                 daemon=True
             ).start()
+
+    def check_app_update(self):
+        try:
+            import requests
+            response = requests.get("https://api.github.com/repos/LUXROBO/modi2-multi-uploader-bin/releases/latest")
+
+            current_version = self.version_info
+            latest_version = response.json()["name"]
+            download_url = response.json()["assets"][0]["browser_download_url"]
+
+            from packaging import version
+            
+            if version.parse(latest_version) > version.parse(current_version):
+                print(f"need to update to {latest_version}\n{download_url}")
+                msg = QMessageBox()
+                msg.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
+                msg.setWindowTitle("App update")
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.setIcon(QMessageBox.Icon.Information)
+                msg.setText(f"need to update to {latest_version}")
+                msg.setDetailedText(download_url)
+                msg.exec_()
+
+        except:
+            pass
+
     #
     # Helper functions
     #

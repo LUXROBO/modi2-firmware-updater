@@ -8,7 +8,6 @@ from modi2_multi_uploader.gui_firmware_upload import Form
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-
     parser.add_argument(
         '--debug', type=str, default="False",
         choices=["False", "True"],
@@ -19,5 +18,6 @@ if __name__ == "__main__":
     print("Running MODI2 Multi Uploader")
     app = QtWidgets.QApplication(sys.argv)
     w = Form(debug=debug)
-    sys.exit(app.exec())
+    ret = app.exec()
     print("Terminating MODI2 Multi Uploader")
+    sys.exit(ret)

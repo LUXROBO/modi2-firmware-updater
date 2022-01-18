@@ -458,7 +458,7 @@ class ESPLoader(object):
             json_pkt = self._port.read(1)
             if json_pkt == b"":
                 return None
-            time.sleep(0.1)
+            time.sleep(0.001)
         json_pkt += self._port.read_until(b"}")
         return json_pkt
 
@@ -467,80 +467,10 @@ class ESPLoader(object):
         init_time = time.time()
         while not json_msg:
             json_msg = self.read_json()
-            time.sleep(0.1)
+            time.sleep(0.001)
             if time.time() - init_time > timeout:
                 return None
         return json_msg
-
-    def get_network_uuid(self):
-        init_time = time.time()
-        while True:
-            if time.time() - init_time > 5:
-                return None
-
-            get_uuid_pkt = b'{"c":40,"s":0,"d":4095,"b":"//8AAAAAAAA=","l":8}'
-            self._port.write(get_uuid_pkt)
-            try:
-                msg = self.wait_for_json()
-                if not msg:
-                    time.sleep(0.2)
-                    continue
-
-                json_msg = json.loads(msg)
-                if json_msg["c"] == 0x05 or json_msg["c"] == 0x0A:
-                    module_uuid = unpack_data(json_msg["b"], (6, 2))[0]
-                    module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network":
-                        return module_uuid
-            except json.decoder.JSONDecodeError as jde:
-                # print("json parse error: " + str(jde))
-                # return None
-                time.sleep(0.2)
-                pass
-
-            time.sleep(0.2)
-
-    def get_esp_app_version(self):
-        init_time = time.time()
-
-        while True:
-            get_version_pkt = b'{"c":160,"s":25,"d":4095,"b":"AAAAAAAAAA==","l":8}'
-            self._port.write(get_version_pkt)
-
-            try:
-                json_msg = json.loads(self.wait_for_json())
-                if json_msg["c"] == 0xA1 and json_msg["s"] == 0x09:
-                    break
-            except json.decoder.JSONDecodeError as jde:
-                # print("json parse error: " + str(jde))
-                return None
-
-            if time.time() - init_time > 1:
-                return None
-
-        ver = b64decode(json_msg["b"]).lstrip(b"\x00")
-        return ver.decode("ascii")
-
-    def get_esp_ota_version(self):
-        init_time = time.time()
-
-        while True:
-            get_version_pkt = b'{"c":160,"s":71,"d":4095,"b":"AAAAAAAAAA==","l":8}'
-            self._port.write(get_version_pkt)
-
-            try:
-                json_msg = json.loads(self.wait_for_json())
-                if json_msg["c"] == 0xA1 and json_msg["s"] == 71:
-                    break
-            except json.decoder.JSONDecodeError as jde:
-                # print("json parse error: " + str(jde))
-                return None
-
-            if time.time() - init_time > 1:
-                return None
-
-        ver = b64decode(json_msg["b"]).lstrip(b"\x00")
-        return ver.decode("ascii")
 
     def set_esp_app_version(self, version_text: str, retry = 5):
         # print(f"Writing esp app version info (v{version_text})")
@@ -556,7 +486,10 @@ class ESPLoader(object):
         for _ in range(0, retry):
             self._port.write(version_msg_enc)
             try:
-                json_msg = json.loads(self.wait_for_json())
+                msg = self.wait_for_json()
+                if not msg:
+                    continue
+                json_msg = json.loads(msg)
                 if json_msg["c"] == 0xA1 and json_msg["s"] == 24:
                     break
                 # self.__boot_to_app()
@@ -580,7 +513,10 @@ class ESPLoader(object):
         for _ in range(0, retry):
             self._port.write(version_msg_enc)
             try:
-                json_msg = json.loads(self.wait_for_json())
+                msg = self.wait_for_json()
+                if not msg:
+                    continue
+                json_msg = json.loads(msg)
                 if json_msg["c"] == 0xA1 and json_msg["s"] == 70:
                     break
             except json.decoder.JSONDecodeError as jde:
@@ -611,7 +547,7 @@ class ESPLoader(object):
         self._port.write(b'{"c":43,"s":0,"d":4095,"b":"Kw==","l":1}')
         self.flush_input()
         self._port.flushOutput()
-        time.sleep(1)
+        time.sleep(0.5)
 
         # issue reset-to-bootloader:
         # RTS = either CH_PD/EN or nRESET (both active low = chip in reset
@@ -646,9 +582,9 @@ class ESPLoader(object):
                 return None
             except FatalError as e:
                 # if esp32r0_delay:
-                #     print('_', end='')
+                #     # print('_', end='')
                 # else:
-                #     print('.', end='')
+                #     # print('.', end='')
                 sys.stdout.flush()
                 time.sleep(0.05)
                 last_error = e
@@ -4098,8 +4034,8 @@ class ESP32FirmwareUpdater():
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
                 None
-            except:
-                self.__print("error")
+            except Exception as e:
+                self.__print("error", str(e))
                 None
 
             if time.time() - init_time > timeout:
@@ -4115,7 +4051,7 @@ class ESP32FirmwareUpdater():
             json_pkt = port.read()
             if json_pkt == b"":
                 return None
-            time.sleep(0.1)
+            time.sleep(0.001)
         json_pkt += port.read_until(b"}")
         return json_pkt.decode("utf8")
 
@@ -4124,7 +4060,7 @@ class ESP32FirmwareUpdater():
         init_time = time.time()
         while not json_msg:
             json_msg = self.read_json(port)
-            time.sleep(0.1)
+            time.sleep(0.001)
             if time.time() - init_time > timeout:
                 return None
         return json_msg
@@ -4244,8 +4180,8 @@ class ESP32FirmwareUpdater():
             app_version_info = self.firmware_version_info["esp32_app"]["app"]
             ota_version_info = self.firmware_version_info["esp32_ota"]["app"]
 
-            self.app_version_to_update = app_version_info.lstrip("v").rstrip("\n")
-            self.ota_version_to_update = ota_version_info.lstrip("v").rstrip("\n")
+            self.app_version_to_update = app_version_info.lstrip("v").rstrip("\n").split("-")[0]
+            self.ota_version_to_update = ota_version_info.lstrip("v").rstrip("\n").split("-")[0]
 
             parser = argparse.ArgumentParser(description='esptool.py v%s - ESP8266 ROM Bootloader Utility' % __version__, prog='esptool')
 
@@ -4564,7 +4500,7 @@ class ESP32FirmwareMultiUploder():
         self.ui = None
         self.list_ui = None
         self.task_end_callback = None
-        self.local_firmware_path = local_firmware_path
+        self.local_firmware_path = path.join(local_firmware_path, "modi-v2-module-binary-main")
 
     def set_ui(self, ui, list_ui):
         self.ui = ui
@@ -4638,7 +4574,7 @@ class ESP32FirmwareMultiUploder():
                         total_sequence += total
 
                         if self.list_ui:
-                            self.list_ui.progress_signal.emit(index, value)
+                            self.list_ui.progress_signal.emit(index, int(value))
                     else:
                         self.state[index] = 2
                 elif self.state[index] == 2:
@@ -4687,7 +4623,7 @@ class ESP32FirmwareMultiUploder():
                             )
 
                 if self.list_ui:
-                    self.list_ui.total_progress_signal.emit(current_sequence / total_sequence * 100.0)
+                    self.list_ui.total_progress_signal.emit(int(current_sequence / total_sequence * 100.0))
                     self.list_ui.total_status_signal.emit("Uploading...")
 
                 print(f"{self.__progress_bar(current_sequence, total_sequence)}", end="")

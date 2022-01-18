@@ -2,7 +2,7 @@
 
 실행 준비
 --
-1. `python3`(파이썬3.6 혹은 그 이상의 버전)를 컴퓨터에 설치
+1. `python3`(파이썬3.9 혹은 그 이상의 버전)를 컴퓨터에 설치
 2. `python3 -m pip install -r requirements.txt`로 의존성 패키지들을 설치
 
 실행 방법 (개발)

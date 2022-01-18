@@ -81,6 +81,9 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 return None, None
 
             try:
+                if not recved:
+                    continue
+
                 json_msg = json.loads(recved)
                 if json_msg["c"] == 0x05:
                     unpacked_data = unpack_data(json_msg["b"], (6, 2))
@@ -162,6 +165,9 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 return False
 
             try:
+                if not recved:
+                    continue
+
                 json_msg = json.loads(recved)
                 if json_msg["c"] == 0x0C:
                     message_decoded = unpack_data(json_msg["b"], (4, 1))
@@ -460,7 +466,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
         # Get version info from version_path, using appropriate methods
         network_version_info = self.firmware_version_info["network"]["app"]
-        network_version_info = network_version_info.lstrip("v")
+        network_version_info = network_version_info.lstrip("v").split("-")[0]
         network_version_digits = [int(digit) for digit in network_version_info.split(".")]
         network_version = (
             network_version_digits[0] << 13
@@ -535,7 +541,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
             json_pkt = self.read()
             if json_pkt == b"":
                 return None
-            time.sleep(0.1)
+            time.sleep(0.001)
         json_pkt += self.read_until(b"}")
         return json_pkt.decode("utf8")
 
@@ -544,7 +550,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         init_time = time.time()
         while not json_msg:
             json_msg = self.read_json()
-            time.sleep(0.1)
+            time.sleep(0.001)
             if time.time() - init_time > timeout:
                 return None
         return json_msg
@@ -601,7 +607,7 @@ class NetworkFirmwareMultiUpdater():
         self.ui = None
         self.list_ui = None
         self.task_end_callback = None
-        self.local_firmware_path = local_firmware_path
+        self.local_firmware_path = path.join(local_firmware_path, "modi-v2-module-binary-main")
 
     def set_ui(self, ui, list_ui):
         self.ui = ui
@@ -672,7 +678,7 @@ class NetworkFirmwareMultiUpdater():
                         if self.list_ui:
                             self.list_ui.current_module_changed_signal.emit(index, "network")
                             self.list_ui.error_message_signal.emit(index, "Updating module")
-                            self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
+                            self.list_ui.progress_signal.emit(index, int(current_module_progress), int(total_module_progress))
                     else:
                         total_progress += 100 / len(self.network_updaters)
                         self.state[index] = 1
@@ -716,7 +722,7 @@ class NetworkFirmwareMultiUpdater():
                             self.ui.update_network_button.setText(f"네트워크 모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
-                    self.list_ui.total_progress_signal.emit(total_progress)
+                    self.list_ui.total_progress_signal.emit(int(total_progress))
                     self.list_ui.total_status_signal.emit("Uploading...")
 
             if is_done:

@@ -245,12 +245,12 @@ class ModiWinUsbComPort:
         self.device = None
         self.path = path
         self._rxremaining = b''
-        self.baudrate = baudrate
         self.parity = 0
         self.stopbits = 1
         self.databits = 8
         self.maximum_packet_size = 0
 
+        self._baudrate = baudrate
         self._timeout = timeout
         self._write_timeout = write_timeout
 
@@ -282,7 +282,7 @@ class ModiWinUsbComPort:
 
         self.is_open = True
 
-        self.setControlLineState(True, True)
+        self.setControlLineState()
         self.setLineCoding()
         self.device.set_timeout(self._ep_in, self._timeout)
         self.reset_input_buffer()
@@ -295,14 +295,28 @@ class ModiWinUsbComPort:
     def timeout(self):
         return self._timeout
 
-    def settimeout(self, timeout):
-        self._timeout = timeout
-        if self.is_open:
-            self.device.set_timeout(self._ep_in, timeout)
-
     @timeout.setter
-    def timeout(self, timeout):
-        self.settimeout(timeout)
+    def timeout(self, value):
+        self._timeout = value
+        if self.is_open:
+            self.device.set_timeout(self._ep_in, value)
+
+    @property
+    def write_timeout(self):
+        return self._write_timeout
+
+    @write_timeout.setter
+    def write_timeout(self, value):
+        self._write_timeout = value
+
+    @property
+    def baudrate(self):
+        return self._baudrate
+
+    @baudrate.setter
+    def baudrate(self, value):
+        self._baudrate = value
+        self.setLineCoding(baudrate=value)
 
     def readinto(self, buf):
         if not self.is_open:
@@ -440,7 +454,7 @@ class ModiWinUsbComPort:
         dbits = {5, 6, 7, 8, 16}
         pmodes = {0, 1, 2, 3, 4}
         brates = {300, 600, 1200, 2400, 4800, 9600, 14400,
-                  19200, 28800, 38400, 57600, 115200, 230400}
+                  19200, 28800, 38400, 57600, 115200, 230400, 921600}
 
         if stopbits is not None:
             if stopbits not in sbits.keys():
@@ -467,13 +481,13 @@ class ModiWinUsbComPort:
                 best = brs[dif.index(min(dif))]
                 raise ValueError(
                     "Invalid baudrates, nearest valid is {}".format(best))
-            self.baudrate = baudrate
+            self._baudrate = baudrate
 
         linecode = [
-            self.baudrate & 0xff,
-            (self.baudrate >> 8) & 0xff,
-            (self.baudrate >> 16) & 0xff,
-            (self.baudrate >> 24) & 0xff,
+            self._baudrate & 0xff,
+            (self._baudrate >> 8) & 0xff,
+            (self._baudrate >> 16) & 0xff,
+            (self._baudrate >> 24) & 0xff,
             sbits[self.stopbits],
             self.parity,
             self.databits]

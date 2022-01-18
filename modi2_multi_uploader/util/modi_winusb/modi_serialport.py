@@ -2,7 +2,6 @@ import sys
 import time
 import serial
 import serial.tools.list_ports as stl
-from modi2_multi_uploader.util.modi_winusb.modi_winusb import ModiWinUsbComPort, list_modi_winusb_paths
 
 def list_modi_serialports():
     info_list = []
@@ -14,6 +13,7 @@ def list_modi_serialports():
         info_list.append(modi_port.device)
 
     if sys.platform.startswith("win"):
+        from modi2_multi_uploader.util.modi_winusb.modi_winusb import list_modi_winusb_paths
         path_list = list_modi_winusb_paths()
         for index, value in enumerate(path_list):
             info_list.append(value)
@@ -26,26 +26,31 @@ class ModiSerialPort():
 
     def __init__(self, port = None, baudrate = 921600, timeout = 0.2, write_timeout = None):
         self.type = self.SERIAL_MODE_COMPORT
-        self.port = port
-        self.baudrate = baudrate
-        self.timeout = timeout
-        self.write_timeout = write_timeout
+        self._port = port
+        self._baudrate = baudrate
+        self._timeout = timeout
+        self._write_timeout = write_timeout
 
         self.serial_port = None
-        self.is_open = False
+        self._is_open = False
 
-        if self.port is not None:
-            self.open(self.port)
+        if self._port is not None:
+            self.open(self._port)
 
     def open(self, port):
-        self.port = port
+        self._port = port
 
-        if sys.platform.startswith("win") and port in list_modi_winusb_paths():
-            self.type = self.SERIAL_MODI_WINUSB
-            winusb = ModiWinUsbComPort(path = self.port, baudrate=self.baudrate, timeout=self.timeout)
-            self.serial_port = winusb
+        if sys.platform.startswith("win"):
+            from modi2_multi_uploader.util.modi_winusb.modi_winusb import ModiWinUsbComPort, list_modi_winusb_paths
+            if port in list_modi_winusb_paths():
+                self.type = self.SERIAL_MODI_WINUSB
+                winusb = ModiWinUsbComPort(path = self._port, baudrate=self._baudrate, timeout=self._timeout)
+                self.serial_port = winusb
+            else:
+                ser = serial.Serial(port = self._port, baudrate=self._baudrate, timeout=self._timeout, write_timeout=self._write_timeout, exclusive=True)
+                self.serial_port = ser
         else:
-            ser = serial.Serial(port = self.port, baudrate=self.baudrate, timeout=self.timeout, write_timeout=self.write_timeout, exclusive=True)
+            ser = serial.Serial(port = self._port, baudrate=self._baudrate, timeout=self._timeout, write_timeout=self._write_timeout, exclusive=True)
             self.serial_port = ser
 
         self.is_open = True
@@ -74,7 +79,7 @@ class ModiSerialPort():
 
         lenterm = len(expected)
         line = bytearray()
-        modi_timeout = self.Timeout(self.timeout)
+        modi_timeout = self.Timeout(self._timeout)
         while True:
             c = self.read(1)
             if c:
@@ -127,6 +132,42 @@ class ModiSerialPort():
         if self.type == self.SERIAL_MODE_COMPORT:
             waiting = self.serial_port.inWaiting()
         return waiting
+
+    @property
+    def port(self):
+        return self._port
+
+    @port.setter
+    def port(self, value):
+        self._port = value
+        self.serial_port.port = value
+
+    @property
+    def baudrate(self):
+        return self._baudrate
+
+    @baudrate.setter
+    def baudrate(self, value):
+        self._baudrate = value
+        self.serial_port.baudrate = value
+
+    @property
+    def timeout(self):
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value):
+        self._timeout = value
+        self.serial_port.timeout = value
+
+    @property
+    def write_timeout(self):
+        return self._write_timeout
+
+    @write_timeout.setter
+    def write_timeout(self, value):
+        self._write_timeout = value
+        self.serial_port.write_timeout = value
 
     class Timeout(object):
         """\

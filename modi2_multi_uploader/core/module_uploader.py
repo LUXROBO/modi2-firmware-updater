@@ -395,7 +395,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     else:
                         self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
                 page_end = page_begin + page_size
                 curr_page = bin_buffer[page_begin:page_end]
                 # Skip current page if empty
@@ -470,11 +470,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             verify_header = 0xAA
             if self.has_update_error:
                 verify_header = 0xFF
-            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
             os_version_info = self.firmware_version_info[module_type]["os"]
-            os_version_info = os_version_info.lstrip("v")
+            os_version_info = os_version_info.lstrip("v").split("-")[0]
             os_version_digits = [int(digit) for digit in os_version_info.split(".")]
             os_version = (
                 os_version_digits[0] << 13
@@ -483,7 +483,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             )
 
             app_version_info = self.firmware_version_info[module_type]["app"]
-            app_version_info = app_version_info.lstrip("v")
+            app_version_info = app_version_info.lstrip("v").split("-")[0]
             app_version_digits = [int(digit) for digit in app_version_info.split(".")]
             app_version = (
                 app_version_digits[0] << 13
@@ -580,7 +580,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     else:
                         self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
                 page_end = page_begin + page_size
                 curr_page = bin_buffer[page_begin:page_end]
                 # Skip current page if empty
@@ -658,11 +658,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 verify_header = 0xFF
 
             self.progress = 99
-            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
             bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
-            bootloader_version_info = bootloader_version_info.lstrip("v")
+            bootloader_version_info = bootloader_version_info.lstrip("v").split("-")[0]
 
             # Set end-flash data to be sent at the end of the firmware update
             end_flash_data = bytearray(16)
@@ -752,7 +752,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     else:
                         self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({num_updated} / {update_module_num})({progress}%)")
 
-                # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
                 page_end = page_begin + page_size
                 curr_page = bin_buffer[page_begin:page_end]
                 # Skip current page if empty
@@ -831,11 +831,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 verify_header = 0xFF
 
             self.progress = 99
-            # self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
             # Get version info from version_path, using appropriate methods
             second_bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
-            second_bootloader_version_info = second_bootloader_version_info.lstrip("v")
+            second_bootloader_version_info = second_bootloader_version_info.lstrip("v").split("-")[0]
 
             # Set end-flash data to be sent at the end of the firmware update
             end_flash_data = bytearray(16)
@@ -1047,7 +1047,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 crc_error_count = 0
 
             end_flash_success = True
-        # self.__print(f"End flash is written for {module_type} ({module_id})")
+        self.__print(f"End flash is written for {module_type} ({module_id})")
 
         return end_flash_success
 
@@ -1193,7 +1193,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             json_pkt = self.read()
             if json_pkt == b"":
                 return None
-            time.sleep(0.1)
+            time.sleep(0.001)
         json_pkt += self.read_until(b"}")
         return json_pkt.decode("utf8")
 
@@ -1202,7 +1202,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         init_time = time.time()
         while not json_msg:
             json_msg = self.read_json()
-            time.sleep(0.1)
+            time.sleep(0.001)
             if time.time() - init_time > timeout:
                 return None
         return json_msg
@@ -1318,7 +1318,7 @@ class ModuleFirmwareMultiUpdater():
         self.ui = None
         self.list_ui = None
         self.task_end_callback = None
-        self.local_firmware_path = local_firmware_path
+        self.local_firmware_path = path.join(local_firmware_path, "modi-v2-module-binary-main")
 
     def set_ui(self, ui, list_ui):
         self.ui = ui
@@ -1412,7 +1412,7 @@ class ModuleFirmwareMultiUpdater():
 
                         if self.list_ui:
                             self.list_ui.current_module_changed_signal.emit(index, module_uploader.module_type)
-                            self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
+                            self.list_ui.progress_signal.emit(index, int(current_module_progress), int(total_module_progress))
                     else:
                         self.state[index] = 1
                 elif self.state[index] == 1:
@@ -1437,14 +1437,14 @@ class ModuleFirmwareMultiUpdater():
                 time.sleep(0.001)
 
             if len(self.module_uploaders):
-                # print(f"{self.__progress_bar(total_progress, 100)}", end="")
+                print(f"{self.__progress_bar(total_progress, 100)}", end="")
                 if self.ui:
                     if self.ui.is_english:
                         self.ui.update_modules_button.setText(f"Modules update is in progress. ({int(total_progress)}%)")
                     else:
                         self.ui.update_modules_button.setText(f"모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
                 if self.list_ui:
-                    self.list_ui.total_progress_signal.emit(total_progress)
+                    self.list_ui.total_progress_signal.emit(int(total_progress))
                     self.list_ui.total_status_signal.emit("Uploading...")
             if is_done:
                 break
@@ -1542,7 +1542,7 @@ class ModuleFirmwareMultiUpdater():
 
                         if self.list_ui:
                             self.list_ui.current_module_changed_signal.emit(index, module_uploader.module_type)
-                            self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
+                            self.list_ui.progress_signal.emit(index, int(current_module_progress), int(total_module_progress))
                     else:
                         self.state[index] = 1
                 elif self.state[index] == 1:
@@ -1568,7 +1568,7 @@ class ModuleFirmwareMultiUpdater():
                 time.sleep(0.001)
 
             if len(self.module_uploaders):
-                # print(f"{self.__progress_bar(total_progress, 100)}", end="")
+                print(f"{self.__progress_bar(total_progress, 100)}", end="")
                 if self.ui:
                     if self.ui.is_english:
                         self.ui.change_modules_type_button.setText(f"Changing modules type is in progress. ({int(total_progress)}%)")
@@ -1576,7 +1576,7 @@ class ModuleFirmwareMultiUpdater():
                         self.ui.change_modules_type_button.setText(f"모듈 타입 변경이 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
-                    self.list_ui.total_progress_signal.emit(total_progress)
+                    self.list_ui.total_progress_signal.emit(int(total_progress))
                     self.list_ui.total_status_signal.emit("Uploading...")
 
             if is_done:
