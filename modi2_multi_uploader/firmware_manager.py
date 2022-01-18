@@ -150,7 +150,7 @@ class FirmwareManagerForm(QDialog):
         msg.setWindowTitle("download firmware")
         msg.setStandardButtons(QMessageBox.Ok)
         if download_success:
-            self.refresh_firmware_info()
+            self.refresh_firmware_info(preset=False)
             msg.setIcon(QMessageBox.Icon.Information)
             msg.setText("download successful.")
         else:
@@ -271,7 +271,7 @@ class FirmwareManagerForm(QDialog):
                                 firmware_list["esp32_ota"].append(version)
         return firmware_list
 
-    def refresh_firmware_info(self):
+    def refresh_firmware_info(self, preset = True):
         firmware_list = self.check_firmware()
         if len(firmware_list) == 0:
             return False
@@ -302,21 +302,22 @@ class FirmwareManagerForm(QDialog):
                 for version in version_list:
                     self.module_ui_dic[key]["bootloader"].addItem(version)
 
-            config_firmeware_version_info = self.get_config_firmware_version_info()
-            if config_firmeware_version_info:
-                for key in config_firmeware_version_info.keys():
-                    app_version = config_firmeware_version_info[key]["app"]
-                    all_texts = [self.module_ui_dic[key]["app"].itemText(i) for i in range(self.module_ui_dic[key]["app"].count())]
-                    if app_version in all_texts:
-                        self.module_ui_dic[key]["app"].setCurrentText(app_version)
+            if preset:
+                config_firmeware_version_info = self.get_config_firmware_version_info()
+                if config_firmeware_version_info:
+                    for key in config_firmeware_version_info.keys():
+                        app_version = config_firmeware_version_info[key]["app"]
+                        all_texts = [self.module_ui_dic[key]["app"].itemText(i) for i in range(self.module_ui_dic[key]["app"].count())]
+                        if app_version in all_texts:
+                            self.module_ui_dic[key]["app"].setCurrentText(app_version)
 
-                    if key in ["network", "esp32_app", "esp32_ota"]:
-                        continue
+                        if key in ["network", "esp32_app", "esp32_ota"]:
+                            continue
 
-                    bootloader_version = config_firmeware_version_info[key]["bootloader"]
-                    all_texts = [self.module_ui_dic[key]["bootloader"].itemText(i) for i in range(self.module_ui_dic[key]["bootloader"].count())]
-                    if bootloader_version in all_texts:
-                        self.module_ui_dic[key]["bootloader"].setCurrentText(bootloader_version)
+                        bootloader_version = config_firmeware_version_info[key]["bootloader"]
+                        all_texts = [self.module_ui_dic[key]["bootloader"].itemText(i) for i in range(self.module_ui_dic[key]["bootloader"].count())]
+                        if bootloader_version in all_texts:
+                            self.module_ui_dic[key]["bootloader"].setCurrentText(bootloader_version)
 
         except Exception:
             return False

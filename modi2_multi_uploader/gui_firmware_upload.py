@@ -562,7 +562,7 @@ class Form(QDialog):
         if len(firmware_list) == 0:
             download_success = self.firmware_manage_form.download_firmware()
             if download_success:
-                refresh_success = self.firmware_manage_form.refresh_firmware_info()
+                refresh_success = self.firmware_manage_form.refresh_firmware_info(preset=False)
                 if refresh_success:
                     self.firmware_manage_form.apply_firmware(show_message=False)
                 else:
