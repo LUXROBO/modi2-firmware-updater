@@ -6,28 +6,13 @@ from io import open
 from os import path
 from itertools import zip_longest
 
-import serial
-import serial.tools.list_ports as stl
+from serial.serialutil import SerialException
+from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.connection_util import list_modi_ports
-from modi2_multi_uploader.util.message_util import (parse_message, unpack_data)
-from modi2_multi_uploader.util.module_util import (Module, get_module_type_from_uuid)
+from modi2_multi_uploader.util.message_util import parse_message, unpack_data
+from modi2_multi_uploader.util.module_util import Module, get_module_type_from_uuid
 
-
-def retry(exception_to_catch):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except exception_to_catch:
-                return wrapper(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-class NetworkFirmwareUpdater(serial.Serial):
+class NetworkFirmwareUpdater(ModiSerialPort):
     """Network Firmware Updater: Updates a firmware of given module"""
 
     NO_ERROR = 0
@@ -39,38 +24,24 @@ class NetworkFirmwareUpdater(serial.Serial):
     ERASE_ERROR = 6
     ERASE_COMPLETE = 7
 
-    NO_RECONNECT = 0
-    SOFT_RECONNECT = 1
-    HARD_RECONNECT = 2
-
-    REQUEST_RECONNECT_NONE = 0
-    REQUEST_DISCONNECT = 1
-    REQUEST_RECONNECT = 2
-    REQUEST_SOFT_DISCONNECT = 3
-    REQUEST_SOFT_RECONNECT = 4
-
-    def __init__(self, device=None):
+    def __init__(self, device=None, local_firmware_path=None):
         self.print = True
         if device != None:
-            super().__init__(
-                device, timeout = 0.1, baudrate = 921600
-            )
+            super().__init__(device, baudrate = 921600, timeout = 0.1, write_timeout = 0)
         else:
-            modi_ports = list_modi_ports()
+            modi_ports = list_modi_serialports()
             if not modi_ports:
-                raise serial.SerialException("No MODI port is connected")
+                raise SerialException("No MODI port is connected")
             for modi_port in modi_ports:
                 try:
-                    super().__init__(
-                        modi_port.device, timeout=0.1, baudrate=921600
-                    )
+                    super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
                 except Exception:
                     self.__print('Next network module')
                     continue
                 else:
                     break
-            self.__print(f"Connecting to MODI network module at {modi_port.device}")
-        
+            self.__print(f"Connecting to MODI network module at {modi_port}")
+
         self.bootloader = False
         self.network_version = None
         self.network_uuid = None
@@ -81,19 +52,12 @@ class NetworkFirmwareUpdater(serial.Serial):
 
         self.progress = 0
 
-        self.need_to_reconnect = False
-        self.reconnect_start_signal = False
-        self.reconnect_end_signal = False
         self.popup_reconnect = False
-        self.popup_reconnect_mode = self.REQUEST_RECONNECT_NONE
         self.raise_error_message = True
         self.update_error = 0
         self.update_error_message = ""
 
-        for device in stl.comports():
-            if self.name == device.name:
-                self.location = device.location
-                break
+        self.local_firmware_path = local_firmware_path
 
     def set_ui(self, ui):
         self.ui = ui
@@ -113,10 +77,13 @@ class NetworkFirmwareUpdater(serial.Serial):
             self.__print("wait for request")
             recved = self.wait_for_json(timeout)
 
-            if time.time() - init_time > timeout or not recved:
+            if time.time() - init_time > timeout:
                 return None, None
 
             try:
+                if not recved:
+                    continue
+
                 json_msg = json.loads(recved)
                 if json_msg["c"] == 0x05:
                     unpacked_data = unpack_data(json_msg["b"], (6, 2))
@@ -137,6 +104,8 @@ class NetworkFirmwareUpdater(serial.Serial):
                         return module_uuid , None
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
+            except:
+                pass
 
             time.sleep(0.2)
 
@@ -144,19 +113,16 @@ class NetworkFirmwareUpdater(serial.Serial):
         send_pkt = parse_message(0x28, 0xFFF, 0xFFF, (0xFF, 0xFF))
         if self.is_open:
             self.write(send_pkt.encode("utf8"))
-            self.reset_input_buffer()
 
     def send_set_network_module_state(self, did, module_state, pnp_state):
         send_pkt = parse_message(0xA4, 0, did, (module_state, pnp_state))
         if self.is_open:
             self.write(send_pkt.encode("utf8"))
-            self.reset_input_buffer()
 
     def send_set_module_state(self, did, module_state, pnp_state):
         send_pkt = parse_message(0x09, 0, did, (module_state, pnp_state))
         if self.is_open:
             self.write(send_pkt.encode("utf8"))
-            self.reset_input_buffer()
 
     def send_firmware_command(self, operation_type, module_id, crc_val, page_addr):
         rot_scmd = 2 if operation_type == "erase" else 1
@@ -186,7 +152,6 @@ class NetworkFirmwareUpdater(serial.Serial):
         send_pkt = parse_message(cmd, sid, did, data)
         if self.is_open:
             self.write(send_pkt.encode("utf8"))
-            self.reset_input_buffer()
 
     def receive_firmware_command_response(self, delay = 0.001, timeout = 5):
         response_wait_time = time.time()
@@ -200,6 +165,9 @@ class NetworkFirmwareUpdater(serial.Serial):
                 return False
 
             try:
+                if not recved:
+                    continue
+
                 json_msg = json.loads(recved)
                 if json_msg["c"] == 0x0C:
                     message_decoded = unpack_data(json_msg["b"], (4, 1))
@@ -227,7 +195,6 @@ class NetworkFirmwareUpdater(serial.Serial):
         send_pkt = parse_message(cmd, sid, did, data)
         if self.is_open:
             self.write(send_pkt.encode("utf8"))
-            self.reset_input_buffer()
 
     def set_firmware_command(self, oper_type, module_id, crc_val, page_addr):
         self.send_firmware_command(oper_type, module_id, crc_val, page_addr)
@@ -261,7 +228,7 @@ class NetworkFirmwareUpdater(serial.Serial):
                 crc_val = erase_page_num,
                 page_addr = 0x0801f800
             )
-            
+
             # erase_page_success = self.set_firmware_command("erase", module_id, 0, 0x0801F800)
             if not erase_page_success:
                 self.update_error = -1
@@ -273,9 +240,9 @@ class NetworkFirmwareUpdater(serial.Serial):
             for end_flash_ptr in range(0, len(end_flash_data), 8):
                 curr_data = end_flash_data[end_flash_ptr : end_flash_ptr + 8]
                 checksum = self.set_firmware_data(
-                    module_id, 
-                    seq_num=end_flash_ptr//8, 
-                    bin_data=curr_data, 
+                    module_id,
+                    seq_num=end_flash_ptr//8,
+                    bin_data=curr_data,
                     checksum=checksum
                 )
                 time.sleep(0.001)
@@ -300,106 +267,12 @@ class NetworkFirmwareUpdater(serial.Serial):
         self.__print(f"End flash is written for network ({module_id})")
         return True
 
-    def reconnect_network_module(self, mode, retry_timeout = 5):
-        if mode == self.SOFT_RECONNECT:
-            self.__print("Temporally disconnecting the serial connection...")
-            self.popup_reconnect_mode = self.REQUEST_SOFT_DISCONNECT
-            self.flushInput()
-            self.flushOutput()
-            self.reset_input_buffer()
-            self.reset_output_buffer()
-            self.close()
-
-            close_time = 5
-            time.sleep(close_time)
-
-            self.__print(f"Re-init serial connection for the update, in {int(close_time)} seconds...")
-            self.popup_reconnect_mode = self.REQUEST_SOFT_RECONNECT
-
-            is_success = False
-            init_time = time.time()
-            while True:
-                try:
-                    for port in stl.comports():
-                        if self.location == port.location:
-                            self.__print("find port: " + port.name)
-                            self.name = port.name
-                            break
-                    super().__init__(self.name, timeout = 0.1, baudrate = 921600)
-                    self.reset_input_buffer()
-                    self.reset_output_buffer()
-                except serial.SerialException as se:
-                    self.__print("error: " + str(se))
-                except:
-                    self.__print("error")
-                else:
-                    is_success = True
-                    break
-                
-                if time.time() - init_time > retry_timeout:
-                    break
-                time.sleep(0.5)
-
-            self.popup_reconnect_mode = self.REQUEST_RECONNECT_NONE
-            time.sleep(2)
-            if not is_success:
-                raise Exception("Reconnect error")
-        elif mode == self.HARD_RECONNECT:
-            self.flushInput()
-            self.flushOutput()
-            self.reset_input_buffer()
-            self.reset_output_buffer()
-            self.close()
-            time.sleep(1)
-
-            # popup reconnect message
-            self.popup_reconnect = True
-            self.popup_reconnect_mode = self.REQUEST_DISCONNECT
-
-            # wait disconnect
-            self.__print("disconnect " + self.name)
-            while True:
-                is_disconnected = True
-                for port in stl.comports():
-                    if self.location == port.location:
-                        is_disconnected = False
-                if is_disconnected:
-                    break
-                time.sleep(0.1)
-
-            time.sleep(0.2)
-            self.popup_reconnect_mode = self.REQUEST_RECONNECT
-
-            self.__print("connect " + self.name)
-            # wait connect
-            while True:
-                is_connected = False
-                for port in stl.comports():
-                    if self.location == port.location:
-                        self.name = port.name
-                        is_connected = True
-                        break
-                if is_connected:
-                    break
-                time.sleep(0.1)
-
-            time.sleep(1)
-
-            self.popup_reconnect = False
-            self.popup_reconnect_mode = self.REQUEST_RECONNECT_NONE
-
-            # reconnect
-            self.__print("try reconnect")
-            super().__init__(self.name, timeout = 0.1, baudrate = 921600)
-            self.reset_input_buffer()
-            self.reset_output_buffer()
-            time.sleep(1)
-
-    def update_module_firmware(self, bootloader):
+    def update_module_firmware(self, bootloader, firmware_version_info):
         self.__print("update_module_firmware")
         self.bootloader = bootloader
         self.update_in_progress = True
         self.progress = 0
+        self.firmware_version_info = firmware_version_info
 
         if self.bootloader:
             self.__print("get network info")
@@ -411,15 +284,24 @@ class NetworkFirmwareUpdater(serial.Serial):
                 self.network_id = 0xFFF
 
             self.__print("update network module")
-            self.progress = 50
+            for i in range(0, 45):
+                self.progress = i
+                time.sleep(0.01)
+
             self.send_set_network_module_state(self.network_id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
-            time.sleep(5)
+            for i in range(46, 50):
+                self.progress = i
+                time.sleep(0.5)
+
+            for i in range(51, 100):
+                self.progress = i
+                time.sleep(0.01)
+
             self.progress = 100
 
             if self.is_open:
-                self.flushInput()
-                self.flushOutput()
                 self.close()
+
             time.sleep(5)
             self.update_error = 1
             self.update_in_progress = False
@@ -432,7 +314,7 @@ class NetworkFirmwareUpdater(serial.Serial):
             retry = 0
             max_retry = 5
             while True:
-                recved = self.wait_for_json(timeout)
+                recved = self.wait_for_json()
                 if not recved:
                     retry += 1
                     if retry > max_retry:
@@ -456,7 +338,7 @@ class NetworkFirmwareUpdater(serial.Serial):
                                 self.network_uuid = module_uuid
                                 self.network_id = self.network_uuid & 0xFFF
 
-                            if warning_type == 0:
+                            if warning_type != 2:
                                 self.send_set_module_state(self.network_id, Module.UPDATE_FIRMWARE_READY, Module.PNP_OFF)
                             if  warning_type == 2:
                                 break
@@ -470,27 +352,25 @@ class NetworkFirmwareUpdater(serial.Serial):
                 self.update_error = -1
                 self.update_error_message = "Warning timeout"
                 if self.is_open:
-                    self.flushInput()
-                    self.flushOutput()
                     self.close()
                 return
 
             # update network module
             self.__print("update network module")
             update_success = self.update_network_module(self.network_id)
-            if not update_success:
-                self.__print("update error - " + self.update_error_message)
 
             if self.is_open:
-                self.flushInput()
-                self.flushOutput()
                 self.close()
 
+            if not update_success:
+                self.__print("update error - " + self.update_error_message)
+            else:
+                self.update_error = 1
+
             self.update_in_progress = False
-            self.update_error = 1
 
     def update_network_module(self, module_id):
-        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "latest","module")
+        root_path = path.join(self.local_firmware_path, "network", self.firmware_version_info["network"]["app"])
         bin_path = path.join(root_path, "network.bin")
         with open(bin_path, "rb") as bin_file:
             bin_buffer = bin_file.read()
@@ -531,10 +411,11 @@ class NetworkFirmwareUpdater(serial.Serial):
             curr_page = bin_buffer[page_begin:page_end]
 
             # Skip current page if empty
-            if not sum(curr_page):
+            if curr_page == bytes(len(curr_page)):
                 page_begin = page_begin + page_size
+                time.sleep(0.2)
                 continue
-            
+
             erase_page_success = self.set_firmware_command(
                 oper_type = "erase",
                 module_id = module_id,
@@ -543,8 +424,8 @@ class NetworkFirmwareUpdater(serial.Serial):
             )
             if not erase_page_success:
                 self.update_error = -1
-                self.update_error_message = "Erase response error"
-                return False
+                self.update_error_message = "Erase flash failed."
+                break
 
             checksum = 0
             for curr_ptr in range(0, page_size, 8):
@@ -562,50 +443,53 @@ class NetworkFirmwareUpdater(serial.Serial):
                 crc_val = checksum,
                 page_addr = flash_memory_addr + page_begin + page_offset
             )
-            if not crc_page_success:
+
+            if crc_page_success:
+                page_retry_count = 0
+            else:
                 page_retry_count += 1
                 if page_retry_count > page_retry_max_count:
                     self.update_error = -1
-                    self.update_error_message = "CRC response error"
-                    return False
+                    self.update_error_message = "Check crc failed."
+                    break
                 continue
-            else:
-                page_retry_count = 0
+
             page_begin = page_begin + page_size
             time.sleep(0.01)
 
         self.progress = 99
         self.__print(f"\rUpdating network ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
+        verify_header = 0xAA
+        if self.update_error == -1:
+            verify_header = 0xFF
+
         # Get version info from version_path, using appropriate methods
-        version_info, version_file = None, "base_version.txt"
-        version_path = root_path + "/" + version_file
-        with open(version_path) as version_file:
-            version_info = version_file.readline().lstrip("v").rstrip("\n")
-        version_digits = [int(digit) for digit in version_info.split(".")]
-        """ Version number is formed by concatenating all three version bits
-            e.g. 2.2.4 -> 010 00010 00000100 -> 0100 0010 0000 0100
-        """
-        version = (
-            version_digits[0] << 13
-            | version_digits[1] << 8
-            | version_digits[2]
+        network_version_info = self.firmware_version_info["network"]["app"]
+        network_version_info = network_version_info.lstrip("v").split("-")[0]
+        network_version_digits = [int(digit) for digit in network_version_info.split(".")]
+        network_version = (
+            network_version_digits[0] << 13
+            | network_version_digits[1] << 8
+            | network_version_digits[2]
         )
 
         # Set end-flash data to be sent at the end of the firmware update
         end_flash_data = bytearray(16)
-        end_flash_data[0] = 0xAA
-        end_flash_data[6] = version & 0xFF
-        end_flash_data[7] = (version >> 8) & 0xFF
+        end_flash_data[0] = verify_header
+        end_flash_data[6] = network_version & 0xFF
+        end_flash_data[7] = (network_version >> 8) & 0xFF
 
         for xxx in range(4):
             end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
 
+        success_end_flash = self.set_end_flash_data(module_id, end_flash_data)
+        if not success_end_flash:
+            self.update_error_message = "version writing failed."
+            self.update_error = -1
 
-        end_flash_success = self.set_end_flash_data(module_id, end_flash_data)
-        if not end_flash_success:
-            return False
-        self.__print(f"Version info (v{version_info}) has been written to its firmware!")
+        self.__print(f"Version info (v{network_version_info}) has been written to its firmware!")
+
         self.__print(f"Firmware update is done for network ({module_id})")
 
         # Reboot all connected modules
@@ -619,10 +503,8 @@ class NetworkFirmwareUpdater(serial.Serial):
         self.__print("Module firmwares have been updated!")
 
         time.sleep(1)
-        
+
         if self.is_open:
-            self.flushInput()
-            self.flushOutput()
             self.close()
 
         if self.ui:
@@ -655,22 +537,22 @@ class NetworkFirmwareUpdater(serial.Serial):
         json_pkt = b""
         while json_pkt != b"{":
             if not self.is_open:
-                return ""
+                return None
             json_pkt = self.read()
             if json_pkt == b"":
-                return ""
-            time.sleep(0.1)
+                return None
+            time.sleep(0.001)
         json_pkt += self.read_until(b"}")
-        return json_pkt
+        return json_pkt.decode("utf8")
 
-    def wait_for_json(self, timeout):
+    def wait_for_json(self, timeout=2):
         json_msg = self.read_json()
         init_time = time.time()
         while not json_msg:
             json_msg = self.read_json()
-            time.sleep(0.1)
+            time.sleep(0.001)
             if time.time() - init_time > timeout:
-                return ""
+                return None
         return json_msg
 
     @staticmethod
@@ -682,9 +564,7 @@ class NetworkFirmwareUpdater(serial.Serial):
         return
 
     @staticmethod
-    def __compare_version(
-        left: str, right: str
-    ) -> int:
+    def __compare_version(left: str, right: str) -> int:
         left_vars = map(int, left.split('.'))
         right_vars = map(int, right.split('.'))
         for a, b in zip_longest(left_vars, right_vars, fillvalue = 0):
@@ -718,20 +598,25 @@ class NetworkFirmwareUpdater(serial.Serial):
 
     def __print(self, data, end="\n"):
         if self.print:
-            print(self.name, end = " - ")
+            # print(self.name, end = " - ")
             print(data, end)
 
 class NetworkFirmwareMultiUpdater():
-    def __init__(self):
+    def __init__(self, local_firmware_path):
         self.update_in_progress = False
         self.ui = None
         self.list_ui = None
+        self.task_end_callback = None
+        self.local_firmware_path = path.join(local_firmware_path, "modi-v2-module-binary-main")
 
     def set_ui(self, ui, list_ui):
         self.ui = ui
         self.list_ui = list_ui
 
-    def update_module_firmware(self, modi_ports, bootloader):
+    def set_task_end_callback(self, task_end_callback):
+        self.task_end_callback = task_end_callback
+
+    def update_module_firmware(self, modi_ports, bootloader, firmware_version_info = {}):
         self.network_updaters = []
         self.network_uuid = []
         self.state = []
@@ -742,11 +627,14 @@ class NetworkFirmwareMultiUpdater():
             if i > 9:
                 break
             try:
-                network_updater = NetworkFirmwareUpdater(modi_port.device)
+                network_updater = NetworkFirmwareUpdater(
+                    device = modi_port,
+                    local_firmware_path = self.local_firmware_path
+                )
                 network_updater.set_print(False)
                 network_updater.set_raise_error(False)
             except:
-                print("open " + modi_port.device + " error")
+                print("open " + modi_port + " error")
             else:
                 self.network_updaters.append(network_updater)
                 self.state.append(0)
@@ -763,46 +651,21 @@ class NetworkFirmwareMultiUpdater():
         for index, network_updater in enumerate(self.network_updaters):
             th.Thread(
                 target=network_updater.update_module_firmware,
-                args=(bootloader, ),
+                args=(bootloader, firmware_version_info, ),
                 daemon=True
             ).start()
             if self.list_ui:
                 self.list_ui.error_message_signal.emit(index, "Wait for network uuid")
 
         delay = 0.1
-        reconnect_device = []
         while True:
             is_done = True
             total_progress = 0
             for index, network_updater in enumerate(self.network_updaters):
                 if network_updater.network_uuid:
                     self.network_uuid[index] = f'0x{network_updater.network_uuid:X}'
-                    self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
-                if self.list_ui:
-                    if network_updater.popup_reconnect_mode == 1:
-                        self.list_ui.error_message_signal.emit(index, "Please disconnect")
-                        self.list_ui.network_state_signal.emit(index, network_updater.popup_reconnect_mode)
-                    elif network_updater.popup_reconnect_mode == 2:
-                        self.list_ui.error_message_signal.emit(index, "Please reconnect")
-                        self.list_ui.network_state_signal.emit(index, network_updater.popup_reconnect_mode)
-                    elif network_updater.popup_reconnect_mode == 3:
-                        self.list_ui.error_message_signal.emit(index, "Disconnecting.....")
-                        self.list_ui.network_state_signal.emit(index, 0)
-                    elif network_updater.popup_reconnect_mode == 4:
-                        self.list_ui.error_message_signal.emit(index, "Reconnecting.....")
-                        self.list_ui.network_state_signal.emit(index, 0)
-
-                if network_updater.need_to_reconnect:
-                    if not index in reconnect_device:
-                        reconnect_device.append(index)
-                if len(reconnect_device):
-                    if index == reconnect_device[0]:
-                        network_updater.reconnect_start_signal = True
-                        if network_updater.reconnect_end_signal:
-                            reconnect_device.pop(0)
-                        else:
-                            if network_updater.update_error != 0:
-                                reconnect_device.pop(0)
+                    if self.list_ui:
+                        self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
 
                 if self.state[index] == 0:
                     # update modules
@@ -814,25 +677,23 @@ class NetworkFirmwareMultiUpdater():
 
                         if self.list_ui:
                             self.list_ui.current_module_changed_signal.emit(index, "network")
-                            self.list_ui.progress_signal.emit(index, current_module_progress, total_module_progress)
+                            self.list_ui.error_message_signal.emit(index, "Updating module")
+                            self.list_ui.progress_signal.emit(index, int(current_module_progress), int(total_module_progress))
                     else:
                         total_progress += 100 / len(self.network_updaters)
                         self.state[index] = 1
-                    if self.list_ui and network_updater.popup_reconnect_mode == 0:
-                        self.list_ui.error_message_signal.emit(index, "Updating module")
-                        self.list_ui.network_state_signal.emit(index, 0)
                 elif self.state[index] == 1:
                     # end
                     total_progress += 100 / len(self.network_updaters)
                     if network_updater.update_error == 1:
                         # update success
-                        print("update success: " + self.network_uuid[index])
+                        # print("update success: " + self.network_uuid[index])
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, 0)
                             self.list_ui.error_message_signal.emit(index, "Update success")
                     else:
                         # update error
-                        print("update error: " + self.network_uuid[index] + " - " + network_updater.update_error_message)
+                        # print("update error: " + self.network_uuid[index] + " - " + network_updater.update_error_message)
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, -1)
                             self.list_ui.error_message_signal.emit(index, network_updater.update_error_message)
@@ -843,9 +704,10 @@ class NetworkFirmwareMultiUpdater():
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.network_updaters)
 
+                time.sleep(0.001)
 
             if len(self.network_updaters):
-                print(f"\r{self.__progress_bar(total_progress, 100)}", end="")
+                print(f"{self.__progress_bar(total_progress, 100)}", end="")
 
                 if self.ui:
                     if bootloader:
@@ -860,7 +722,7 @@ class NetworkFirmwareMultiUpdater():
                             self.ui.update_network_button.setText(f"네트워크 모듈 초기화가 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
-                    self.list_ui.total_progress_signal.emit(total_progress)
+                    self.list_ui.total_progress_signal.emit(int(total_progress))
                     self.list_ui.total_status_signal.emit("Uploading...")
 
             if is_done:
@@ -870,36 +732,8 @@ class NetworkFirmwareMultiUpdater():
 
         self.update_in_progress = False
 
-        if self.ui:
-            self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_button.setEnabled(True)
-            self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_network_esp32_interpreter_button.setEnabled(True)
-            self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.change_modules_type_button.setEnabled(True)
-            self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-            self.ui.update_modules_button.setEnabled(True)
-            if bootloader:
-                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_button.setEnabled(True)
-                if self.ui.is_english:
-                    self.ui.update_network_bootloader_button.setText("Set Network Bootloader")
-                else:
-                    self.ui.update_network_bootloader_button.setText("네트워크 모듈 부트로더")
-            else:
-                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_bootloader_button.setEnabled(True)
-                if self.ui.is_english:
-                    self.ui.update_network_button.setText("Update Network")
-                else:
-                    self.ui.update_network_button.setText("네트워크 모듈 초기화")
-
-        if self.list_ui:
-            self.list_ui.ui.close_button.setEnabled(True)
-            self.list_ui.total_status_signal.emit("Complete")
-            self.list_ui.total_progress_signal.emit(100)
-            for index, network_updater in enumerate(self.network_updaters):
-                self.list_ui.progress_signal.emit(index, 100, 100)
+        if self.list_ui and self.task_end_callback:
+            self.task_end_callback(self.list_ui)
 
         print("\nFirmware update is complete!!")
 
@@ -908,6 +742,6 @@ class NetworkFirmwareMultiUpdater():
         curr_bar = int(50 * current // total)
         rest_bar = int(50 - curr_bar)
         return (
-            f"Firmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] "
+            f"\rFirmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] "
             f"{100 * current / total:3.1f}%"
         )

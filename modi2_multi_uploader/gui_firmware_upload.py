@@ -1,26 +1,22 @@
-import logging
 import os
-import pathlib
-import sys
-import threading as th
-import time
-import traceback as tb
 import io
-import urllib.request as ur
-import zipfile
-import shutil
-from io import open
-from os import path
-from urllib.error import URLError
+import sys
+import time
+import logging
+import pathlib
+import threading as th
+import traceback as tb
 
-from PyQt5 import QtCore, QtGui, QtWidgets, uic
+from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QDialog, QMessageBox
 
-from modi2_multi_uploader.util.connection_util import list_modi_ports
+from modi2_multi_uploader.firmware_manager import FirmwareManagerForm
+from modi2_multi_uploader.update_list_form import ESP32UpdateListForm, ModuleUpdateListForm
 from modi2_multi_uploader.core.esp32_uploader import ESP32FirmwareMultiUploder
 from modi2_multi_uploader.core.module_uploader import ModuleFirmwareMultiUpdater
 from modi2_multi_uploader.core.network_uploader import NetworkFirmwareMultiUpdater
+from modi2_multi_uploader.util.modi_winusb.modi_serialport import list_modi_serialports
 
 
 class StdoutRedirect(QObject):
@@ -71,7 +67,6 @@ class PopupMessageBox(QtWidgets.QMessageBox):
             self.setIcon(self.Icon.Information)
             self.setText("WARNING")
             self.addButton("Ok", self.ActionRole)
-            # restart_btn.clicked.connect(self.restart_btn)
 
         func = {
             "error": error_popup,
@@ -81,8 +76,6 @@ class PopupMessageBox(QtWidgets.QMessageBox):
 
         close_btn = self.addButton("Exit", self.ActionRole)
         close_btn.clicked.connect(self.close_btn)
-        # report_btn = self.addButton('Report Error', self.ActionRole)
-        # report_btn.clicked.connect(self.report_btn)
         self.show()
 
     def event(self, e):
@@ -116,15 +109,6 @@ class PopupMessageBox(QtWidgets.QMessageBox):
     def close_btn(self):
         self.window.close()
 
-    def report_btn(self):
-        pass
-    # def restart_btn(self):
-    #     self.window.stream.thread_signal.connect(self.restart_update)
-    #     self.window.stream.thread_signal.emit(True)
-    # @pyqtSlot(object)
-    # def restart_update(self, click):
-    #     self.window.update_network_button.clicked(click)
-
 
 class ThreadSignal(QObject):
     thread_error = pyqtSignal(object)
@@ -139,7 +123,7 @@ class Form(QDialog):
     GUI Form of MODI Firmware Updater
     """
 
-    def __init__(self, installer=False):
+    def __init__(self, debug=False):
         QDialog.__init__(self)
         self.logger = self.__init_logger()
         self.__excepthook = sys.excepthook
@@ -149,6 +133,7 @@ class Form(QDialog):
         self.is_popup = False
 
         ui_path = os.path.join(os.path.dirname(__file__), "assets", "uploader.ui")
+        firmware_manager_ui_path = os.path.join(os.path.dirname(__file__), "assets", "firmware_manager.ui")
         esp32_upload_list_ui_path = os.path.join(os.path.dirname(__file__), "assets", "esp32_upload_list.ui")
         module_upload_list_ui_path = os.path.join(os.path.dirname(__file__), "assets", "module_upload_list.ui")
         if sys.platform.startswith("win"):
@@ -156,10 +141,13 @@ class Form(QDialog):
         else:
             self.component_path = os.path.join(os.path.dirname(__file__), "assets", "component")
         self.ui = uic.loadUi(ui_path)
+        self.assets_firmware_path = os.path.join(os.path.dirname(__file__), "assets", "firmware")
+        self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi2 multi uploader")
 
         self.ui.setStyleSheet("background-color: white")
         self.ui.console.hide()
-        self.ui.setFixedHeight(600)
+        self.ui.firmware_manage_button.setVisible(False)
+        self.ui.setFixedHeight(640)
 
         # Set LUXROBO logo image
         logo_path = os.path.join(self.component_path, "luxrobo_logo.png")
@@ -167,8 +155,20 @@ class Form(QDialog):
         qPixmapVar.load(logo_path)
         self.ui.lux_logo.setPixmap(qPixmapVar)
 
-        self.esp32_upload_list_form = ESP32UpdateListForm(esp32_upload_list_ui_path, self.component_path)
-        self.module_upload_list_form = ModuleUpdateListForm(module_upload_list_ui_path, self.component_path)
+        self.firmware_manage_form = FirmwareManagerForm(path_dict={
+            "ui": firmware_manager_ui_path,
+            "component": self.component_path,
+            "assets_firmware": self.assets_firmware_path,
+            "local_firmware": self.local_firmware_path,
+        })
+        self.esp32_upload_list_form = ESP32UpdateListForm(path_dict={
+            "ui": esp32_upload_list_ui_path,
+            "component": self.component_path,
+        })
+        self.module_upload_list_form = ModuleUpdateListForm(path_dict={
+            "ui": module_upload_list_ui_path,
+            "component": self.component_path,
+        })
 
         # Buttons image
         self.active_path = pathlib.PurePosixPath(self.component_path, "btn_frame_active.png")
@@ -184,24 +184,26 @@ class Form(QDialog):
         self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.update_network_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+        self.ui.firmware_manage_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         self.ui.console.setStyleSheet("font-size: 10px")
 
-        version_path = path.join(path.dirname(__file__), "..", "version.txt")
-        with open(version_path, "r") as version_file:
-            version_info = version_file.readline().lstrip("v").rstrip("\n")
+        version_path = os.path.join(os.path.dirname(__file__), "..", "version.txt")
+        with io.open(version_path, "r") as version_file:
+            self.version_info = version_file.readline().rstrip("\n")
 
-        self.ui.setWindowTitle("MODI+ Multi Uploader - v" + version_info)
+        self.ui.setWindowTitle("MODI+ Multi Uploader - " + self.version_info)
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         # Redirect stdout to text browser (i.e. console in our UI)
-        self.stdout = StdoutRedirect()
-        self.stdout.start()
-        self.stdout.printOccur.connect(
-            lambda line: self.__append_text_line(line)
-        )
-        self.stdout.logger = self.logger
+        if not debug:
+            self.stdout = StdoutRedirect()
+            self.stdout.start()
+            self.stdout.printOccur.connect(
+                lambda line: self.__append_text_line(line)
+            )
+            self.stdout.logger = self.logger
 
         # Set signal for thread communication
         self.stream = ThreadSignal()
@@ -213,6 +215,7 @@ class Form(QDialog):
         self.ui.update_modules_button.clicked.connect(self.update_modules)
         self.ui.update_network_button.clicked.connect(self.update_network)
         self.ui.update_network_bootloader_button.clicked.connect(self.update_network_bootloader)
+        self.ui.firmware_manage_button.clicked.connect(self.firmware_manage)
         self.ui.translate_button.clicked.connect(self.translate_button_text)
         self.ui.devmode_button.clicked.connect(self.dev_mode_button)
 
@@ -223,8 +226,33 @@ class Form(QDialog):
             self.ui.update_modules_button,
             self.ui.update_network_button,
             self.ui.update_network_bootloader_button,
+            self.ui.firmware_manage_button,
             self.ui.devmode_button,
             self.ui.translate_button,
+        ]
+
+        self.button_en = [
+            "Update Network ESP32",
+            "Update Network ESP32 Interpreter",
+            "Change Modules Type",
+            "Update Modules",
+            "Update Network Modules",
+            "Set Network Bootloader",
+            "Manage Firmware",
+            "Dev Mode",
+            "한국어",
+        ]
+
+        self.button_kr = [
+            "네트워크 모듈 업데이트",
+            "네트워크 모듈 인터프리터 초기화",
+            "모듈 타입 변경",
+            "모듈 초기화",
+            "네트워크 모듈 초기화",
+            "네트워크 모듈 부트로더",
+            "펌웨어 관리",
+            "개발자 모드",
+            "English",
         ]
 
         # Disable the first button to be focused when UI is loaded
@@ -249,34 +277,16 @@ class Form(QDialog):
         self.ui.stream = self.stream
         self.ui.popup = self._thread_signal_hook
 
-        # Check module firmware
-        self.local_firmware_path = path.join(path.dirname(__file__), "assets", "firmware", "latest")
-        # module
-        self.local_module_firmware_path = path.join(self.local_firmware_path, "module")
-        self.local_module_version_path = path.join(self.local_module_firmware_path, "version.txt")
-        self.latest_module_firmware_path = "https://download.luxrobo.com/modi-skeleton/skeleton.zip"
-        self.latest_module_version_path = "https://download.luxrobo.com/modi-skeleton/version.txt"
-        # network base
-        self.local_network_firmware_path = path.join(self.local_firmware_path, "module")
-        self.local_network_version_path = path.join(self.local_network_firmware_path, "base_version.txt")
-        self.latest_network_firmware_path = "https://download.luxrobo.com/modi-network-os/network.zip"
-        self.latest_network_version_path = "https://download.luxrobo.com/modi-network-os/version.txt"
-        #esp32
-        self.local_esp32_firmware_path = path.join(self.local_firmware_path, "esp32")
-        self.local_esp32_version_path = path.join(self.local_esp32_firmware_path, "esp_version.txt")
-        self.latest_esp32_firmware_path = [
-            "https://download.luxrobo.com/modi-ota-firmware/ota.zip",
-            "https://download.luxrobo.com/modi-esp32-firmware/esp.zip",
-        ]
-        self.latest_esp32_version_path = "https://download.luxrobo.com/modi-esp32-firmware/version.txt"
+        # check module firmware
         self.check_module_firmware()
 
         # Set Button Status
-        self.translate_button_text()
-        self.translate_button_text()
-        self.dev_mode_button()
-        self.dev_mode_button()
+        self.refresh_button_text()
+        self.refresh_console()
         self.ui.show()
+
+        # check app update
+        self.check_app_update()
 
     #
     # Main methods
@@ -293,20 +303,28 @@ class Form(QDialog):
             target=self.__click_motion, args=(0, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32")
         self.esp32_upload_list_form.reset_device_list()
-        self.esp32_upload_list_form.ui.show()
-        esp32_updater = ESP32FirmwareMultiUploder()
-        esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
+
+        def run_task(self, modi_ports, firmware_version_info):
+            esp32_updater = ESP32FirmwareMultiUploder(self.local_firmware_path)
+            esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
+            esp32_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = esp32_updater
+            esp32_updater.update_firmware(modi_ports, False, firmware_version_info)
+
         th.Thread(
-            target=esp32_updater.update_firmware,
-            args=(modi_ports, ),
+            target=run_task,
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
-        self.firmware_updater = esp32_updater
+
+        self.esp32_upload_list_form.ui.exec_()
 
     def update_network_esp32_interpreter(self):
         button_start = time.time()
@@ -320,20 +338,28 @@ class Form(QDialog):
             target=self.__click_motion, args=(1, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32 Interpreter")
         self.esp32_upload_list_form.reset_device_list()
-        self.esp32_upload_list_form.ui.show()
-        esp32_updater = ESP32FirmwareMultiUploder()
-        esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
+
+        def run_task(self, modi_ports, firmware_version_info):
+            esp32_updater = ESP32FirmwareMultiUploder(self.local_firmware_path)
+            esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
+            esp32_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = esp32_updater
+            esp32_updater.update_firmware(modi_ports, True, firmware_version_info)
+
         th.Thread(
-            target=esp32_updater.update_firmware,
-            args=(modi_ports, True,),
+            target=run_task,
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
-        self.firmware_updater = esp32_updater
+
+        self.esp32_upload_list_form.ui.exec_()
 
     def change_modules_type(self):
         module_type = self.ui.module_type_combobox.currentText()
@@ -348,21 +374,27 @@ class Form(QDialog):
             target=self.__click_motion, args=(2, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.module_upload_list_form.ui.setWindowTitle("Change Modules Type")
         self.module_upload_list_form.reset_device_list()
-        self.module_upload_list_form.ui.show()
-        module_updater = ModuleFirmwareMultiUpdater()
-        module_updater.set_ui(self.ui, self.module_upload_list_form)
+
+        def run_task(self, modi_ports, module_type):
+            module_updater = ModuleFirmwareMultiUpdater()
+            module_updater.set_ui(self.ui, self.module_upload_list_form)
+            module_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = module_updater
+            module_updater.change_module_type(modi_ports, module_type)
+
         th.Thread(
-            target=module_updater.change_module_type,
-            args=(modi_ports, module_type),
+            target=run_task,
+            args=(self, modi_ports, module_type),
             daemon=True
         ).start()
-        self.firmware_updater = module_updater
 
+        self.module_upload_list_form.ui.exec_()
 
     def update_modules(self):
         button_start = time.time()
@@ -376,20 +408,29 @@ class Form(QDialog):
             target=self.__click_motion, args=(3, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
+            self.__reset_ui(self.module_upload_list_form)
             raise Exception("No MODI port is connected")
 
+        self.module_upload_list_form.ui.setWindowTitle("Update Modules")
         self.module_upload_list_form.reset_device_list()
-        self.module_upload_list_form.ui.show()
-        module_updater = ModuleFirmwareMultiUpdater()
-        module_updater.set_ui(self.ui, self.module_upload_list_form)
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
+
+        def run_task(self, modi_ports, firmware_version_info):
+            module_updater = ModuleFirmwareMultiUpdater(self.local_firmware_path)
+            module_updater.set_ui(self.ui, self.module_upload_list_form)
+            module_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = module_updater
+            module_updater.update_module_firmware(modi_ports, firmware_version_info)
+
         th.Thread(
-            target=module_updater.update_module_firmware,
-            args=(modi_ports, ),
+            target=run_task,
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
-        self.firmware_updater = module_updater
+
+        self.module_upload_list_form.ui.exec_()
 
     def update_network(self):
         button_start = time.time()
@@ -403,20 +444,28 @@ class Form(QDialog):
             target=self.__click_motion, args=(4, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.module_upload_list_form.ui.setWindowTitle("Update Network Modules")
         self.module_upload_list_form.reset_device_list()
-        self.module_upload_list_form.ui.show()
-        network_updater = NetworkFirmwareMultiUpdater()
-        network_updater.set_ui(self.ui, self.module_upload_list_form)
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
+
+        def run_task(self, modi_ports, firmware_version_info):
+            network_updater = NetworkFirmwareMultiUpdater(self.local_firmware_path)
+            network_updater.set_ui(self.ui, self.module_upload_list_form)
+            network_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = network_updater
+            network_updater.update_module_firmware(modi_ports, False, firmware_version_info)
+
         th.Thread(
-            target=network_updater.update_module_firmware,
-            args=(modi_ports, False),
-            daemon=True,
+            target=run_task,
+            args=(self, modi_ports, firmware_version_info),
+            daemon=True
         ).start()
-        self.firmware_updater = network_updater
+
+        self.module_upload_list_form.ui.exec_()
 
     def update_network_bootloader(self):
         button_start = time.time()
@@ -430,262 +479,136 @@ class Form(QDialog):
             target=self.__click_motion, args=(5, button_start), daemon=True
         ).start()
 
-        modi_ports = list_modi_ports()
+        modi_ports = list_modi_serialports()
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
+        self.module_upload_list_form.ui.setWindowTitle("Set Network Bootloader")
         self.module_upload_list_form.reset_device_list()
-        self.module_upload_list_form.ui.show()
-        network_updater = NetworkFirmwareMultiUpdater()
-        network_updater.set_ui(self.ui, self.module_upload_list_form)
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
+
+        def run_task(self, modi_ports, firmware_version_info):
+            network_updater = NetworkFirmwareMultiUpdater(self.local_firmware_path)
+            network_updater.set_ui(self.ui, self.module_upload_list_form)
+            network_updater.set_task_end_callback(self.__reset_ui)
+            self.firmware_updater = network_updater
+            network_updater.update_module_firmware(modi_ports, True, firmware_version_info)
+
         th.Thread(
-            target=network_updater.update_module_firmware,
-            args=(modi_ports, True),
-            daemon=True,
+            target=run_task,
+            args=(self, modi_ports, firmware_version_info),
+            daemon=True
         ).start()
-        self.firmware_updater = network_updater
+
+        self.module_upload_list_form.ui.exec_()
+
+    def firmware_manage(self):
+        button_start = time.time()
+        self.ui.firmware_manage_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.console.clear()
+        th.Thread(
+            target=self.__click_motion, args=(6, button_start), daemon=True
+        ).start()
+
+        self.firmware_manage_form.refresh_firmware_info()
+        self.firmware_manage_form.ui.exec_()
+
+        self.__reset_ui()
 
     def dev_mode_button(self):
         button_start = time.time()
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path});font-size: 13px")
         th.Thread(
-            target=self.__click_motion, args=(6, button_start), daemon=True
+            target=self.__click_motion, args=(7, button_start), daemon=True
         ).start()
-        if self.console:
-            self.ui.console.hide()
-            self.ui.setFixedHeight(600)
-        else:
-            self.ui.console.show()
-            self.ui.setFixedHeight(780)
         self.console = not self.console
+        self.refresh_console()
+
+    def refresh_console(self):
+        if self.console:
+            self.ui.console.show()
+            self.ui.firmware_manage_button.setVisible(True)
+            self.ui.change_modules_type_button.setVisible(True)
+            self.ui.module_type_combobox.setVisible(True)
+            self.ui.setFixedHeight(720)
+        else:
+            self.ui.console.hide()
+            self.ui.firmware_manage_button.setVisible(False)
+            self.ui.change_modules_type_button.setVisible(False)
+            self.ui.module_type_combobox.setVisible(False)
+            self.ui.setFixedHeight(640)
 
     def translate_button_text(self):
         button_start = time.time()
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path}); font-size: 13px")
         th.Thread(
-            target=self.__click_motion, args=(7, button_start), daemon=True
+            target=self.__click_motion, args=(8, button_start), daemon=True
         ).start()
-        button_en = [
-            "Update Network ESP32",
-            "Update Network ESP32 Interpreter",
-            "Change Modules Type",
-            "Update Modules",
-            "Update Network",
-            "Set Network Bootloader",
-            "Dev Mode",
-            "한국어",
-        ]
-        button_kr = [
-            "네트워크 모듈 업데이트",
-            "네트워크 모듈 인터프리터 초기화",
-            "모듈 타입 변경",
-            "모듈 초기화",
-            "네트워크 모듈 초기화",
-            "네트워크 모듈 부트로더",
-            "개발자 모드",
-            "English",
-        ]
-        appropriate_translation = (
-            button_kr if self.button_in_english else button_en
-        )
+
         self.button_in_english = not self.button_in_english
         self.ui.is_english = not self.ui.is_english
+        self.refresh_button_text()
+
+    def refresh_button_text(self):
+        appropriate_translation = (
+            self.button_en if self.button_in_english else self.button_kr
+        )
         for i, button in enumerate(self.buttons):
             button.setText(appropriate_translation[i])
 
     def check_module_firmware(self):
-        if not os.path.exists(self.local_firmware_path):
-            os.mkdir(self.local_firmware_path)
+        check_success = True
+        firmware_list = self.firmware_manage_form.check_firmware()
+        if len(firmware_list) == 0:
+            download_success = self.firmware_manage_form.download_firmware()
+            if download_success:
+                refresh_success = self.firmware_manage_form.refresh_firmware_info(preset=False)
+                if refresh_success:
+                    self.firmware_manage_form.apply_firmware(show_message=False)
+                else:
+                    check_success = False
+            else:
+                check_success = False
+        else:
+            refresh_success = self.firmware_manage_form.refresh_firmware_info()
+            self.firmware_manage_form.apply_firmware(show_message=False)
 
-        self.__check_module_version()
-        self.__check_network_base_version()
-        self.__check_esp32_version()
+        if not check_success:
+            def error_exception(message):
+                time.sleep(1)
+                raise Exception(message)
 
-    def __download_module_firmware(self):
+            th.Thread(
+                target=error_exception,
+                args=("download firmware first,\n and select firmware version"),
+                daemon=True
+            ).start()
+
+    def check_app_update(self):
         try:
-            # read latest version
-            with ur.urlopen(self.latest_module_version_path, timeout=5) as conn:
-                last_version_name = conn.read().decode("utf8")
+            import requests
+            response = requests.get("https://api.github.com/repos/LUXROBO/modi2-multi-uploader-bin/releases/latest")
 
-            # skeleton update
-            with ur.urlopen(self.latest_module_firmware_path, timeout=5) as conn:
-                module_name = [
-                    "button",
-                    "dial",
-                    "display",
-                    "environment",
-                    "gyro",
-                    "ir",
-                    "led",
-                    "mic",
-                    "motor",
-                    "speaker",
-                    "ultrasonic"
-                ]
-                download_response = conn.read()
-                zip_content = zipfile.ZipFile(io.BytesIO(download_response), "r")
+            current_version = self.version_info
+            latest_version = response.json()["name"]
+            download_url = response.json()["assets"][0]["browser_download_url"]
 
-                for i, module in enumerate(module_name):
-                    src_path = module + "/Base_module.bin"
-                    bin_buffer = zip_content.read(src_path)
-                    
-                    if module == "environment":
-                        dest_path = path.join(self.local_module_firmware_path, "env" + ".bin")
-                    else:
-                        dest_path = path.join(self.local_module_firmware_path, module + ".bin")
-                    
-                    with open(dest_path, "wb") as data_file:
-                        data_file.write(bin_buffer)
+            from packaging import version
+            
+            if version.parse(latest_version) > version.parse(current_version):
+                print(f"need to update to {latest_version}\n{download_url}")
+                msg = QMessageBox()
+                msg.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
+                msg.setWindowTitle("App update")
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.setIcon(QMessageBox.Icon.Information)
+                msg.setText(f"need to update to {latest_version}")
+                msg.setDetailedText(download_url)
+                msg.exec_()
 
-            # version update
-            with open(path.join(self.local_module_firmware_path, "version.txt"), "w") as data_file:
-                data_file.write(last_version_name)
+        except:
+            pass
 
-            return True
-
-        except URLError:
-            return False
-
-    def __download_network_firmware(self):
-        try:
-            # read latest version
-            with ur.urlopen(self.latest_network_version_path, timeout=5) as conn:
-                last_version_name = conn.read().decode("utf8")
-
-            # network base update
-            with ur.urlopen(self.latest_network_firmware_path, timeout=5) as conn:
-                download_response = conn.read()
-                zip_content = zipfile.ZipFile(io.BytesIO(download_response), "r")
-
-                with open(path.join(self.local_network_firmware_path, "network.bin"), "wb") as data_file:
-                    data_file.write(zip_content.read("network.bin"))
-
-            # version update
-            with open(path.join(self.local_network_firmware_path, "base_version.txt"), "w") as data_file:
-                data_file.write(last_version_name)
-
-            return True
-
-        except URLError:
-            return False
-
-    def __download_esp32_firmware(self):
-        try:
-            # read latest version
-            with ur.urlopen(self.latest_esp32_version_path, timeout=5) as conn:
-                last_version_name = conn.read().decode("utf8")
-
-            # ota update
-            with ur.urlopen(self.latest_esp32_firmware_path[0], timeout=5) as conn:
-                download_response = conn.read()
-                zip_content = zipfile.ZipFile(io.BytesIO(download_response), "r")
-
-                with open(path.join(self.local_esp32_firmware_path, "modi_ota_factory.bin"), "wb") as data_file:
-                    data_file.write(zip_content.read("modi_ota_factory.bin"))
-
-                with open(path.join(self.local_esp32_firmware_path, "ota_data_initial.bin"), "wb") as data_file:
-                    data_file.write(zip_content.read("ota_data_initial.bin"))
-
-            # bootloader, partitions, esp32 update
-            with ur.urlopen(self.latest_esp32_firmware_path[1], timeout=5) as conn:
-                download_response = conn.read()
-                zip_content = zipfile.ZipFile(io.BytesIO(download_response), "r")
-
-                with open(path.join(self.local_esp32_firmware_path, "bootloader.bin"), "wb") as data_file:
-                    data_file.write(zip_content.read("bootloader.bin"))
-
-                with open(path.join(self.local_esp32_firmware_path, "partitions.bin"), "wb") as data_file:
-                    data_file.write(zip_content.read("partitions.bin"))
-
-                with open(path.join(self.local_esp32_firmware_path, "esp32.bin"), "wb") as data_file:
-                    data_file.write(zip_content.read("esp32.bin"))
-
-            # version update
-            with open(path.join(self.local_esp32_firmware_path, "esp_version.txt"), "w") as data_file:
-                data_file.write(last_version_name)
-
-            return True
-
-        except URLError:
-            return False
-
-    def __check_module_version(self):
-        # try:
-        #     local_version_info = None
-        #     latest_version_info = None
-
-        #     with ur.urlopen(self.latest_module_version_path, timeout=5) as conn:
-        #         latest_version_name = conn.read().decode("utf8")
-        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
-
-        #     if os.path.exists(self.local_module_firmware_path):
-        #         with open(self.local_module_version_path) as version_file:
-        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-        #     else:
-        #         os.mkdir(self.local_module_firmware_path)
-
-        #     if (local_version_info == None) or (local_version_info != latest_version_info):
-        #         self.__download_module_firmware()
-
-        # except URLError:
-        #     if not os.path.exists(self.local_module_firmware_path):
-        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
-        #         shutil.copytree(assert_path, self.local_module_firmware_path)
-        if not os.path.exists(self.local_module_firmware_path):
-            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
-            shutil.copytree(assert_path, self.local_module_firmware_path)
-
-    def __check_network_base_version(self):
-        # try:
-        #     local_version_info = None
-        #     latest_version_info = None
-
-        #     with ur.urlopen(self.latest_network_version_path, timeout=5) as conn:
-        #         latest_version_name = conn.read().decode("utf8")
-        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
-
-        #     if os.path.exists(self.local_network_firmware_path):
-        #         with open(self.local_module_version_path) as version_file:
-        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-        #     else:
-        #         os.mkdir(self.local_network_firmware_path)
-
-        #     if (local_version_info == None) or (local_version_info != latest_version_info):
-        #         self.__download_network_firmware()
-
-        # except URLError:
-        #     if not os.path.exists(self.local_network_firmware_path):
-        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
-        #         shutil.copytree(assert_path, self.local_network_firmware_path)
-        if not os.path.exists(self.local_network_firmware_path):
-            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "module")
-            shutil.copytree(assert_path, self.local_network_firmware_path)
-
-    def __check_esp32_version(self):
-        # try:
-        #     local_version_info = None
-        #     latest_version_info = None
-
-        #     with ur.urlopen(self.latest_esp32_version_path, timeout=5) as conn:
-        #         latest_version_name = conn.read().decode("utf8")
-        #         latest_version_info = latest_version_name.lstrip("v").rstrip("\n")
-
-        #     if os.path.exists(self.local_esp32_firmware_path):
-        #         with open(self.local_module_version_path) as version_file:
-        #             local_version_info = version_file.readline().lstrip("v").rstrip("\n")
-        #     else:
-        #         os.mkdir(self.local_esp32_firmware_path)
-
-        #     if (local_version_info == None) or (local_version_info != latest_version_info):
-        #         self.__download_esp32_firmware()
-
-        # except URLError:
-        #     if not os.path.exists(self.local_esp32_firmware_path):
-        #         assert_path = path.join(path.dirname(__file__), "assets", "firmware", "esp32")
-        #         shutil.copytree(assert_path, self.local_esp32_firmware_path)
-        if not os.path.exists(self.local_esp32_firmware_path):
-            assert_path = path.join(path.dirname(__file__), "assets", "firmware", "esp32")
-            shutil.copytree(assert_path, self.local_esp32_firmware_path)
     #
     # Helper functions
     #
@@ -741,15 +664,36 @@ class Form(QDialog):
         while time.time() - start_time < 0.2:
             pass
 
-        if button_type in [6, 7]:
+        if button_type in [7, 8]:
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         else:
+            self.ui.module_type_combobox.setEnabled(False)
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
             for i, q_button in enumerate(self.buttons):
-                if i in [button_type, 6, 7]:
+                if i in [button_type, 7, 8]:
                     continue
                 q_button.setStyleSheet(f"border-image: url({self.inactive_path}); font-size: 16px")
                 q_button.setEnabled(False)
+
+    def __reset_ui(self, list_ui = None):
+        self.ui.module_type_combobox.setEnabled(True)
+        for i, q_button in enumerate(self.buttons):
+            if i in [7, 8]:
+                continue
+            q_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+            q_button.setEnabled(True)
+
+        # refresh language
+        self.refresh_button_text()
+
+        # reset list ui
+        if list_ui == self.module_upload_list_form:
+            self.module_upload_list_form.ui.close_button.setEnabled(True)
+            self.module_upload_list_form.total_status_signal.emit("Complete")
+            self.module_upload_list_form.total_progress_signal.emit(100)
+        elif list_ui == self.esp32_upload_list_form:
+            self.esp32_upload_list_form.ui.close_button.setEnabled(True)
+            self.esp32_upload_list_form.total_status_signal.emit("Complete")
 
     def __append_text_line(self, line):
         self.ui.console.moveCursor(
@@ -777,391 +721,3 @@ class Form(QDialog):
     @staticmethod
     def __is_update_progress_line(line):
         return line.startswith("\rUpdating") or line.startswith("\rFirmware Upload: [")
-
-class ESP32UpdateListForm(QDialog):
-    network_state_signal = pyqtSignal(int, int)
-    network_uuid_signal = pyqtSignal(int, str)
-    progress_signal = pyqtSignal(int, int)
-    total_progress_signal = pyqtSignal(int)
-    total_status_signal = pyqtSignal(str)
-    error_message_signal = pyqtSignal(int, str)
-
-    def __init__(self, ui_path, component_path):
-        QDialog.__init__(self)
-
-        self.component_path = component_path
-        self.ui = uic.loadUi(ui_path)
-        self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
-
-        self.ui_icon_list = [
-            self.ui.image_1,
-            self.ui.image_2,
-            self.ui.image_3,
-            self.ui.image_4,
-            self.ui.image_5,
-            self.ui.image_6,
-            self.ui.image_7,
-            self.ui.image_8,
-            self.ui.image_9,
-            self.ui.image_10
-        ]
-
-        self.ui_network_id_list = [
-            self.ui.network_id_1,
-            self.ui.network_id_2,
-            self.ui.network_id_3,
-            self.ui.network_id_4,
-            self.ui.network_id_5,
-            self.ui.network_id_6,
-            self.ui.network_id_7,
-            self.ui.network_id_8,
-            self.ui.network_id_9,
-            self.ui.network_id_10,
-        ]
-
-        self.ui_progress_list = [
-            self.ui.progress_bar_1,
-            self.ui.progress_bar_2,
-            self.ui.progress_bar_3,
-            self.ui.progress_bar_4,
-            self.ui.progress_bar_5,
-            self.ui.progress_bar_6,
-            self.ui.progress_bar_7,
-            self.ui.progress_bar_8,
-            self.ui.progress_bar_9,
-            self.ui.progress_bar_10,
-        ]
-
-        self.ui_progress_value_list = [
-            self.ui.progress_value_1,
-            self.ui.progress_value_2,
-            self.ui.progress_value_3,
-            self.ui.progress_value_4,
-            self.ui.progress_value_5,
-            self.ui.progress_value_6,
-            self.ui.progress_value_7,
-            self.ui.progress_value_8,
-            self.ui.progress_value_9,
-            self.ui.progress_value_10,
-        ]
-
-        self.ui_error_message_list = [
-            self.ui.error_message_1,
-            self.ui.error_message_2,
-            self.ui.error_message_3,
-            self.ui.error_message_4,
-            self.ui.error_message_5,
-            self.ui.error_message_6,
-            self.ui.error_message_7,
-            self.ui.error_message_8,
-            self.ui.error_message_9,
-            self.ui.error_message_10,
-        ]
-
-        self.ui.close_button.clicked.connect(self.ui.close)
-        
-        self.network_state_signal.connect(self.set_network_state)
-        self.network_uuid_signal.connect(self.set_network_uuid)
-        self.progress_signal.connect(self.progress_value_changed)
-        self.total_progress_signal.connect(self.total_progress_value_changed)
-        self.total_status_signal.connect(self.total_progress_status_changed)
-        self.error_message_signal.connect(self.set_error_message)
-
-        self.device_num = 0
-        self.device_max_num = 10
-
-    def reset_device_list(self):
-        self.device_num = 0
-        self.ui.progress_bar_total.setValue(0)
-        self.ui.total_status.setText("")
-
-        for i in range(0, 10):
-            icon_path = os.path.join(self.component_path, "modules", "network_none.png")
-            pixmap = QtGui.QPixmap()
-            pixmap.load(icon_path)
-
-            self.ui_icon_list[i].setPixmap(pixmap)
-            self.ui_progress_list[i].setValue(0)
-            self.ui_progress_value_list[i].setText("0%")
-            self.ui_error_message_list[i].setText("")
-            self.ui_network_id_list[i].setText("not connected")
-
-    def set_device_num(self, num):
-        self.reset_device_list()
-        self.device_num = num
-        for i in range(0, self.device_num):
-            icon_path = os.path.join(self.component_path, "modules", "network.png")
-            pixmap = QtGui.QPixmap()
-            pixmap.load(icon_path)
-            self.ui_icon_list[i].setPixmap(pixmap)
-
-    def set_network_state(self, index, state):
-        if index > self.device_num - 1:
-            return
-
-        pixmap = QtGui.QPixmap()
-        if state == -1:
-            icon_path = os.path.join(self.component_path, "modules", "network_error.png")
-            pixmap.load(icon_path)
-        elif state == 0:
-            icon_path = os.path.join(self.component_path, "modules", "network.png")
-            pixmap.load(icon_path)
-        else:
-            icon_path = os.path.join(self.component_path, "modules", "network_reconnect.png")
-            pixmap.load(icon_path)
-
-        self.ui_icon_list[index].setPixmap(pixmap)
-
-    def set_network_uuid(self, index, str):
-        if index > self.device_num - 1:
-            return
-
-        self.ui_network_id_list[index].setText(str)
-
-    def progress_value_changed(self, index, value):
-        if index > self.device_num - 1:
-            return
-
-        self.ui_progress_list[index].setValue(value)
-        self.ui_progress_list[index].repaint()
-        self.ui_progress_value_list[index].setText(str(value) + "%")
-
-    def total_progress_value_changed(self, value):
-        self.ui.progress_bar_total.setValue(value)
-        self.ui.progress_bar_total.repaint()
-
-    def total_progress_status_changed(self, status):
-        self.ui.total_status.setText(status)
-
-    def set_error_message(self, index, error_message):
-        if index > self.device_num - 1:
-            return
-
-        self.ui_error_message_list[index].setText(error_message)
-
-
-class ModuleUpdateListForm(QDialog):
-    network_state_signal = pyqtSignal(int, int)
-    network_uuid_signal = pyqtSignal(int, str)
-    current_module_changed_signal = pyqtSignal(int, str)
-    progress_signal = pyqtSignal(int, int, int)
-    total_progress_signal = pyqtSignal(int)
-    total_status_signal = pyqtSignal(str)
-    error_message_signal = pyqtSignal(int, str)
-
-    def __init__(self, ui_path, component_path):
-        QDialog.__init__(self)
-
-        self.component_path = component_path
-        self.ui = uic.loadUi(ui_path)
-        self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
-
-        self.ui_icon_list = [
-            self.ui.image_1,
-            self.ui.image_2,
-            self.ui.image_3,
-            self.ui.image_4,
-            self.ui.image_5,
-            self.ui.image_6,
-            self.ui.image_7,
-            self.ui.image_8,
-            self.ui.image_9,
-            self.ui.image_10
-        ]
-
-        self.ui_current_icon_list = [
-            self.ui.image_current_1,
-            self.ui.image_current_2,
-            self.ui.image_current_3,
-            self.ui.image_current_4,
-            self.ui.image_current_5,
-            self.ui.image_current_6,
-            self.ui.image_current_7,
-            self.ui.image_current_8,
-            self.ui.image_current_9,
-            self.ui.image_current_10,
-        ]
-
-        self.ui_network_id_list = [
-            self.ui.network_id_1,
-            self.ui.network_id_2,
-            self.ui.network_id_3,
-            self.ui.network_id_4,
-            self.ui.network_id_5,
-            self.ui.network_id_6,
-            self.ui.network_id_7,
-            self.ui.network_id_8,
-            self.ui.network_id_9,
-            self.ui.network_id_10,
-        ]
-
-        self.ui_current_progress_list = [
-            self.ui.progress_bar_current_1,
-            self.ui.progress_bar_current_2,
-            self.ui.progress_bar_current_3,
-            self.ui.progress_bar_current_4,
-            self.ui.progress_bar_current_5,
-            self.ui.progress_bar_current_6,
-            self.ui.progress_bar_current_7,
-            self.ui.progress_bar_current_8,
-            self.ui.progress_bar_current_9,
-            self.ui.progress_bar_current_10,
-        ]
-
-        self.ui_total_progress_list = [
-            self.ui.progress_bar_total_1,
-            self.ui.progress_bar_total_2,
-            self.ui.progress_bar_total_3,
-            self.ui.progress_bar_total_4,
-            self.ui.progress_bar_total_5,
-            self.ui.progress_bar_total_6,
-            self.ui.progress_bar_total_7,
-            self.ui.progress_bar_total_8,
-            self.ui.progress_bar_total_9,
-            self.ui.progress_bar_total_10,
-        ]
-
-        self.ui_current_progress_value_list = [
-            self.ui.progress_current_value_1,
-            self.ui.progress_current_value_2,
-            self.ui.progress_current_value_3,
-            self.ui.progress_current_value_4,
-            self.ui.progress_current_value_5,
-            self.ui.progress_current_value_6,
-            self.ui.progress_current_value_7,
-            self.ui.progress_current_value_8,
-            self.ui.progress_current_value_9,
-            self.ui.progress_current_value_10,
-        ]
-
-        self.ui_total_progress_value_list = [
-            self.ui.progress_total_value_1,
-            self.ui.progress_total_value_2,
-            self.ui.progress_total_value_3,
-            self.ui.progress_total_value_4,
-            self.ui.progress_total_value_5,
-            self.ui.progress_total_value_6,
-            self.ui.progress_total_value_7,
-            self.ui.progress_total_value_8,
-            self.ui.progress_total_value_9,
-            self.ui.progress_total_value_10,
-        ]
-
-        self.ui_error_message_list = [
-            self.ui.error_message_1,
-            self.ui.error_message_2,
-            self.ui.error_message_3,
-            self.ui.error_message_4,
-            self.ui.error_message_5,
-            self.ui.error_message_6,
-            self.ui.error_message_7,
-            self.ui.error_message_8,
-            self.ui.error_message_9,
-            self.ui.error_message_10,
-        ]
-
-        self.ui.close_button.clicked.connect(self.ui.close)
-
-        self.network_state_signal.connect(self.set_network_state)
-        self.network_uuid_signal.connect(self.set_network_uuid)
-        self.current_module_changed_signal.connect(self.current_module_changed)
-        self.progress_signal.connect(self.progress_value_changed)
-        self.total_progress_signal.connect(self.total_progress_value_changed)
-        self.total_status_signal.connect(self.total_progress_status_changed)
-        self.error_message_signal.connect(self.set_error_message)
-        
-        self.device_num = 0
-        self.device_max_num = 10
-
-    def reset_device_list(self):
-        self.device_num = 0
-        self.ui.progress_bar_total.setValue(0)
-        self.ui.total_status.setText("")
-
-        for i in range(0, 10):
-            icon_path = os.path.join(self.component_path, "modules", "network_none.png")
-            icon_pixmap = QtGui.QPixmap()
-            icon_pixmap.load(icon_path)
-            self.ui_icon_list[i].setPixmap(icon_pixmap)
-
-            current_icon_path = os.path.join(self.component_path, "modules", "network_none_28.png")
-            current_icon_pixmap = QtGui.QPixmap()
-            current_icon_pixmap.load(current_icon_path)
-            self.ui_current_icon_list[i].setPixmap(current_icon_pixmap)
-
-            self.ui_current_progress_list[i].setValue(0)
-            self.ui_total_progress_list[i].setValue(0)
-            self.ui_current_progress_value_list[i].setText("0%")
-            self.ui_total_progress_value_list[i].setText("0%")
-            self.ui_error_message_list[i].setText("")
-            self.ui_network_id_list[i].setText("not connected")
-
-    def set_device_num(self, num):
-        self.reset_device_list()
-        self.device_num = num
-        for i in range(0, self.device_num):
-            icon_path = os.path.join(self.component_path, "modules", "network.png")
-            pixmap = QtGui.QPixmap()
-            pixmap.load(icon_path)
-            self.ui_icon_list[i].setPixmap(pixmap)
-
-    def set_network_state(self, index, state):
-        if index > self.device_num - 1:
-            return
-
-        pixmap = QtGui.QPixmap()
-        if state == -1:
-            icon_path = os.path.join(self.component_path, "modules", "network_error.png")
-            pixmap.load(icon_path)
-        elif state == 0:
-            icon_path = os.path.join(self.component_path, "modules", "network.png")
-            pixmap.load(icon_path)
-        elif state == 1:
-            icon_path = os.path.join(self.component_path, "modules", "network_disconnect.png")
-            pixmap.load(icon_path)
-        elif state == 2:
-            icon_path = os.path.join(self.component_path, "modules", "network_reconnect.png")
-            pixmap.load(icon_path)
-
-        self.ui_icon_list[index].setPixmap(pixmap)
-
-    def set_network_uuid(self, index, str):
-        if index > self.device_num - 1:
-            return
-
-        self.ui_network_id_list[index].setText(str)
-
-    def current_module_changed(self, index, module_type):
-        if index > self.device_num - 1:
-            return
-
-        if module_type:
-            icon_path = os.path.join(self.component_path, "modules", module_type + "_28.png")
-            pixmap = QtGui.QPixmap()
-            pixmap.load(icon_path)
-            self.ui_current_icon_list[index].setPixmap(pixmap)
-
-    def progress_value_changed(self, index, current, total):
-        if index > self.device_num - 1:
-            return
-
-        self.ui_current_progress_list[index].setValue(current)
-        self.ui_current_progress_list[index].repaint()
-        self.ui_current_progress_value_list[index].setText(str(current) + "%")
-        self.ui_total_progress_list[index].setValue(total)
-        self.ui_total_progress_list[index].repaint()
-        self.ui_total_progress_value_list[index].setText(str(total) + "%")
-
-
-    def total_progress_value_changed(self, value):
-        self.ui.progress_bar_total.setValue(value)
-        self.ui.progress_bar_total.repaint()
-
-    def total_progress_status_changed(self, status):
-        self.ui.total_status.setText(status)
-
-    def set_error_message(self, index, error_message):
-        if index > self.device_num - 1:
-            return
-
-        self.ui_error_message_list[index].setText(error_message)

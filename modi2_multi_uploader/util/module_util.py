@@ -16,7 +16,7 @@ def get_module_type_from_uuid(uuid):
         0x10  : "battery",
         # Input modules
         0x2000: "env",
-        0x2010: "gyro",
+        0x2010: "imu",
         0x2020: "mic",
         0x2030: "button",
         0x2040: "dial",
@@ -39,7 +39,7 @@ def get_module_uuid_from_type(module_type):
         "battery"   :0x10  ,
         # module :# Input
         "env"       :0x2000,
-        "gyro"      :0x2010,
+        "imu"      :0x2010,
         "mic"       :0x2020,
         "button"    :0x2030,
         "dial"      :0x2040,
@@ -154,7 +154,7 @@ class Module:
         )
         version_path = path.join(root_path, "version.txt")
         with open(version_path) as version_file:
-            version_info = version_file.readline().lstrip("v").rstrip("\n")
+            version_info = version_file.readline().lstrip("v").rstrip("\n").split("-")[0]
         version_digits = [int(digit) for digit in version_info.split(".")]
         latest_version = (
             version_digits[0] << 13

@@ -25,9 +25,6 @@ a = Analysis(
         ('modi2_multi_uploader/assets', 'modi2_multi_uploader/assets'),
         ('version.txt', '.')
     ],
-    hiddenimports=[
-        "modi2_multi_uploader.util.connection_util",
-    ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
@@ -58,7 +55,7 @@ exe = EXE(
 )
 app = BUNDLE(
     exe,
-    name='MODI+ Multi Uploader - v' + version_path + '.app',
+    name='MODI+ Multi Uploader - v' + version_info + '.app',
     icon='network_module.ico',
     bundle_identifier=None,
 )

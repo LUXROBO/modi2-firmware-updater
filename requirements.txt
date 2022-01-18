@@ -5,3 +5,5 @@ pytest
 mypy
 flake8
 isort
+requests
+winusbcdc
