@@ -493,15 +493,7 @@ class Form(QDialog):
             self.firmware_manage_form.apply_firmware(show_message=False)
 
         if not check_success:
-            def error_exception(message):
-                time.sleep(1)
-                raise Exception(message)
-
-            th.Thread(
-                target=error_exception,
-                args=("download firmware first,\n and select firmware version"),
-                daemon=True
-            ).start()
+            raise Exception("download firmware first,\n and select firmware version")
         else:
             self.firmware_manage_form.check_firmware_version_update()
 
