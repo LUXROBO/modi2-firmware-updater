@@ -3,11 +3,10 @@ import json
 import stat
 import shutil
 from functools import cmp_to_key
-from itertools import zip_longest
 import http.client as httplib
 
 from PyQt5 import QtGui, uic
-from PyQt5.QtCore import pyqtSignal, QSignalMapper
+from PyQt5.QtCore import QSignalMapper
 from PyQt5.QtWidgets import QDialog, QMessageBox
 
 class FirmwareManagerForm(QDialog):
