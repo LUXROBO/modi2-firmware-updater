@@ -169,6 +169,13 @@ class ModiSerialPort():
         self._write_timeout = value
         self.serial_port.write_timeout = value
 
+    @property
+    def dtr(self):
+        if self.type == self.SERIAL_MODE_COMPORT:
+            return self.serial_port.dtr
+        else:
+            return False
+
     class Timeout(object):
         """\
         Abstraction for timeout operations. Using time.monotonic() if available

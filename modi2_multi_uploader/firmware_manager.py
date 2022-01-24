@@ -18,8 +18,9 @@ class FirmwareManagerForm(QDialog):
         self.component_path = path_dict["component"]
         self.assets_firmware_path = path_dict["assets_firmware"]
         self.local_firmware_path = path_dict["local_firmware"]
+        self.module_firmware_directory = path_dict["firmware_directory"]
 
-        self.local_firmware_binary_path = os.path.join(self.local_firmware_path, "modi-v2-module-binary-main")
+        self.local_firmware_binary_path = os.path.join(self.local_firmware_path, self.module_firmware_directory)
         self.local_firmware_version_path = os.path.join(self.local_firmware_path, "firmware_version.json")
 
         self.ui = uic.loadUi(path_dict["ui"])
@@ -143,6 +144,8 @@ class FirmwareManagerForm(QDialog):
                 self.module_ui_dic[key]["app"].currentTextChanged.connect(mapper.map)
         mapper.mapped["QString"].connect(self.app_version_combobox_changed)
 
+        self.module_firmware_version = self.get_config_firmware_version_info()["version"]
+
     def download_button_clicked(self):
         download_success = self.download_firmware()
         msg = QMessageBox()
@@ -150,7 +153,8 @@ class FirmwareManagerForm(QDialog):
         msg.setWindowTitle("download firmware")
         msg.setStandardButtons(QMessageBox.Ok)
         if download_success:
-            self.refresh_firmware_info(preset=False)
+            self.refresh_firmware_info()
+            self.apply_firmware(show_message = False)
             msg.setIcon(QMessageBox.Icon.Information)
             msg.setText("download successful.")
         else:
@@ -165,6 +169,7 @@ class FirmwareManagerForm(QDialog):
         msg.setWindowTitle("refresh firmware")
         msg.setStandardButtons(QMessageBox.Ok)
         if refresh_success:
+            self.apply_firmware(show_message = False)
             msg.setIcon(QMessageBox.Icon.Information)
             msg.setText("refresh successful.")
         else:
@@ -186,14 +191,22 @@ class FirmwareManagerForm(QDialog):
                 self.__rmtree(self.local_firmware_binary_path)
 
             import requests
-            url = "https://github.com/LUXROBO/modi-v2-module-binary/archive/refs/heads/main.zip"
-            content = requests.get(url)
+            release_url = "https://api.github.com/repos/LUXROBO/modi-v2-module-binary/releases/latest"
+            response = requests.get(release_url).json()
+            download_url = response["zipball_url"]
+            version_name = response["name"]
+            content = requests.get(download_url)
 
             # unzip the content
             from io import BytesIO
             from zipfile import ZipFile
             zip = ZipFile(BytesIO(content.content))
+            root_dir_name = zip.infolist()[0].filename.split("/")[0]
             zip.extractall(self.local_firmware_path)
+            os.rename(os.path.join(self.local_firmware_path, root_dir_name), self.local_firmware_binary_path)
+
+            self.module_firmware_version = version_name
+
         except Exception as e:
             self.copy_assets_firmware()
 
@@ -271,7 +284,7 @@ class FirmwareManagerForm(QDialog):
                                 firmware_list["esp32_ota"].append(version)
         return firmware_list
 
-    def refresh_firmware_info(self, preset = True):
+    def refresh_firmware_info(self):
         firmware_list = self.check_firmware()
         if len(firmware_list) == 0:
             return False
@@ -302,24 +315,8 @@ class FirmwareManagerForm(QDialog):
                 for version in version_list:
                     self.module_ui_dic[key]["bootloader"].addItem(version)
 
-            if preset:
-                config_firmeware_version_info = self.get_config_firmware_version_info()
-                if config_firmeware_version_info:
-                    for key in config_firmeware_version_info.keys():
-                        app_version = config_firmeware_version_info[key]["app"]
-                        all_texts = [self.module_ui_dic[key]["app"].itemText(i) for i in range(self.module_ui_dic[key]["app"].count())]
-                        if app_version in all_texts:
-                            self.module_ui_dic[key]["app"].setCurrentText(app_version)
-
-                        if key in ["network", "esp32_app", "esp32_ota"]:
-                            continue
-
-                        bootloader_version = config_firmeware_version_info[key]["bootloader"]
-                        all_texts = [self.module_ui_dic[key]["bootloader"].itemText(i) for i in range(self.module_ui_dic[key]["bootloader"].count())]
-                        if bootloader_version in all_texts:
-                            self.module_ui_dic[key]["bootloader"].setCurrentText(bootloader_version)
-
-        except Exception:
+        except Exception as e:
+            print(e)
             return False
 
         return True
@@ -327,17 +324,49 @@ class FirmwareManagerForm(QDialog):
     def apply_firmware(self, show_message):
         firmware_version_info = self.get_selected_firmware_version_info()
         with open(self.local_firmware_version_path, "w") as config_file:
+            firmware_version_info["version"] = self.module_firmware_version
             json_msg = json.dumps(firmware_version_info, indent=4)
             config_file.write(str(json_msg))
 
-            if show_message:
+        if show_message:
+            msg = QMessageBox()
+            msg.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
+            msg.setWindowTitle("apply firmware")
+            msg.setStandardButtons(QMessageBox.Ok)
+            msg.setIcon(QMessageBox.Icon.Information)
+            msg.setText("apply successful.")
+            msg.exec_()
+
+    def check_firmware_version_update(self):
+        connection = self.__check_internet_connection()
+        if not connection:
+            return False
+
+        try:
+            import requests
+            response = requests.get("https://api.github.com/repos/LUXROBO/modi-v2-module-binary/releases/latest").json()
+
+            current_version = self.module_firmware_version
+            latest_version = response["name"]
+
+            from packaging import version
+            if version.parse(latest_version) > version.parse(current_version):
+                self.download_firmware()
+                self.refresh_firmware_info()
+                self.apply_firmware(show_message=False)
+
                 msg = QMessageBox()
                 msg.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
-                msg.setWindowTitle("apply firmware")
+                msg.setWindowTitle("Module firmware update")
                 msg.setStandardButtons(QMessageBox.Ok)
                 msg.setIcon(QMessageBox.Icon.Information)
-                msg.setText("apply successful.")
+                msg.setText(f"module firmware updated to {latest_version}")
                 msg.exec_()
+
+        except Exception as e:
+            return False
+
+        return True
 
     def get_selected_firmware_version_info(self):
         module_version_dic = {}
@@ -353,10 +382,12 @@ class FirmwareManagerForm(QDialog):
         return module_version_dic
 
     def get_config_firmware_version_info(self):
-        if not os.path.isfile(self.local_firmware_version_path):
-            return None
+        if os.path.isfile(self.local_firmware_version_path):
+            firmware_version_path = self.local_firmware_version_path
+        else:
+            firmware_version_path = os.path.join(self.assets_firmware_path, "firmware_version.json")
 
-        with open(self.local_firmware_version_path, "r") as config_file:
+        with open(firmware_version_path, "r") as config_file:
             config_info = config_file.read()
             return json.loads(config_info)
 

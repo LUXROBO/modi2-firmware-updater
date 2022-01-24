@@ -13,31 +13,20 @@ def make_clean():
         if os.path.isdir(dirpath):
             rmtree(dirpath)
 
-    redundant_specfile = os.path.join(cwd, 'main.spec')
-    if os.path.exists(redundant_specfile):
-        os.remove(redundant_specfile)
-
-    redundant_logfile = os.path.join(cwd, 'gmfu.log')
-    if os.path.exists(redundant_logfile):
-        os.remove(redundant_logfile)
-
-
-def make_executable():
+def make_executable(is_multi):
     make_clean()
-    os.system('pyinstaller modi_updater.spec')
-
+    if is_multi:
+        os.system(f'pyinstaller modi_multi_uploader.spec')
+    else:
+        os.system(f'pyinstaller modi_single_uploader.spec')
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument(
-        '--mode', type=str, default='install',
-        choices=['clean', 'install'],
-        help='This is a script which makes your life a lot easier :)'
+        '--multi', type=str, default="True",
+        choices=["False", "True"],
+        help='multi uploader'
     )
     args = parser.parse_args()
-    mode = args.mode
-    mode_func = {
-        'clean': make_clean,
-        'install': make_executable,
-    }.get(mode)
-    mode_func()
+    multi = (args.multi == 'True')
+    make_executable(multi)
