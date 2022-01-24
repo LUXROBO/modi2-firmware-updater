@@ -17,7 +17,7 @@ if not site_package_paths:
 
 block_cipher = None
 a = Analysis(
-    ['main.py'],
+    ['main_multi.py'],
     pathex=site_package_paths,
     binaries=[],
     # Put data(i.e. assets) under virtual 'modi2_multi_uploader/'

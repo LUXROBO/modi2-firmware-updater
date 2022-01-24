@@ -2,7 +2,6 @@ import os
 import io
 import sys
 import time
-import logging
 import pathlib
 import threading as th
 import traceback as tb
@@ -18,7 +17,6 @@ from modi2_multi_uploader.core.module_uploader import ModuleFirmwareMultiUpdater
 from modi2_multi_uploader.core.network_uploader import NetworkFirmwareMultiUpdater
 from modi2_multi_uploader.util.modi_winusb.modi_serialport import list_modi_serialports
 
-
 class StdoutRedirect(QObject):
     printOccur = pyqtSignal(str, str, name="print")
 
@@ -27,7 +25,6 @@ class StdoutRedirect(QObject):
         self.daemon = True
         self.sysstdout = sys.stdout.write
         self.sysstderr = sys.stderr.write
-        self.logger = None
 
     def stop(self):
         sys.stdout.write = self.sysstdout
@@ -40,17 +37,6 @@ class StdoutRedirect(QObject):
     def write(self, s, color="black"):
         sys.stdout.flush()
         self.printOccur.emit(s, color)
-        if self.logger and not self.__is_redundant_line(s):
-            self.logger.info(s)
-
-    @staticmethod
-    def __is_redundant_line(line):
-        return (
-            line.startswith("\rUpdating") or
-            line.startswith("\rFirmware Upload: [") or
-            len(line) < 3
-        )
-
 
 class PopupMessageBox(QtWidgets.QMessageBox):
     def __init__(self, main_window, level):
@@ -99,10 +85,7 @@ class PopupMessageBox(QtWidgets.QMessageBox):
             textEdit.setMaximumHeight(MAXSIZE)
             textEdit.setMinimumWidth(MINWIDTH_CHANGE)
             textEdit.setMaximumWidth(MAXSIZE)
-            textEdit.setSizePolicy(
-                QtWidgets.QSizePolicy.Expanding,
-                QtWidgets.QSizePolicy.Expanding,
-            )
+            textEdit.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding,)
 
         return result
 
@@ -117,20 +100,21 @@ class ThreadSignal(QObject):
     def __init__(self):
         super().__init__()
 
-
 class Form(QDialog):
     """
     GUI Form of MODI Firmware Updater
     """
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, multi=True, develop=False):
         QDialog.__init__(self)
-        self.logger = self.__init_logger()
         self.__excepthook = sys.excepthook
         sys.excepthook = self.__popup_excepthook
         th.excepthook = self.__popup_thread_excepthook
         self.err_list = list()
         self.is_popup = False
+        self.is_debug = debug
+        self.is_multi = multi
+        self.is_develop = develop
 
         ui_path = os.path.join(os.path.dirname(__file__), "assets", "uploader.ui")
         firmware_manager_ui_path = os.path.join(os.path.dirname(__file__), "assets", "firmware_manager.ui")
@@ -142,12 +126,11 @@ class Form(QDialog):
             self.component_path = os.path.join(os.path.dirname(__file__), "assets", "component")
         self.ui = uic.loadUi(ui_path)
         self.assets_firmware_path = os.path.join(os.path.dirname(__file__), "assets", "firmware")
-        self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi2 multi uploader")
+        self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi+ uploader")
+        self.module_firmware_directory = "module_firmware" if not self.is_develop else "module_firmware_develop"
+        self.module_firmware_path = os.path.join(self.local_firmware_path, self.module_firmware_directory)
 
         self.ui.setStyleSheet("background-color: white")
-        self.ui.console.hide()
-        self.ui.firmware_manage_button.setVisible(False)
-        self.ui.setFixedHeight(640)
 
         # Set LUXROBO logo image
         logo_path = os.path.join(self.component_path, "luxrobo_logo.png")
@@ -155,11 +138,12 @@ class Form(QDialog):
         qPixmapVar.load(logo_path)
         self.ui.lux_logo.setPixmap(qPixmapVar)
 
-        self.firmware_manage_form = FirmwareManagerForm(path_dict={
+        self.firmware_manage_form = FirmwareManagerForm(develop=self.is_develop, path_dict={
             "ui": firmware_manager_ui_path,
             "component": self.component_path,
             "assets_firmware": self.assets_firmware_path,
             "local_firmware": self.local_firmware_path,
+            "firmware_directory": self.module_firmware_directory
         })
         self.esp32_upload_list_form = ESP32UpdateListForm(path_dict={
             "ui": esp32_upload_list_ui_path,
@@ -177,91 +161,76 @@ class Form(QDialog):
         self.language_frame_path = pathlib.PurePosixPath(self.component_path, "lang_frame.png")
         self.language_frame_pressed_path = pathlib.PurePosixPath(self.component_path, "lang_frame_pressed.png")
 
-        self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.module_type_combobox.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.firmware_manage_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
-        self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
-        self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
-        self.ui.console.setStyleSheet("font-size: 10px")
+        self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.active_path})")
+        self.ui.update_network_submodule_button.setStyleSheet(f"border-image: url({self.active_path})")
+        self.ui.delete_user_code_button.setStyleSheet(f"border-image: url({self.active_path})")
+        self.ui.update_general_modules_button.setStyleSheet(f"border-image: url({self.active_path})")
+        self.ui.manage_firmware_version_button.setStyleSheet(f"border-image: url({self.active_path})")
+        self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path})")
+        self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path})")
 
         version_path = os.path.join(os.path.dirname(__file__), "..", "version.txt")
         with io.open(version_path, "r") as version_file:
             self.version_info = version_file.readline().rstrip("\n")
 
-        self.ui.setWindowTitle("MODI+ Multi Uploader - " + self.version_info)
+        if self.is_multi:
+            self.ui.setWindowTitle("MODI+ Multi Uploader - " + self.version_info)
+        else:
+            self.ui.setWindowTitle("MODI+ Uploader - " + self.version_info)
+
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
 
         # Redirect stdout to text browser (i.e. console in our UI)
-        if not debug:
+        if not self.is_debug:
             self.stdout = StdoutRedirect()
             self.stdout.start()
-            self.stdout.printOccur.connect(
-                lambda line: self.__append_text_line(line)
-            )
-            self.stdout.logger = self.logger
+            self.stdout.printOccur.connect(lambda line: self.__append_text_line(line))
 
         # Set signal for thread communication
         self.stream = ThreadSignal()
 
         # Connect up the buttons
-        self.ui.update_network_esp32_button.clicked.connect(self.update_network_esp32)
-        self.ui.update_network_esp32_interpreter_button.clicked.connect(self.update_network_esp32_interpreter)
-        self.ui.change_modules_type_button.clicked.connect(self.change_modules_type)
-        self.ui.update_modules_button.clicked.connect(self.update_modules)
-        self.ui.update_network_button.clicked.connect(self.update_network)
-        self.ui.update_network_bootloader_button.clicked.connect(self.update_network_bootloader)
-        self.ui.firmware_manage_button.clicked.connect(self.firmware_manage)
-        self.ui.translate_button.clicked.connect(self.translate_button_text)
-        self.ui.devmode_button.clicked.connect(self.dev_mode_button)
+        self.ui.update_network_module_button.clicked.connect(self.update_network_module_button_clicked)
+        self.ui.update_network_submodule_button.clicked.connect(self.update_network_submodule_button_clicked)
+        self.ui.delete_user_code_button.clicked.connect(self.delete_user_code_button_clicked)
+        self.ui.update_general_modules_button.clicked.connect(self.update_general_modules_button_clicked)
+        self.ui.manage_firmware_version_button.clicked.connect(self.manage_firmware_version_button_clicked)
+        self.ui.devmode_button.clicked.connect(self.devmode_button_clicked)
+        self.ui.translate_button.clicked.connect(self.translate_button_clicked)
 
         self.buttons = [
-            self.ui.update_network_esp32_button,
-            self.ui.update_network_esp32_interpreter_button,
-            self.ui.change_modules_type_button,
-            self.ui.update_modules_button,
-            self.ui.update_network_button,
-            self.ui.update_network_bootloader_button,
-            self.ui.firmware_manage_button,
+            self.ui.update_network_module_button,
+            self.ui.update_network_submodule_button,
+            self.ui.delete_user_code_button,
+            self.ui.update_general_modules_button,
+            self.ui.manage_firmware_version_button,
             self.ui.devmode_button,
             self.ui.translate_button,
         ]
 
         self.button_en = [
-            "Update Network ESP32",
-            "Update Network ESP32 Interpreter",
-            "Change Modules Type",
-            "Update Modules",
-            "Update Network Modules",
-            "Set Network Bootloader",
-            "Manage Firmware",
-            "Dev Mode",
+            "Update Network Module",
+            "Update Network Submodule",
+            "Delete User Code",
+            "Update General Modules",
+            "Manage Module Firmware Version",
+            "Show Detail",
             "한국어",
         ]
 
         self.button_kr = [
             "네트워크 모듈 업데이트",
-            "네트워크 모듈 인터프리터 초기화",
-            "모듈 타입 변경",
-            "모듈 초기화",
-            "네트워크 모듈 초기화",
-            "네트워크 모듈 부트로더",
+            "네트워크 서브 모듈 업데이트",
+            "시용자 코드 삭제",
+            "일반 모듈 업데이트",
             "펌웨어 관리",
-            "개발자 모드",
+            "자세히 보기",
             "English",
         ]
 
         # Disable the first button to be focused when UI is loaded
-        self.ui.update_network_esp32_button.setAutoDefault(False)
-        self.ui.update_network_esp32_button.setDefault(False)
-
-        # Print init status
-        time_now_str = time.strftime("[%Y/%m/%d@%X]", time.localtime())
-        print(time_now_str + " GUI MODI Firmware Updater has been started!")
+        self.ui.update_network_module_button.setAutoDefault(False)
+        self.ui.update_network_module_button.setDefault(False)
 
         # Set up field variables
         self.firmware_updater = None
@@ -275,7 +244,6 @@ class Form(QDialog):
         self.ui.language_frame_path = self.language_frame_path
         self.ui.language_frame_pressed_path = self.language_frame_pressed_path
         self.ui.stream = self.stream
-        self.ui.popup = self._thread_signal_hook
 
         # check module firmware
         self.check_module_firmware()
@@ -291,14 +259,15 @@ class Form(QDialog):
     #
     # Main methods
     #
-    def update_network_esp32(self):
+    def update_network_module_button_clicked(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
-            self.esp32_upload_list_form.ui.show()
+            if self.is_multi:
+                self.module_upload_list_form.ui.show()
             return
-        self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
-        print("ESP32 Firmware Updater has been initialized for esp update!")
+        print("Network Firmware Updater has been initialized for base update!")
         th.Thread(
             target=self.__click_motion, args=(0, button_start), daemon=True
         ).start()
@@ -307,16 +276,21 @@ class Form(QDialog):
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
-        self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32")
-        self.esp32_upload_list_form.reset_device_list()
+        if self.is_multi:
+            self.module_upload_list_form.ui.setWindowTitle("Update Network Modules")
+            self.module_upload_list_form.reset_device_list()
+
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
         def run_task(self, modi_ports, firmware_version_info):
-            esp32_updater = ESP32FirmwareMultiUploder(self.local_firmware_path)
-            esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
-            esp32_updater.set_task_end_callback(self.__reset_ui)
-            self.firmware_updater = esp32_updater
-            esp32_updater.update_firmware(modi_ports, False, firmware_version_info)
+            self.firmware_updater = NetworkFirmwareMultiUpdater(self.module_firmware_path)
+            self.firmware_updater.set_task_end_callback(self.__reset_ui)
+            if self.is_multi:
+                self.firmware_updater.set_ui(self.ui, self.module_upload_list_form)
+                self.firmware_updater.update_module_firmware(modi_ports, firmware_version_info)
+            else:
+                self.firmware_updater.set_ui(self.ui, None)
+                self.firmware_updater.update_module_firmware([modi_ports[0]], firmware_version_info)
 
         th.Thread(
             target=run_task,
@@ -324,16 +298,18 @@ class Form(QDialog):
             daemon=True
         ).start()
 
-        self.esp32_upload_list_form.ui.exec_()
+        if self.is_multi:
+            self.module_upload_list_form.ui.exec_()
 
-    def update_network_esp32_interpreter(self):
+    def update_network_submodule_button_clicked(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
-            self.esp32_upload_list_form.ui.show()
+            if self.is_multi:
+                self.esp32_upload_list_form.ui.show()
             return
-        self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_network_submodule_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
-        print("ESP32 Firmware Updater has been initialized for esp interpreter update!")
+        print("ESP32 Firmware Updater has been initialized for esp update!")
         th.Thread(
             target=self.__click_motion, args=(1, button_start), daemon=True
         ).start()
@@ -342,16 +318,21 @@ class Form(QDialog):
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
-        self.esp32_upload_list_form.ui.setWindowTitle("Update Network ESP32 Interpreter")
-        self.esp32_upload_list_form.reset_device_list()
+        if self.is_multi:
+            self.esp32_upload_list_form.ui.setWindowTitle("Update Network Submodules")
+            self.esp32_upload_list_form.reset_device_list()
+
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
         def run_task(self, modi_ports, firmware_version_info):
-            esp32_updater = ESP32FirmwareMultiUploder(self.local_firmware_path)
-            esp32_updater.set_ui(self.ui, self.esp32_upload_list_form)
-            esp32_updater.set_task_end_callback(self.__reset_ui)
-            self.firmware_updater = esp32_updater
-            esp32_updater.update_firmware(modi_ports, True, firmware_version_info)
+            self.firmware_updater = ESP32FirmwareMultiUploder(self.module_firmware_path)
+            self.firmware_updater.set_task_end_callback(self.__reset_ui)
+            if self.is_multi:
+                self.firmware_updater.set_ui(self.ui, self.esp32_upload_list_form)
+                self.firmware_updater.update_firmware(modi_ports, False, firmware_version_info)
+            else:
+                self.firmware_updater.set_ui(self.ui, None)
+                self.firmware_updater.update_firmware([modi_ports[0]], False, firmware_version_info)
 
         th.Thread(
             target=run_task,
@@ -359,17 +340,18 @@ class Form(QDialog):
             daemon=True
         ).start()
 
-        self.esp32_upload_list_form.ui.exec_()
+        if self.is_multi:
+            self.esp32_upload_list_form.ui.exec_()
 
-    def change_modules_type(self):
-        module_type = self.ui.module_type_combobox.currentText()
+    def delete_user_code_button_clicked(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
-            self.module_upload_list_form.ui.show()
+            if self.is_multi:
+                self.esp32_upload_list_form.ui.show()
             return
-        self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.delete_user_code_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
-        print(f"Module Firmware Updater has been initialized for changing module type to {module_type}")
+        print("ESP32 Firmware Updater has been initialized for esp interpreter update!")
         th.Thread(
             target=self.__click_motion, args=(2, button_start), daemon=True
         ).start()
@@ -378,30 +360,38 @@ class Form(QDialog):
         if not modi_ports:
             raise Exception("No MODI port is connected")
 
-        self.module_upload_list_form.ui.setWindowTitle("Change Modules Type")
-        self.module_upload_list_form.reset_device_list()
+        if self.is_multi:
+            self.esp32_upload_list_form.ui.setWindowTitle("Delete User Code")
+            self.esp32_upload_list_form.reset_device_list()
 
-        def run_task(self, modi_ports, module_type):
-            module_updater = ModuleFirmwareMultiUpdater()
-            module_updater.set_ui(self.ui, self.module_upload_list_form)
-            module_updater.set_task_end_callback(self.__reset_ui)
-            self.firmware_updater = module_updater
-            module_updater.change_module_type(modi_ports, module_type)
+        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
+
+        def run_task(self, modi_ports, firmware_version_info):
+            self.firmware_updater = ESP32FirmwareMultiUploder(self.module_firmware_path)
+            self.firmware_updater.set_task_end_callback(self.__reset_ui)
+            if self.is_multi:
+                self.firmware_updater.set_ui(self.ui, self.esp32_upload_list_form)
+                self.firmware_updater.update_firmware(modi_ports, True, firmware_version_info)
+            else:
+                self.firmware_updater.set_ui(self.ui, None)
+                self.firmware_updater.update_firmware([modi_ports[0]], True, firmware_version_info)
 
         th.Thread(
             target=run_task,
-            args=(self, modi_ports, module_type),
+            args=(self, modi_ports, firmware_version_info),
             daemon=True
         ).start()
 
-        self.module_upload_list_form.ui.exec_()
+        if self.is_multi:
+            self.esp32_upload_list_form.ui.exec_()
 
-    def update_modules(self):
+    def update_general_modules_button_clicked(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
-            self.module_upload_list_form.ui.show()
+            if self.is_multi:
+                self.module_upload_list_form.ui.show()
             return
-        self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.update_general_modules_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
         print("Module Firmware Updater has been initialized for module update!")
         th.Thread(
@@ -413,16 +403,22 @@ class Form(QDialog):
             self.__reset_ui(self.module_upload_list_form)
             raise Exception("No MODI port is connected")
 
-        self.module_upload_list_form.ui.setWindowTitle("Update Modules")
-        self.module_upload_list_form.reset_device_list()
+        if self.is_multi:
+            self.module_upload_list_form.ui.setWindowTitle("Update General Modules")
+            self.module_upload_list_form.reset_device_list()
+
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
         def run_task(self, modi_ports, firmware_version_info):
-            module_updater = ModuleFirmwareMultiUpdater(self.local_firmware_path)
-            module_updater.set_ui(self.ui, self.module_upload_list_form)
-            module_updater.set_task_end_callback(self.__reset_ui)
-            self.firmware_updater = module_updater
-            module_updater.update_module_firmware(modi_ports, firmware_version_info)
+            self.firmware_updater = ModuleFirmwareMultiUpdater(self.module_firmware_path)
+            self.firmware_updater.set_task_end_callback(self.__reset_ui)
+
+            if self.is_multi:
+                self.firmware_updater.set_ui(self.ui, self.module_upload_list_form)
+                self.firmware_updater.update_module_firmware(modi_ports, firmware_version_info)
+            else:
+                self.firmware_updater.set_ui(self.ui, None)
+                self.firmware_updater.update_module_firmware([modi_ports[0]], firmware_version_info)
 
         th.Thread(
             target=run_task,
@@ -430,84 +426,15 @@ class Form(QDialog):
             daemon=True
         ).start()
 
-        self.module_upload_list_form.ui.exec_()
+        if self.is_multi:
+            self.module_upload_list_form.ui.exec_()
 
-    def update_network(self):
+    def manage_firmware_version_button_clicked(self):
         button_start = time.time()
-        if self.firmware_updater and self.firmware_updater.update_in_progress:
-            self.module_upload_list_form.ui.show()
-            return
-        self.ui.update_network_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
+        self.ui.manage_firmware_version_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
-        print("Network Firmware Updater has been initialized for base update!")
         th.Thread(
             target=self.__click_motion, args=(4, button_start), daemon=True
-        ).start()
-
-        modi_ports = list_modi_serialports()
-        if not modi_ports:
-            raise Exception("No MODI port is connected")
-
-        self.module_upload_list_form.ui.setWindowTitle("Update Network Modules")
-        self.module_upload_list_form.reset_device_list()
-        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
-
-        def run_task(self, modi_ports, firmware_version_info):
-            network_updater = NetworkFirmwareMultiUpdater(self.local_firmware_path)
-            network_updater.set_ui(self.ui, self.module_upload_list_form)
-            network_updater.set_task_end_callback(self.__reset_ui)
-            self.firmware_updater = network_updater
-            network_updater.update_module_firmware(modi_ports, False, firmware_version_info)
-
-        th.Thread(
-            target=run_task,
-            args=(self, modi_ports, firmware_version_info),
-            daemon=True
-        ).start()
-
-        self.module_upload_list_form.ui.exec_()
-
-    def update_network_bootloader(self):
-        button_start = time.time()
-        if self.firmware_updater and self.firmware_updater.update_in_progress:
-            self.module_upload_list_form.ui.show()
-            return
-        self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
-        self.ui.console.clear()
-        print("Network Firmware Updater has been initialized for base update!")
-        th.Thread(
-            target=self.__click_motion, args=(5, button_start), daemon=True
-        ).start()
-
-        modi_ports = list_modi_serialports()
-        if not modi_ports:
-            raise Exception("No MODI port is connected")
-
-        self.module_upload_list_form.ui.setWindowTitle("Set Network Bootloader")
-        self.module_upload_list_form.reset_device_list()
-        firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
-
-        def run_task(self, modi_ports, firmware_version_info):
-            network_updater = NetworkFirmwareMultiUpdater(self.local_firmware_path)
-            network_updater.set_ui(self.ui, self.module_upload_list_form)
-            network_updater.set_task_end_callback(self.__reset_ui)
-            self.firmware_updater = network_updater
-            network_updater.update_module_firmware(modi_ports, True, firmware_version_info)
-
-        th.Thread(
-            target=run_task,
-            args=(self, modi_ports, firmware_version_info),
-            daemon=True
-        ).start()
-
-        self.module_upload_list_form.ui.exec_()
-
-    def firmware_manage(self):
-        button_start = time.time()
-        self.ui.firmware_manage_button.setStyleSheet(f"border-image: url({self.pressed_path}); font-size: 16px")
-        self.ui.console.clear()
-        th.Thread(
-            target=self.__click_motion, args=(6, button_start), daemon=True
         ).start()
 
         self.firmware_manage_form.refresh_firmware_info()
@@ -515,44 +442,37 @@ class Form(QDialog):
 
         self.__reset_ui()
 
-    def dev_mode_button(self):
+    def devmode_button_clicked(self):
         button_start = time.time()
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path});font-size: 13px")
         th.Thread(
-            target=self.__click_motion, args=(7, button_start), daemon=True
+            target=self.__click_motion, args=(5, button_start), daemon=True
         ).start()
         self.console = not self.console
         self.refresh_console()
 
-    def refresh_console(self):
-        if self.console:
-            self.ui.console.show()
-            self.ui.firmware_manage_button.setVisible(True)
-            self.ui.change_modules_type_button.setVisible(True)
-            self.ui.module_type_combobox.setVisible(True)
-            self.ui.setFixedHeight(720)
-        else:
-            self.ui.console.hide()
-            self.ui.firmware_manage_button.setVisible(False)
-            self.ui.change_modules_type_button.setVisible(False)
-            self.ui.module_type_combobox.setVisible(False)
-            self.ui.setFixedHeight(640)
-
-    def translate_button_text(self):
+    def translate_button_clicked(self):
         button_start = time.time()
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path}); font-size: 13px")
         th.Thread(
-            target=self.__click_motion, args=(8, button_start), daemon=True
+            target=self.__click_motion, args=(6, button_start), daemon=True
         ).start()
 
         self.button_in_english = not self.button_in_english
         self.ui.is_english = not self.ui.is_english
         self.refresh_button_text()
 
+    def refresh_console(self):
+        if self.console:
+            self.ui.console.show()
+            self.ui.manage_firmware_version_button.setVisible(True)
+        else:
+            self.ui.console.hide()
+            self.ui.manage_firmware_version_button.setVisible(False)
+        self.ui.adjustSize()
+
     def refresh_button_text(self):
-        appropriate_translation = (
-            self.button_en if self.button_in_english else self.button_kr
-        )
+        appropriate_translation = (self.button_en if self.button_in_english else self.button_kr)
         for i, button in enumerate(self.buttons):
             button.setText(appropriate_translation[i])
 
@@ -562,7 +482,7 @@ class Form(QDialog):
         if len(firmware_list) == 0:
             download_success = self.firmware_manage_form.download_firmware()
             if download_success:
-                refresh_success = self.firmware_manage_form.refresh_firmware_info(preset=False)
+                refresh_success = self.firmware_manage_form.refresh_firmware_info()
                 if refresh_success:
                     self.firmware_manage_form.apply_firmware(show_message=False)
                 else:
@@ -583,15 +503,17 @@ class Form(QDialog):
                 args=("download firmware first,\n and select firmware version"),
                 daemon=True
             ).start()
+        else:
+            self.firmware_manage_form.check_firmware_version_update()
 
     def check_app_update(self):
         try:
             import requests
-            response = requests.get("https://api.github.com/repos/LUXROBO/modi2-multi-uploader-bin/releases/latest")
+            response = requests.get("https://api.github.com/repos/LUXROBO/modi2-multi-uploader-bin/releases/latest").json()
 
             current_version = self.version_info
-            latest_version = response.json()["name"]
-            download_url = response.json()["assets"][0]["browser_download_url"]
+            latest_version = response["name"]
+            download_url = response["assets"][0]["browser_download_url"]
 
             from packaging import version
             
@@ -612,18 +534,6 @@ class Form(QDialog):
     #
     # Helper functions
     #
-    @staticmethod
-    def __init_logger():
-        logger = logging.getLogger("GUI MODI Firmware Updater Logger")
-        logger.setLevel(logging.DEBUG)
-
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        file_handler = logging.FileHandler("gmfu.log")
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-
-        return logger
-
     def __popup_excepthook(self, exctype, value, traceback):
         self.__excepthook(exctype, value, traceback)
         if self.is_popup:
@@ -642,45 +552,28 @@ class Form(QDialog):
 
     @pyqtSlot(object)
     def __thread_error_hook(self, err_msg):
-        self.__popup_excepthook(
-            err_msg.exc_type, err_msg.exc_value, err_msg.exc_traceback
-        )
-
-    @pyqtSlot(object)
-    def _thread_signal_hook(self):
-        self.thread_popup = PopupMessageBox(self.ui, level="warning")
-        if self.button_in_english:
-            text = (
-                "Reconnect network module and "
-                "click the button again please."
-            )
-        else:
-            text = "네트워크 모듈을 재연결 후 버튼을 다시 눌러주십시오."
-        self.thread_popup.setInformativeText(text)
-        self.is_popup = True
+        self.__popup_excepthook(err_msg.exc_type, err_msg.exc_value, err_msg.exc_traceback)
 
     def __click_motion(self, button_type, start_time):
         # Busy wait for 0.2 seconds
         while time.time() - start_time < 0.2:
             pass
 
-        if button_type in [7, 8]:
+        if button_type in [5, 6]:
             self.buttons[button_type].setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
         else:
-            self.ui.module_type_combobox.setEnabled(False)
-            self.buttons[button_type].setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+            self.buttons[button_type].setStyleSheet(f"border-image: url({self.active_path})")
             for i, q_button in enumerate(self.buttons):
-                if i in [button_type, 7, 8]:
+                if i in [button_type, 5, 6]:
                     continue
-                q_button.setStyleSheet(f"border-image: url({self.inactive_path}); font-size: 16px")
+                q_button.setStyleSheet(f"border-image: url({self.inactive_path})")
                 q_button.setEnabled(False)
 
     def __reset_ui(self, list_ui = None):
-        self.ui.module_type_combobox.setEnabled(True)
         for i, q_button in enumerate(self.buttons):
-            if i in [7, 8]:
+            if i in [5, 6]:
                 continue
-            q_button.setStyleSheet(f"border-image: url({self.active_path}); font-size: 16px")
+            q_button.setStyleSheet(f"border-image: url({self.active_path})")
             q_button.setEnabled(True)
 
         # refresh language
@@ -696,15 +589,9 @@ class Form(QDialog):
             self.esp32_upload_list_form.total_status_signal.emit("Complete")
 
     def __append_text_line(self, line):
-        self.ui.console.moveCursor(
-            QtGui.QTextCursor.End, QtGui.QTextCursor.MoveAnchor
-        )
-        self.ui.console.moveCursor(
-            QtGui.QTextCursor.StartOfLine, QtGui.QTextCursor.MoveAnchor
-        )
-        self.ui.console.moveCursor(
-            QtGui.QTextCursor.End, QtGui.QTextCursor.KeepAnchor
-        )
+        self.ui.console.moveCursor(QtGui.QTextCursor.End, QtGui.QTextCursor.MoveAnchor)
+        self.ui.console.moveCursor(QtGui.QTextCursor.StartOfLine, QtGui.QTextCursor.MoveAnchor)
+        self.ui.console.moveCursor(QtGui.QTextCursor.End, QtGui.QTextCursor.KeepAnchor)
 
         # Remove new line character if current line represents update_progress
         if self.__is_update_progress_line(line):
@@ -714,10 +601,7 @@ class Form(QDialog):
         # Display user text input
         self.ui.console.moveCursor(QtGui.QTextCursor.End)
         self.ui.console.insertPlainText(line)
-        # QtWidgets.QApplication.processEvents(
-        #     QtCore.QEventLoop.ExcludeUserInputEvents
-        # )
 
     @staticmethod
     def __is_update_progress_line(line):
-        return line.startswith("\rUpdating") or line.startswith("\rFirmware Upload: [")
+        return line.startswith("\r")
