@@ -440,17 +440,14 @@ class ESPLoader(object):
             self.command()
 
     def _setDTR(self, state):
-        pass
-        # self._port.setDTR(state)
+        self._port.setDTR(state)
 
     def _setRTS(self, state):
-        pass
-        # self._port.setRTS(state)
-
+        self._port.setRTS(state)
         # Work-around for adapters on Windows using the usbser.sys driver:
         # generate a dummy change to DTR so that the set-control-line-state
         # request is sent with the updated RTS state and the same DTR state
-        # self._port.setDTR(self._port.dtr)
+        self._port.setDTR(self._port.dtr)
 
     def read_json(self):
         json_pkt = b""
@@ -471,6 +468,26 @@ class ESPLoader(object):
             if time.time() - init_time > timeout:
                 return None
         return json_msg
+
+    # def read_json(self):
+    #     json_pkt = b""
+    #     while json_pkt != b"{":
+    #         json_pkt = self._port.read()
+    #         if json_pkt == b"":
+    #             return ""
+    #         time.sleep(0.1)
+    #     json_pkt += self._port.read_until(b"}")
+    #     return json_pkt
+
+    # def wait_for_json(self, timeout = 1):
+    #     json_msg = self.read_json()
+    #     init_time = time.time()
+    #     while not json_msg:
+    #         json_msg = self.read_json()
+    #         time.sleep(0.1)
+    #         if time.time() - init_time > timeout:
+    #             return ""
+    #     return json_msg
 
     def set_esp_app_version(self, version_text: str, retry = 5):
         # print(f"Writing esp app version info (v{version_text})")
@@ -582,9 +599,9 @@ class ESPLoader(object):
                 return None
             except FatalError as e:
                 # if esp32r0_delay:
-                #     # print('_', end='')
+                #     print('_', end='')
                 # else:
-                #     # print('.', end='')
+                #     print('.', end='')
                 sys.stdout.flush()
                 time.sleep(0.05)
                 last_error = e
@@ -3983,7 +4000,7 @@ FK3JstjaPDbhTnM9u/28uDgYRLjoq1ml/2YEpIIv7cvl/izGpnFh4vn/AOixonk=\
 from os import path
 
 class ESP32FirmwareUpdater():
-    def __init__(self, port, local_firmware_path=None):
+    def __init__(self, port, module_firmware_path=None):
         self.port = port
         self.baudrate = 921600
 
@@ -4000,7 +4017,7 @@ class ESP32FirmwareUpdater():
         self.ui = None
         self.print = True
 
-        self.local_firmware_path = local_firmware_path
+        self.module_firmware_path = module_firmware_path
 
     def set_ui(self, ui):
         self.ui = ui
@@ -4108,7 +4125,7 @@ class ESP32FirmwareUpdater():
                 if time.time() - init_time > 5:
                     break
 
-                time.sleep(0.5)
+                time.sleep(0.1)
 
             self.__print("ESP interpreter reset is complete!!")
             self.esp.close()
@@ -4119,29 +4136,13 @@ class ESP32FirmwareUpdater():
                 if self.esp.firmware_progress > 100:
                     self.esp.firmware_progress = 100
                     break
-                time.sleep(0.3)
+                time.sleep(0.05)
 
             self.esp.firmware_progress = 100
 
             time.sleep(0.5)
             self.update_in_progress = False
             self.update_error = 1
-
-            if self.ui:
-                self.ui.update_network_esp32_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32_button.setEnabled(True)
-                self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.change_modules_type_button.setEnabled(True)
-                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_modules_button.setEnabled(True)
-                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_button.setEnabled(True)
-                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_bootloader_button.setEnabled(True)
-                if self.ui.is_english:
-                    self.ui.update_network_esp32_interpreter_button.setText("Update Network ESP32 Interpreter")
-                else:
-                    self.ui.update_network_esp32_interpreter_button.setText("네트워크 모듈 인터프리터 초기화")
 
         else:
             self.__print("update_firmware")
@@ -4153,8 +4154,8 @@ class ESP32FirmwareUpdater():
             network_serialport.close()
             time.sleep(1)
 
-            self.app_firmware_path = path.join(self.local_firmware_path, "esp32", "app", self.firmware_version_info["esp32_app"]["app"])
-            self.ota_firmware_path = path.join(self.local_firmware_path, "esp32", "ota", self.firmware_version_info["esp32_ota"]["app"])
+            self.app_firmware_path = path.join(self.module_firmware_path, "esp32", "app", self.firmware_version_info["esp32_app"]["app"])
+            self.ota_firmware_path = path.join(self.module_firmware_path, "esp32", "ota", self.firmware_version_info["esp32_ota"]["app"])
             self.arg = ['--chip', 'esp32',
                         '--port', self.port,
                         '--baud', str(self.baudrate),
@@ -4417,11 +4418,10 @@ class ESP32FirmwareUpdater():
                     operation_func(self.esp, args)
                 except Exception as e:
                     self.update_error_message = str(e)
-                    print(self.update_error_message)
+                    self.update_error = -1
                     if self.raise_error_message:
                         raise Exception(self.update_error_message)
                     else:
-                        self.update_error = -1
                         return
                 finally:
                     try:  # Clean up AddrFilenamePairAction files
@@ -4447,14 +4447,16 @@ class ESP32FirmwareUpdater():
                     if self.esp.IS_STUB:
                         self.esp.soft_reset(True)  # exit stub back to ROM loader
 
-                self.esp.firmware_progress = 94
-                time.sleep(3)
-                self.esp.wait_for_json()
-                time.sleep(0.01)
-                self.esp.firmware_progress = 98
-                self.esp.set_esp_app_version(self.app_version_to_update)
-                time.sleep(0.01)
-                self.esp.set_esp_ota_version(self.ota_version_to_update)
+                if self.update_error != -1:
+                    self.esp.firmware_progress = 94
+                    time.sleep(3)
+                    self.esp.wait_for_json()
+                    time.sleep(0.01)
+                    self.esp.firmware_progress = 98
+                    self.esp.set_esp_app_version(self.app_version_to_update)
+                    time.sleep(0.01)
+                    self.esp.set_esp_ota_version(self.ota_version_to_update)
+
                 self.__print("ESP firmware update is complete!!")
                 self.esp.firmware_progress = 100
                 time.sleep(0.05)
@@ -4466,41 +4468,18 @@ class ESP32FirmwareUpdater():
 
             time.sleep(1)
 
-            if self.ui:
-                if self.ui.is_english:
-                    self.ui.update_network_esp32_button.setText("Network ESP32 update is in progress. (100%)")
-                else:
-                    self.ui.update_network_esp32_button.setText("네트워크 모듈 업데이트가 진행중입니다. (100%)")
-
             self.update_in_progress = False
             self.update_error = 1
 
             time.sleep(1)
 
-            if self.ui:
-                self.ui.update_network_esp32_interpreter_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_esp32_interpreter_button.setEnabled(True)
-                self.ui.change_modules_type_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.change_modules_type_button.setEnabled(True)
-                self.ui.update_modules_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_modules_button.setEnabled(True)
-                self.ui.update_network_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_button.setEnabled(True)
-                self.ui.update_network_bootloader_button.setStyleSheet(f"border-image: url({self.ui.active_path}); font-size: 16px")
-                self.ui.update_network_bootloader_button.setEnabled(True)
-                if self.ui.is_english:
-                    self.ui.update_network_esp32_button.setText("Update Network ESP32")
-                else:
-                    self.ui.update_network_esp32_button.setText("네트워크 모듈 업데이트")
-
-
 class ESP32FirmwareMultiUploder():
-    def __init__(self, local_firmware_path):
+    def __init__(self, module_firmware_path):
         self.update_in_progress = False
         self.ui = None
         self.list_ui = None
         self.task_end_callback = None
-        self.local_firmware_path = path.join(local_firmware_path, "modi-v2-module-binary-main")
+        self.module_firmware_path = module_firmware_path
 
     def set_ui(self, ui, list_ui):
         self.ui = ui
@@ -4520,7 +4499,7 @@ class ESP32FirmwareMultiUploder():
             try:
                 esp32_updater = ESP32FirmwareUpdater(
                     port = modi_port,
-                    local_firmware_path = self.local_firmware_path
+                    module_firmware_path = self.module_firmware_path
                 )
                 esp32_updater.set_print(False)
                 esp32_updater.set_raise_error(False)
@@ -4543,6 +4522,12 @@ class ESP32FirmwareMultiUploder():
                 args=(update_interpreter, firmware_version_info),
                 daemon=True
             ).start()
+
+        if not update_interpreter and self.ui:
+            if self.ui.is_english:
+                self.ui.update_network_submodule_button.setText("Network submodule update is in progress. (0%)")
+            else:
+                self.ui.update_network_submodule_button.setText("네트워크 서브모듈 업데이트가 진행중입니다. (0%)")
 
         delay = 0.1
         while True:
@@ -4601,26 +4586,14 @@ class ESP32FirmwareMultiUploder():
                 if self.ui:
                     if update_interpreter:
                         if self.ui.is_english:
-                            self.ui.update_network_esp32_interpreter_button.setText(
-                                f"Network ESP32 Interpreter reset is in progress. "
-                                f"({int(current_sequence/total_sequence*100)}%)"
-                            )
+                            self.ui.delete_user_code_button.setText(f"User code delete is in progress. ({int(current_sequence/total_sequence*100)}%)")
                         else:
-                            self.ui.update_network_esp32_interpreter_button.setText(
-                                f"네트워크 모듈 인터프리터 초기화가 진행중입니다. "
-                                f"({int(current_sequence/total_sequence*100)}%)"
-                            )
+                            self.ui.delete_user_code_button.setText(f"사용자 코드 삭제가 진행중입니다. ({int(current_sequence/total_sequence*100)}%)")
                     else:
                         if self.ui.is_english:
-                            self.ui.update_network_esp32_button.setText(
-                                f"Network ESP32 update is in progress. "
-                                f"({int(current_sequence/total_sequence*100)}%)"
-                            )
+                            self.ui.update_network_submodule_button.setText(f"Network submodule update is in progress. ({int(current_sequence/total_sequence*100)}%)")
                         else:
-                            self.ui.update_network_esp32_button.setText(
-                                f"네트워크 모듈 업데이트가 진행중입니다. "
-                                f"({int(current_sequence/total_sequence*100)}%)"
-                            )
+                            self.ui.update_network_submodule_button.setText(f"네트워크 서브모듈 업데이트가 진행중입니다. ({int(current_sequence/total_sequence*100)}%)")
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(int(current_sequence / total_sequence * 100.0))
@@ -4635,7 +4608,7 @@ class ESP32FirmwareMultiUploder():
 
         self.update_in_progress = False
 
-        if self.list_ui and self.task_end_callback:
+        if self.task_end_callback:
             self.task_end_callback(self.list_ui)
 
         print("\nESP firmware update is complete!!")
@@ -4644,7 +4617,4 @@ class ESP32FirmwareMultiUploder():
     def __progress_bar(current: int, total: int) -> str:
         curr_bar = int(50 * current // total)
         rest_bar = int(50 - curr_bar)
-        return (
-            f"\rFirmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] "
-            f"{100 * current / total:3.1f}%"
-        )
+        return (f"\rFirmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] {100 * current / total:3.1f}%")
