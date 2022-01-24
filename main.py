@@ -5,14 +5,14 @@ from PyQt5 import QtWidgets
 
 from modi2_multi_uploader.gui_firmware_upload import Form
 
-def run_gui(debug=False, multi=True, develop=False):
+def run_gui(debug=False, multi=True):
     if multi:
         print("Running MODI+ Multi Uploader")
     else:
         print("Running MODI+ Uploader")
 
     app = QtWidgets.QApplication(sys.argv)
-    w = Form(debug=debug, multi=multi, develop=develop)
+    w = Form(debug=debug, multi=multi)
     ret = app.exec()
 
     if multi:
@@ -34,14 +34,9 @@ if __name__ == "__main__":
         choices=["False", "True"],
         help='multi uploader'
     )
-    parser.add_argument(
-        '--develop', type=str, default="False",
-        choices=["False", "True"],
-        help='develop mode'
-    )
+
     args = parser.parse_args()
     debug = (args.debug == 'True')
     multi = (args.multi == 'True')
-    develop = (args.develop == 'True')
 
-    run_gui(debug, multi, develop)
+    run_gui(debug, multi)

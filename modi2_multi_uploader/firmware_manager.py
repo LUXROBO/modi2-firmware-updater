@@ -12,10 +12,8 @@ from PyQt5.QtWidgets import QDialog, QMessageBox
 
 class FirmwareManagerForm(QDialog):
 
-    def __init__(self, develop=False, path_dict = {}):
+    def __init__(self, path_dict = {}):
         QDialog.__init__(self)
-
-        self.is_develop = develop
 
         self.component_path = path_dict["component"]
         self.assets_firmware_path = path_dict["assets_firmware"]

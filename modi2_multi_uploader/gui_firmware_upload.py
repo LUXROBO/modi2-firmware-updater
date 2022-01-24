@@ -105,7 +105,7 @@ class Form(QDialog):
     GUI Form of MODI Firmware Updater
     """
 
-    def __init__(self, debug=False, multi=True, develop=False):
+    def __init__(self, debug=False, multi=True):
         QDialog.__init__(self)
         self.__excepthook = sys.excepthook
         sys.excepthook = self.__popup_excepthook
@@ -114,7 +114,6 @@ class Form(QDialog):
         self.is_popup = False
         self.is_debug = debug
         self.is_multi = multi
-        self.is_develop = develop
 
         ui_path = os.path.join(os.path.dirname(__file__), "assets", "uploader.ui")
         firmware_manager_ui_path = os.path.join(os.path.dirname(__file__), "assets", "firmware_manager.ui")
@@ -127,7 +126,7 @@ class Form(QDialog):
         self.ui = uic.loadUi(ui_path)
         self.assets_firmware_path = os.path.join(os.path.dirname(__file__), "assets", "firmware")
         self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi+ uploader")
-        self.module_firmware_directory = "module_firmware" if not self.is_develop else "module_firmware_develop"
+        self.module_firmware_directory = "module_firmware"
         self.module_firmware_path = os.path.join(self.local_firmware_path, self.module_firmware_directory)
 
         self.ui.setStyleSheet("background-color: white")
@@ -138,7 +137,7 @@ class Form(QDialog):
         qPixmapVar.load(logo_path)
         self.ui.lux_logo.setPixmap(qPixmapVar)
 
-        self.firmware_manage_form = FirmwareManagerForm(develop=self.is_develop, path_dict={
+        self.firmware_manage_form = FirmwareManagerForm(path_dict={
             "ui": firmware_manager_ui_path,
             "component": self.component_path,
             "assets_firmware": self.assets_firmware_path,
