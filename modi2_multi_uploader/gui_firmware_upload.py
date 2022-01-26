@@ -16,6 +16,7 @@ from modi2_multi_uploader.core.esp32_uploader import ESP32FirmwareMultiUploder
 from modi2_multi_uploader.core.module_uploader import ModuleFirmwareMultiUpdater
 from modi2_multi_uploader.core.network_uploader import NetworkFirmwareMultiUpdater
 from modi2_multi_uploader.util.modi_winusb.modi_serialport import list_modi_serialports
+from modi2_multi_uploader.util.platform_util import is_raspberrypi
 
 class StdoutRedirect(QObject):
     printOccur = pyqtSignal(str, str, name="print")
@@ -250,10 +251,17 @@ class Form(QDialog):
         # Set Button Status
         self.refresh_button_text()
         self.refresh_console()
-        self.ui.show()
 
         # check app update
         self.check_app_update()
+
+        if is_raspberrypi():
+            from PyQt5.QtCore import Qt
+            self.ui.setFixedWidth(0)
+            self.ui.setFixedHeight(0)
+            self.ui.setWindowState(Qt.WindowMaximized)
+
+        self.ui.show()
 
     #
     # Main methods
