@@ -7,7 +7,7 @@ import threading as th
 import traceback as tb
 
 from PyQt5 import QtGui, QtWidgets, uic
-from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QDialog, QMessageBox
 
 from modi2_multi_uploader.firmware_manager import FirmwareManagerForm
@@ -16,6 +16,7 @@ from modi2_multi_uploader.core.esp32_uploader import ESP32FirmwareMultiUploder
 from modi2_multi_uploader.core.module_uploader import ModuleFirmwareMultiUpdater
 from modi2_multi_uploader.core.network_uploader import NetworkFirmwareMultiUpdater
 from modi2_multi_uploader.util.modi_winusb.modi_serialport import list_modi_serialports
+from modi2_multi_uploader.util.platform_util import is_raspberrypi
 
 class StdoutRedirect(QObject):
     printOccur = pyqtSignal(str, str, name="print")
@@ -178,6 +179,8 @@ class Form(QDialog):
             self.ui.setWindowTitle("MODI+ Uploader - " + self.version_info)
 
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
+        self.ui.setWindowFlag(Qt.WindowMinimizeButtonHint, True)
+        self.ui.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
 
         # Redirect stdout to text browser (i.e. console in our UI)
         if not self.is_debug:
@@ -250,10 +253,15 @@ class Form(QDialog):
         # Set Button Status
         self.refresh_button_text()
         self.refresh_console()
-        self.ui.show()
 
         # check app update
         self.check_app_update()
+
+        if is_raspberrypi():
+            self.ui.setMinimumSize(0, 0)
+            self.ui.setWindowState(Qt.WindowMaximized)
+
+        self.ui.show()
 
     #
     # Main methods
@@ -298,6 +306,8 @@ class Form(QDialog):
         ).start()
 
         if self.is_multi:
+            if is_raspberrypi():
+                self.module_upload_list_form.ui.setWindowState(Qt.WindowMaximized)
             self.module_upload_list_form.ui.exec_()
 
     def update_network_submodule_button_clicked(self):
@@ -340,6 +350,8 @@ class Form(QDialog):
         ).start()
 
         if self.is_multi:
+            if is_raspberrypi():
+                self.esp32_upload_list_form.ui.setWindowState(Qt.WindowMaximized)
             self.esp32_upload_list_form.ui.exec_()
 
     def delete_user_code_button_clicked(self):
@@ -382,6 +394,8 @@ class Form(QDialog):
         ).start()
 
         if self.is_multi:
+            if is_raspberrypi():
+                self.esp32_upload_list_form.ui.setWindowState(Qt.WindowMaximized)
             self.esp32_upload_list_form.ui.exec_()
 
     def update_general_modules_button_clicked(self):
@@ -426,6 +440,8 @@ class Form(QDialog):
         ).start()
 
         if self.is_multi:
+            if is_raspberrypi():
+                self.module_upload_list_form.ui.setWindowState(Qt.WindowMaximized)
             self.module_upload_list_form.ui.exec_()
 
     def manage_firmware_version_button_clicked(self):
@@ -462,13 +478,19 @@ class Form(QDialog):
         self.refresh_button_text()
 
     def refresh_console(self):
-        if self.console:
-            self.ui.console.show()
-            self.ui.manage_firmware_version_button.setVisible(True)
-        else:
+        if is_raspberrypi():
             self.ui.console.hide()
             self.ui.manage_firmware_version_button.setVisible(False)
-        self.ui.adjustSize()
+            self.ui.setWindowState(Qt.WindowMaximized)
+        else:
+            if self.console:
+                self.ui.console.show()
+                self.ui.manage_firmware_version_button.setVisible(True)
+            else:
+                self.ui.console.hide()
+                self.ui.manage_firmware_version_button.setVisible(False)
+
+            self.ui.adjustSize()
 
     def refresh_button_text(self):
         appropriate_translation = (self.button_en if self.button_in_english else self.button_kr)
