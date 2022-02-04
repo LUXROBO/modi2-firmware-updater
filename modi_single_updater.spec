@@ -17,7 +17,7 @@ if not site_package_paths:
 
 block_cipher = None
 a = Analysis(
-    ['execute_single_updater.py.py'],
+    ['execute_single_updater.py'],
     pathex=site_package_paths,
     binaries=[],
     # Put data(i.e. assets) under virtual 'modi2_firmware_updater/'
