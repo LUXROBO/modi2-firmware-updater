@@ -530,10 +530,15 @@ class Form(QDialog):
 
             current_version = self.version_info
             latest_version = response["name"]
+
             download_url = response["assets"][0]["browser_download_url"]
+            for asset in response["assets"]:
+                file_name = asset["name"]
+                if not "Multi" in file_name and not "multi" in file_name:
+                    # single updater
+                    download_url = asset["browser_download_url"]
 
             from packaging import version
-            
             if version.parse(latest_version) > version.parse(current_version):
                 print(f"need to update to {latest_version}\n{download_url}")
                 msg = QMessageBox()
