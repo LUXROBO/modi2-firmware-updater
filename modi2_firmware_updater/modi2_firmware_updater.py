@@ -16,7 +16,7 @@ from modi2_firmware_updater.core.esp32_updater import ESP32FirmwareMultiUploder
 from modi2_firmware_updater.core.module_updater import ModuleFirmwareMultiUpdater
 from modi2_firmware_updater.core.network_updater import NetworkFirmwareMultiUpdater
 from modi2_firmware_updater.util.modi_winusb.modi_serialport import list_modi_serialports
-from modi2_firmware_updater.util.platform_util import is_raspberrypi
+from modi2_firmware_updater.util.platform_util import is_raspberrypi, set_delay_option
 
 class StdoutRedirect(QObject):
     printOccur = pyqtSignal(str, str, name="print")
@@ -253,6 +253,10 @@ class Form(QDialog):
         # Set Button Status
         self.refresh_button_text()
         self.refresh_console()
+
+        # Set delay option
+        delay_option = (self.is_multi==True)
+        set_delay_option(delay_option)
 
         # check app update
         self.check_app_update()
