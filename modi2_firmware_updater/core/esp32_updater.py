@@ -20,10 +20,10 @@ from base64 import b64decode, b64encode
 from io import open
 from os import path
 
-from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
+from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.message_util import unpack_data
-from modi2_multi_uploader.util.module_util import get_module_type_from_uuid
+from modi2_firmware_updater.util.message_util import unpack_data
+from modi2_firmware_updater.util.module_util import get_module_type_from_uuid
 
 __version__ = "3.1-dev"
 __print__ = True
@@ -4571,6 +4571,7 @@ class ESP32FirmwareMultiUploder():
                             self.list_ui.network_state_signal.emit(index, 0)
                             self.list_ui.progress_signal.emit(index, 100)
                     else:
+                        print("\n" + esp32_updater.update_error_message + "\n")
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, -1)
                             self.list_ui.error_message_signal.emit(index, esp32_updater.update_error_message)
@@ -4597,7 +4598,7 @@ class ESP32FirmwareMultiUploder():
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(int(current_sequence / total_sequence * 100.0))
-                    self.list_ui.total_status_signal.emit("Uploading...")
+                    self.list_ui.total_status_signal.emit("Update...")
 
                 print(f"{self.__progress_bar(current_sequence, total_sequence)}", end="")
 
@@ -4617,4 +4618,4 @@ class ESP32FirmwareMultiUploder():
     def __progress_bar(current: int, total: int) -> str:
         curr_bar = int(50 * current // total)
         rest_bar = int(50 - curr_bar)
-        return (f"\rFirmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] {100 * current / total:3.1f}%")
+        return (f"\rFirmware Update: [{'=' * curr_bar}>{'.' * rest_bar}] {100 * current / total:3.1f}%")

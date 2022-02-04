@@ -2,7 +2,6 @@
 .DS_Store
 *.pyc
 .gitconfig
-modi
 *.log
 
 # dirs

@@ -3,22 +3,22 @@ import argparse
 
 from PyQt5 import QtWidgets
 
-from modi2_multi_uploader.gui_firmware_upload import Form
+from modi2_firmware_updater.modi2_firmware_updater import Form
 
 def run_gui(debug=False, multi=True):
     if multi:
-        print("Running MODI+ Multi Uploader")
+        print("Running MODI+ Multi Firmware Updater")
     else:
-        print("Running MODI+ Uploader")
+        print("Running MODI+ Firmware Updater")
 
     app = QtWidgets.QApplication(sys.argv)
     w = Form(debug=debug, multi=multi)
     ret = app.exec()
 
     if multi:
-        print(f"Terminating MODI+ Multi Uploader")
+        print(f"Terminating MODI+ Firmware Multi Updater")
     else:
-        print(f"Terminating MODI+ Uploader")
+        print(f"Terminating MODI+ Firmware Updater")
 
     sys.exit(ret)
 
@@ -30,9 +30,9 @@ if __name__ == "__main__":
         help='debug mode'
     )
     parser.add_argument(
-        '--multi', type=str, default="True",
+        '--multi', type=str, default="False",
         choices=["False", "True"],
-        help='multi uploader'
+        help='multi updater'
     )
 
     args = parser.parse_args()

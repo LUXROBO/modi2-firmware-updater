@@ -1,9 +1,6 @@
 import os
-
 from shutil import rmtree
-from platform import system
 from argparse import ArgumentParser
-
 
 def make_clean():
     cwd = os.path.dirname(__file__)
@@ -13,20 +10,22 @@ def make_clean():
         if os.path.isdir(dirpath):
             rmtree(dirpath)
 
-def make_executable(is_multi):
+def make_executable():
     make_clean()
-    if is_multi:
-        os.system(f'pyinstaller modi_multi_uploader.spec')
-    else:
-        os.system(f'pyinstaller modi_single_uploader.spec')
+    os.system(f'pyinstaller modi_multi_updater.spec')
+    os.system(f'pyinstaller modi_single_updater.spec')
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument(
-        '--multi', type=str, default="True",
-        choices=["False", "True"],
-        help='multi uploader'
+        '--mode', type=str, default='install',
+        choices=['clean', 'install'],
+        help='This is a script which makes your life a lot easier :)'
     )
     args = parser.parse_args()
-    multi = (args.multi == 'True')
-    make_executable(multi)
+    mode = args.mode
+    mode_func = {
+        'clean': make_clean,
+        'install': make_executable,
+    }.get(mode)
+    mode_func()

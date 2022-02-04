@@ -10,13 +10,13 @@ from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QDialog, QMessageBox
 
-from modi2_multi_uploader.firmware_manager import FirmwareManagerForm
-from modi2_multi_uploader.update_list_form import ESP32UpdateListForm, ModuleUpdateListForm
-from modi2_multi_uploader.core.esp32_uploader import ESP32FirmwareMultiUploder
-from modi2_multi_uploader.core.module_uploader import ModuleFirmwareMultiUpdater
-from modi2_multi_uploader.core.network_uploader import NetworkFirmwareMultiUpdater
-from modi2_multi_uploader.util.modi_winusb.modi_serialport import list_modi_serialports
-from modi2_multi_uploader.util.platform_util import is_raspberrypi
+from modi2_firmware_updater.firmware_manager import FirmwareManagerForm
+from modi2_firmware_updater.update_list_form import ESP32UpdateListForm, ModuleUpdateListForm
+from modi2_firmware_updater.core.esp32_updater import ESP32FirmwareMultiUploder
+from modi2_firmware_updater.core.module_updater import ModuleFirmwareMultiUpdater
+from modi2_firmware_updater.core.network_updater import NetworkFirmwareMultiUpdater
+from modi2_firmware_updater.util.modi_winusb.modi_serialport import list_modi_serialports
+from modi2_firmware_updater.util.platform_util import is_raspberrypi
 
 class StdoutRedirect(QObject):
     printOccur = pyqtSignal(str, str, name="print")
@@ -103,7 +103,7 @@ class ThreadSignal(QObject):
 
 class Form(QDialog):
     """
-    GUI Form of MODI Firmware Updater
+    GUI Form of MODI+ Firmware Updater
     """
 
     def __init__(self, debug=False, multi=True):
@@ -116,17 +116,17 @@ class Form(QDialog):
         self.is_debug = debug
         self.is_multi = multi
 
-        ui_path = os.path.join(os.path.dirname(__file__), "assets", "uploader.ui")
+        ui_path = os.path.join(os.path.dirname(__file__), "assets", "main.ui")
         firmware_manager_ui_path = os.path.join(os.path.dirname(__file__), "assets", "firmware_manager.ui")
-        esp32_upload_list_ui_path = os.path.join(os.path.dirname(__file__), "assets", "esp32_upload_list.ui")
-        module_upload_list_ui_path = os.path.join(os.path.dirname(__file__), "assets", "module_upload_list.ui")
+        esp32_update_list_ui_path = os.path.join(os.path.dirname(__file__), "assets", "esp32_update_list.ui")
+        module_update_list_ui_path = os.path.join(os.path.dirname(__file__), "assets", "module_update_list.ui")
         if sys.platform.startswith("win"):
             self.component_path = pathlib.PurePosixPath(pathlib.PurePath(__file__), "..", "assets", "component")
         else:
             self.component_path = os.path.join(os.path.dirname(__file__), "assets", "component")
         self.ui = uic.loadUi(ui_path)
         self.assets_firmware_path = os.path.join(os.path.dirname(__file__), "assets", "firmware")
-        self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi+ uploader")
+        self.local_firmware_path = os.path.join(os.path.expanduser("~"), "Documents", "modi+ firmware updater")
         self.module_firmware_directory = "module_firmware"
         self.module_firmware_path = os.path.join(self.local_firmware_path, self.module_firmware_directory)
 
@@ -145,12 +145,12 @@ class Form(QDialog):
             "local_firmware": self.local_firmware_path,
             "firmware_directory": self.module_firmware_directory
         })
-        self.esp32_upload_list_form = ESP32UpdateListForm(path_dict={
-            "ui": esp32_upload_list_ui_path,
+        self.esp32_update_list_form = ESP32UpdateListForm(path_dict={
+            "ui": esp32_update_list_ui_path,
             "component": self.component_path,
         })
-        self.module_upload_list_form = ModuleUpdateListForm(path_dict={
-            "ui": module_upload_list_ui_path,
+        self.module_update_list_form = ModuleUpdateListForm(path_dict={
+            "ui": module_update_list_ui_path,
             "component": self.component_path,
         })
 
@@ -174,9 +174,9 @@ class Form(QDialog):
             self.version_info = version_file.readline().rstrip("\n")
 
         if self.is_multi:
-            self.ui.setWindowTitle("MODI+ Multi Uploader - " + self.version_info)
+            self.ui.setWindowTitle("MODI+ Firmware Multi Updater - " + self.version_info)
         else:
-            self.ui.setWindowTitle("MODI+ Uploader - " + self.version_info)
+            self.ui.setWindowTitle("MODI+ Firmware Updater - " + self.version_info)
 
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
         self.ui.setWindowFlag(Qt.WindowMinimizeButtonHint, True)
@@ -270,7 +270,7 @@ class Form(QDialog):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             if self.is_multi:
-                self.module_upload_list_form.ui.show()
+                self.module_update_list_form.ui.show()
             return
         self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
@@ -281,11 +281,11 @@ class Form(QDialog):
 
         modi_ports = list_modi_serialports()
         if not modi_ports:
-            raise Exception("No MODI port is connected")
+            raise Exception("No MODI+ port is connected")
 
         if self.is_multi:
-            self.module_upload_list_form.ui.setWindowTitle("Update Network Modules")
-            self.module_upload_list_form.reset_device_list()
+            self.module_update_list_form.ui.setWindowTitle("Update Network Modules")
+            self.module_update_list_form.reset_device_list()
 
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
@@ -293,7 +293,7 @@ class Form(QDialog):
             self.firmware_updater = NetworkFirmwareMultiUpdater(self.module_firmware_path)
             self.firmware_updater.set_task_end_callback(self.__reset_ui)
             if self.is_multi:
-                self.firmware_updater.set_ui(self.ui, self.module_upload_list_form)
+                self.firmware_updater.set_ui(self.ui, self.module_update_list_form)
                 self.firmware_updater.update_module_firmware(modi_ports, firmware_version_info)
             else:
                 self.firmware_updater.set_ui(self.ui, None)
@@ -307,14 +307,14 @@ class Form(QDialog):
 
         if self.is_multi:
             if is_raspberrypi():
-                self.module_upload_list_form.ui.setWindowState(Qt.WindowMaximized)
-            self.module_upload_list_form.ui.exec_()
+                self.module_update_list_form.ui.setWindowState(Qt.WindowMaximized)
+            self.module_update_list_form.ui.exec_()
 
     def update_network_submodule_button_clicked(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             if self.is_multi:
-                self.esp32_upload_list_form.ui.show()
+                self.esp32_update_list_form.ui.show()
             return
         self.ui.update_network_submodule_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
@@ -325,11 +325,11 @@ class Form(QDialog):
 
         modi_ports = list_modi_serialports()
         if not modi_ports:
-            raise Exception("No MODI port is connected")
+            raise Exception("No MODI+ port is connected")
 
         if self.is_multi:
-            self.esp32_upload_list_form.ui.setWindowTitle("Update Network Submodules")
-            self.esp32_upload_list_form.reset_device_list()
+            self.esp32_update_list_form.ui.setWindowTitle("Update Network Submodules")
+            self.esp32_update_list_form.reset_device_list()
 
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
@@ -337,7 +337,7 @@ class Form(QDialog):
             self.firmware_updater = ESP32FirmwareMultiUploder(self.module_firmware_path)
             self.firmware_updater.set_task_end_callback(self.__reset_ui)
             if self.is_multi:
-                self.firmware_updater.set_ui(self.ui, self.esp32_upload_list_form)
+                self.firmware_updater.set_ui(self.ui, self.esp32_update_list_form)
                 self.firmware_updater.update_firmware(modi_ports, False, firmware_version_info)
             else:
                 self.firmware_updater.set_ui(self.ui, None)
@@ -351,14 +351,14 @@ class Form(QDialog):
 
         if self.is_multi:
             if is_raspberrypi():
-                self.esp32_upload_list_form.ui.setWindowState(Qt.WindowMaximized)
-            self.esp32_upload_list_form.ui.exec_()
+                self.esp32_update_list_form.ui.setWindowState(Qt.WindowMaximized)
+            self.esp32_update_list_form.ui.exec_()
 
     def delete_user_code_button_clicked(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             if self.is_multi:
-                self.esp32_upload_list_form.ui.show()
+                self.esp32_update_list_form.ui.show()
             return
         self.ui.delete_user_code_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
@@ -369,11 +369,11 @@ class Form(QDialog):
 
         modi_ports = list_modi_serialports()
         if not modi_ports:
-            raise Exception("No MODI port is connected")
+            raise Exception("No MODI+ port is connected")
 
         if self.is_multi:
-            self.esp32_upload_list_form.ui.setWindowTitle("Delete User Code")
-            self.esp32_upload_list_form.reset_device_list()
+            self.esp32_update_list_form.ui.setWindowTitle("Delete User Code")
+            self.esp32_update_list_form.reset_device_list()
 
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
@@ -381,7 +381,7 @@ class Form(QDialog):
             self.firmware_updater = ESP32FirmwareMultiUploder(self.module_firmware_path)
             self.firmware_updater.set_task_end_callback(self.__reset_ui)
             if self.is_multi:
-                self.firmware_updater.set_ui(self.ui, self.esp32_upload_list_form)
+                self.firmware_updater.set_ui(self.ui, self.esp32_update_list_form)
                 self.firmware_updater.update_firmware(modi_ports, True, firmware_version_info)
             else:
                 self.firmware_updater.set_ui(self.ui, None)
@@ -395,14 +395,14 @@ class Form(QDialog):
 
         if self.is_multi:
             if is_raspberrypi():
-                self.esp32_upload_list_form.ui.setWindowState(Qt.WindowMaximized)
-            self.esp32_upload_list_form.ui.exec_()
+                self.esp32_update_list_form.ui.setWindowState(Qt.WindowMaximized)
+            self.esp32_update_list_form.ui.exec_()
 
     def update_general_modules_button_clicked(self):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             if self.is_multi:
-                self.module_upload_list_form.ui.show()
+                self.module_update_list_form.ui.show()
             return
         self.ui.update_general_modules_button.setStyleSheet(f"border-image: url({self.pressed_path})")
         self.ui.console.clear()
@@ -413,12 +413,12 @@ class Form(QDialog):
 
         modi_ports = list_modi_serialports()
         if not modi_ports:
-            self.__reset_ui(self.module_upload_list_form)
-            raise Exception("No MODI port is connected")
+            self.__reset_ui(self.module_update_list_form)
+            raise Exception("No MODI+ port is connected")
 
         if self.is_multi:
-            self.module_upload_list_form.ui.setWindowTitle("Update General Modules")
-            self.module_upload_list_form.reset_device_list()
+            self.module_update_list_form.ui.setWindowTitle("Update General Modules")
+            self.module_update_list_form.reset_device_list()
 
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
@@ -427,7 +427,7 @@ class Form(QDialog):
             self.firmware_updater.set_task_end_callback(self.__reset_ui)
 
             if self.is_multi:
-                self.firmware_updater.set_ui(self.ui, self.module_upload_list_form)
+                self.firmware_updater.set_ui(self.ui, self.module_update_list_form)
                 self.firmware_updater.update_module_firmware(modi_ports, firmware_version_info)
             else:
                 self.firmware_updater.set_ui(self.ui, None)
@@ -441,8 +441,8 @@ class Form(QDialog):
 
         if self.is_multi:
             if is_raspberrypi():
-                self.module_upload_list_form.ui.setWindowState(Qt.WindowMaximized)
-            self.module_upload_list_form.ui.exec_()
+                self.module_update_list_form.ui.setWindowState(Qt.WindowMaximized)
+            self.module_update_list_form.ui.exec_()
 
     def manage_firmware_version_button_clicked(self):
         button_start = time.time()
@@ -522,7 +522,7 @@ class Form(QDialog):
     def check_app_update(self):
         try:
             import requests
-            response = requests.get("https://api.github.com/repos/LUXROBO/modi2-multi-uploader-bin/releases/latest").json()
+            response = requests.get("https://api.github.com/repos/LUXROBO/modi2-firmware-updater/releases/latest").json()
 
             current_version = self.version_info
             latest_version = response["name"]
@@ -593,13 +593,13 @@ class Form(QDialog):
         self.refresh_button_text()
 
         # reset list ui
-        if list_ui == self.module_upload_list_form:
-            self.module_upload_list_form.ui.close_button.setEnabled(True)
-            self.module_upload_list_form.total_status_signal.emit("Complete")
-            self.module_upload_list_form.total_progress_signal.emit(100)
-        elif list_ui == self.esp32_upload_list_form:
-            self.esp32_upload_list_form.ui.close_button.setEnabled(True)
-            self.esp32_upload_list_form.total_status_signal.emit("Complete")
+        if list_ui == self.module_update_list_form:
+            self.module_update_list_form.ui.close_button.setEnabled(True)
+            self.module_update_list_form.total_status_signal.emit("Complete")
+            self.module_update_list_form.total_progress_signal.emit(100)
+        elif list_ui == self.esp32_update_list_form:
+            self.esp32_update_list_form.ui.close_button.setEnabled(True)
+            self.esp32_update_list_form.total_status_signal.emit("Complete")
 
     def __append_text_line(self, line):
         self.ui.console.moveCursor(QtGui.QTextCursor.End, QtGui.QTextCursor.MoveAnchor)

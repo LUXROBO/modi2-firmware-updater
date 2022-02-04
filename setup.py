@@ -19,18 +19,17 @@ def get_requirements():
         requirements = requirements_file.read().splitlines()
         return requirements
 
-
 setup(
-    name='MODI+ Multi Upploader',
+    name='MODI+ Firmware Updater',
     version=version_info,
     author='LUXROBO',
     author_email='tech@luxrobo.com',
-    description='A GUI Form of MODI+ Multi Uploader utilizing PyMODI as its backend.',
+    description='A GUI Form of MODI+ Firmware Updater utilizing PyMODI as its backend.',
     long_description=get_readme(),
     long_description_content_type='text/markdown',
     license='MIT',
     install_requires=get_requirements(),
-    url='https://git.luxrobo.net/modi2-tools/modi2-multi-uploader',
+    url='https://github.com/LUXROBO/modi2-firmware-updater',
     packages=find_packages(),
     classifiers=[
         'Programming Language :: Python :: 3',
