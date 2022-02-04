@@ -63,6 +63,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.update_error = 0
         self.update_error_message = ""
         self.has_update_error = False
+        self.this_update_error = False
 
         self.module_firmware_path = module_firmware_path
 
@@ -100,10 +101,6 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             if self.update_in_progress == False:
                 # 장치 연결까지 대기
                 continue
-
-            if self.has_update_error:
-                # 에러가 발생할 경우, 종료
-                break
 
             if len(self.modules_to_update_second_bootloader) != 0:
                 self.__send_conn(parse_message(0x2C, 0x0, 0xFFF, (1,1))) #SWU LEGACY MODE
@@ -282,7 +279,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
             with open(bin_path, "rb") as bin_file:
                 bin_buffer = bin_file.read()
-
+            self.this_update_error = False
             # Init metadata of the bytes loaded
             flash_memory_addr = 0x08000000
             bin_size = sys.getsizeof(bin_buffer)
@@ -335,7 +332,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     erase_error_count = erase_error_count + 1
                     if erase_error_count > erase_error_limit:
                         erase_error_count = 0
-                        self.has_update_error = True
+                        self.this_update_error = True
                         self.update_error_message = f"{module_type} ({module_id}) erase flash failed."
                         break
                     continue
@@ -367,7 +364,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     crc_error_count = crc_error_count + 1
                     if crc_error_count > crc_error_limit:
                         crc_error_count = 0
-                        self.has_update_error = True
+                        self.this_update_error = True
                         self.update_error_message = f"{module_type} ({module_id}) check crc failed."
                         break
                     continue
@@ -379,7 +376,8 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
             
             verify_header = 0xAA
-            if self.has_update_error:
+            if self.this_update_error:
+                self.has_update_error = True
                 verify_header = 0xFF
 
             # Get version info from version_path, using appropriate methods
@@ -449,7 +447,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             if module_type in ["speaker", "display", "env"]:
                 root_path = path.join(self.module_firmware_path, "bootloader", "e103", self.firmware_version_info[module_type]["bootloader"])
                 bin_path = path.join(root_path, "bootloader_e103.bin")
-
+            self.this_update_error = False
             # Init metadata of the bytes loaded
             flash_memory_addr = 0x08000000
             page_size = 0x400
@@ -509,7 +507,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     if erase_error_count > erase_error_limit:
                         erase_error_count = 0
                         self.update_error_message = f"{module_type} ({module_id}) erase flash failed."
-                        self.has_update_error = True
+                        self.this_update_error = True
                         print(self.update_error_message)
                         break
                     continue
@@ -539,7 +537,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     crc_error_count = crc_error_count + 1
                     if crc_error_count > crc_error_limit:
                         crc_error_count = 0
-                        self.has_update_error = True
+                        self.this_update_error = True
                         self.update_error_message = f"{module_type} ({module_id}) check crc failed."
                         break
                     continue
@@ -549,38 +547,37 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 page_begin = page_begin + page_size
                 time.sleep(0.01)
 
-            verify_header = 0xAA
-            if self.has_update_error:
-                verify_header = 0xFF
+            if not self.this_update_error:
+                self.progress = 99
+                self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
 
-            self.progress = 99
-            self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
+                # Get version info from version_path, using appropriate methods
+                bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
+                bootloader_version_info = bootloader_version_info.lstrip("v").split("-")[0]
 
-            # Get version info from version_path, using appropriate methods
-            bootloader_version_info = self.firmware_version_info[module_type]["bootloader"]
-            bootloader_version_info = bootloader_version_info.lstrip("v").split("-")[0]
+                # Set end-flash data to be sent at the end of the firmware update
+                end_flash_data = bytearray(16)
+                end_flash_data[0] = 0xAA
+                end_flash_data[6] = 0
+                end_flash_data[7] = 0
 
-            # Set end-flash data to be sent at the end of the firmware update
-            end_flash_data = bytearray(16)
-            end_flash_data[0] = verify_header
-            end_flash_data[6] = 0
-            end_flash_data[7] = 0
+                for xxx in range(4):
+                    if module_type in ["speaker", "display", "env"]:
+                        end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
+                    else:
+                        end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
 
-            for xxx in range(4):
-                if module_type in ["speaker", "display", "env"]:
-                    end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
-                else:
-                    end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
+                success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
+                if not success_end_flash:
+                    self.update_error_message = f"{module_type} ({module_id}) version writing failed."
+                    self.has_update_error = True
 
-            success_end_flash = self.send_end_flash_data(module_type, module_id, end_flash_data)
-            if not success_end_flash:
-                self.update_error_message = f"{module_type} ({module_id}) version writing failed."
+                reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
+                self.__send_conn(reboot_message)
+
+                self.__print(f"Version info (v{bootloader_version_info}) has been written to its firmware!")
+            else:
                 self.has_update_error = True
-
-            reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
-            self.__send_conn(reboot_message)
-
-            self.__print(f"Version info (v{bootloader_version_info}) has been written to its firmware!")
 
             # Firmware update flag down, resetting used flags
             self.__print(f"Firmware update is done for {module_type} ({module_id})")
@@ -606,7 +603,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             if module_type in ["speaker", "display", "env"]:
                 root_path = path.join(self.module_firmware_path, "bootloader", "e103", self.firmware_version_info[module_type]["bootloader"])
                 bin_path = path.join(root_path, "second_bootloader_e103.bin")
-
+            self.this_update_error = False
             # Init metadata of the bytes loaded
             flash_memory_addr = 0x08000000
             page_size = 0x400
@@ -667,7 +664,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     if erase_error_count > erase_error_limit:
                         erase_error_count = 0
                         self.update_error_message = f"{module_type} ({module_id}) erase flash failed."
-                        self.has_update_error = True
+                        self.this_update_error = True
                         print(self.update_error_message)
                         break
                     continue
@@ -697,7 +694,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     crc_error_count = crc_error_count + 1
                     if crc_error_count > crc_error_limit:
                         crc_error_count = 0
-                        self.has_update_error = True
+                        self.this_update_error = True
                         self.update_error_message = f"{module_type} ({module_id}) check crc failed."
                         break
                     continue
@@ -708,7 +705,8 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 time.sleep(0.01)
 
             verify_header = 0xAA
-            if self.has_update_error:
+            if self.this_update_error:
+                self.has_update_error = True
                 verify_header = 0xFF
 
             self.progress = 99
@@ -1153,6 +1151,7 @@ class ModuleFirmwareMultiUpdater():
                             self.list_ui.error_message_signal.emit(index, "Update success")
                     else:
                         module_updater.close()
+                        print("\n" + module_updater.update_error_message + "\n")
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, -1)
                             self.list_ui.error_message_signal.emit(index, module_updater.update_error_message)

@@ -4571,6 +4571,7 @@ class ESP32FirmwareMultiUploder():
                             self.list_ui.network_state_signal.emit(index, 0)
                             self.list_ui.progress_signal.emit(index, 100)
                     else:
+                        print("\n" + esp32_updater.update_error_message + "\n")
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, -1)
                             self.list_ui.error_message_signal.emit(index, esp32_updater.update_error_message)
