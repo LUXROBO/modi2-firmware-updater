@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MODI_FIRMWARE_UPDATE_LIST</class>
- <widget class="QDialog" name="MODI_FIRMWARE_UPDATE_LIST">
+ <class>modi2_firmware_update_list</class>
+ <widget class="QDialog" name="modi2_firmware_update_list">
   <property name="geometry">
    <rect>
     <x>0</x>

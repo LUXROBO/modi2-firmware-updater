@@ -6,10 +6,10 @@ from io import open
 from os import path
 
 from serial.serialutil import SerialException
-from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
+from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.message_util import parse_message, unpack_data
-from modi2_multi_uploader.util.module_util import Module, get_module_type_from_uuid
+from modi2_firmware_updater.util.message_util import parse_message, unpack_data
+from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid
 
 class NetworkFirmwareUpdater(ModiSerialPort):
     """Network Firmware Updater: Updates a firmware of given module"""
@@ -30,7 +30,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         else:
             modi_ports = list_modi_serialports()
             if not modi_ports:
-                raise SerialException("No MODI port is connected")
+                raise SerialException("No MODI+ port is connected")
             for modi_port in modi_ports:
                 try:
                     super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
@@ -39,7 +39,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                     continue
                 else:
                     break
-            self.__print(f"Connecting to MODI network module at {modi_port}")
+            self.__print(f"Connecting to MODI+ network module at {modi_port}")
 
         self.bootloader = False
         self.network_version = None
@@ -661,7 +661,7 @@ class NetworkFirmwareMultiUpdater():
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(int(total_progress))
-                    self.list_ui.total_status_signal.emit("Uploading...")
+                    self.list_ui.total_status_signal.emit("Update...")
 
             if is_done:
                 break
@@ -679,4 +679,4 @@ class NetworkFirmwareMultiUpdater():
     def __progress_bar(current: int, total: int) -> str:
         curr_bar = int(50 * current // total)
         rest_bar = int(50 - curr_bar)
-        return (f"\rFirmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] {100 * current / total:3.1f}%")
+        return (f"\rFirmware Update: [{'=' * curr_bar}>{'.' * rest_bar}] {100 * current / total:3.1f}%")

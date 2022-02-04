@@ -2,7 +2,7 @@ import time
 from os import path
 from typing import Union
 
-from modi2_multi_uploader.util.message_util import parse_message
+from modi2_firmware_updater.util.message_util import parse_message
 
 BROADCAST_ID = 0xFFF
 
