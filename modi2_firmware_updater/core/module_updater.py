@@ -10,8 +10,8 @@ from serial.serialutil import SerialException
 from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
 from modi2_firmware_updater.util.message_util import decode_message, parse_message, unpack_data
-from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid, get_module_uuid_from_type
-
+from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid
+from modi2_firmware_updater.util.platform_util import delay
 
 def retry(exception_to_catch):
     def decorator(func):
@@ -347,7 +347,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
                     curr_data = curr_page[curr_ptr : curr_ptr + 8]
                     checksum = self.send_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
-                    self.__delay(0.001)
+                    delay(0.001)
 
                 # CRC on current page (send CRC request / receive CRC response)
                 crc_page_success = self.send_firmware_command(
@@ -522,7 +522,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
                     curr_data = curr_page[curr_ptr : curr_ptr + 8]
                     checksum = self.send_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
-                    self.__delay(0.001)
+                    delay(0.001)
 
                 # CRC on current page (send CRC request / receive CRC response)
                 crc_page_success = self.send_firmware_command(
@@ -679,7 +679,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
                     curr_data = curr_page[curr_ptr : curr_ptr + 8]
                     checksum = self.send_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
-                    self.__delay(0.001)
+                    delay(0.001)
 
                 # CRC on current page (send CRC request / receive CRC response)
                 crc_page_success = self.send_firmware_command(
@@ -868,12 +868,6 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         message["l"] = 8
 
         return json.dumps(message, separators=(",", ":"))
-
-    @staticmethod
-    def __delay(span):
-        init_time = time.perf_counter()
-        while time.perf_counter() - init_time < span:
-            pass
 
     def calc_crc32(self, data: bytes, crc: int) -> int:
         crc ^= int.from_bytes(data, byteorder="little", signed=False)

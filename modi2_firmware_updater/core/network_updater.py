@@ -10,6 +10,7 @@ from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPo
 
 from modi2_firmware_updater.util.message_util import parse_message, unpack_data
 from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid
+from modi2_firmware_updater.util.platform_util import delay
 
 class NetworkFirmwareUpdater(ModiSerialPort):
     """Network Firmware Updater: Updates a firmware of given module"""
@@ -417,7 +418,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
                 curr_data = curr_page[curr_ptr : curr_ptr + 8]
                 checksum = self.set_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
-                self.__delay(0.001)
+                delay(0.001)
 
             # CRC on current page (send CRC request / receive CRC response)
             crc_page_success = self.set_firmware_command(
@@ -515,12 +516,6 @@ class NetworkFirmwareUpdater(ModiSerialPort):
             if time.time() - init_time > timeout:
                 return None
         return json_msg
-
-    @staticmethod
-    def __delay(span):
-        init_time = time.perf_counter()
-        while time.perf_counter() - init_time < span:
-            pass
 
     def calc_crc32(self, data: bytes, crc: int) -> int:
         crc ^= int.from_bytes(data, byteorder="little", signed=False)
