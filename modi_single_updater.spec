@@ -17,12 +17,12 @@ if not site_package_paths:
 
 block_cipher = None
 a = Analysis(
-    ['main_multi.py'],
+    ['execute_single_updater.py'],
     pathex=site_package_paths,
     binaries=[],
-    # Put data(i.e. assets) under virtual 'modi2_multi_uploader/'
+    # Put data(i.e. assets) under virtual 'modi2_firmware_updater/'
     datas=[
-        ('modi2_multi_uploader/assets', 'modi2_multi_uploader/assets'),
+        ('modi2_firmware_updater/assets', 'modi2_firmware_updater/assets'),
         ('version.txt', '.')
     ],
     hookspath=[],
@@ -43,7 +43,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='MODI+ Multi Uploader - v' + version_info,
+    name='MODI+ Firmware Updater - v' + version_info,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -55,7 +55,7 @@ exe = EXE(
 )
 app = BUNDLE(
     exe,
-    name='MODI+ Multi Uploader - v' + version_info + '.app',
+    name='MODI+ Firmware Updater - v' + version_info + '.app',
     icon='network_module.ico',
     bundle_identifier=None,
 )

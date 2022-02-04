@@ -1,4 +1,4 @@
-# MODI2 Multi Uploader
+# MODI+ Firmware Updater
 
 실행 준비
 --
@@ -16,4 +16,4 @@
 실행파일 생성
 --
 1. `python3 bootstrap.py` 커맨드를 실행하여 정의한 `spec` 파일을 기반으로 실행파일을 생성
-2. `dist` 폴더 내 `modi2_multi_upploader.exe` 혹은 `modi2_multi_upploader.app` 실행파일이 생성된것을 확인
+2. `dist` 폴더 내 `MODI+ Firmware Updater.exe`, `MODI+ Firmware Multi Updater.exe` 실행파일이 생성된것을 확인

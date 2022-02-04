@@ -35,7 +35,7 @@
         "bootloader": "v1.0.0"
     },
     "display": {
-        "app": "v1.1.0",
+        "app": "v1.1.1",
         "os": "v1.0.1",
         "bootloader": "v1.0.0"
     },
@@ -45,7 +45,7 @@
         "bootloader": "v1.0.0"
     },
     "speaker": {
-        "app": "v1.1.0",
+        "app": "v1.1.1",
         "os": "v1.0.1",
         "bootloader": "v1.0.0"
     },
@@ -63,5 +63,5 @@
     "esp32_ota": {
         "app": "v1.0.0"
     },
-    "version": "v20220105"
+    "version": "v20220125"
 }

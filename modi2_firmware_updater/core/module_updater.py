@@ -7,11 +7,11 @@ from io import open
 from os import path
 
 from serial.serialutil import SerialException
-from modi2_multi_uploader.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
+from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
-from modi2_multi_uploader.util.message_util import decode_message, parse_message, unpack_data
-from modi2_multi_uploader.util.module_util import Module, get_module_type_from_uuid, get_module_uuid_from_type
-
+from modi2_firmware_updater.util.message_util import decode_message, parse_message, unpack_data
+from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid
+from modi2_firmware_updater.util.platform_util import delay
 
 def retry(exception_to_catch):
     def decorator(func):
@@ -74,7 +74,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         else:
             modi_ports = list_modi_serialports()
             if not modi_ports:
-                raise SerialException("No MODI port is connected")
+                raise SerialException("No MODI+ port is connected")
             for modi_port in modi_ports:
                 try:
                     super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
@@ -83,15 +83,15 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     continue
                 else:
                     break
-            self.__print(f"Connecting to MODI network module at {modi_port}")
+            self.__print(f"Connecting to MODI+ network module at {modi_port}")
 
         self.open_recv_thread()
 
         th.Thread(
-            target=self.module_firmware_upload_manager, daemon=True
+            target=self.module_firmware_update_manager, daemon=True
         ).start()
 
-    def module_firmware_upload_manager(self):
+    def module_firmware_update_manager(self):
         timeout_count = 0
         timeout_delay = 0.1
         while timeout_count < 10:
@@ -239,21 +239,21 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     return
             module_elem = module_id, module_type
             self.modules_to_update.append(module_elem)
-            print(f"Adding {module_type} ({module_id}) to update waiting list...{' ' * 60}")
+            print(f"\nAdding {module_type} ({module_id}) to update waiting list...{' ' * 60}\n")
         elif module_section == 1: # module in second bootloader
             for curr_module_id, curr_module_type in self.modules_to_update_bootloader:
                 if module_id == curr_module_id:
                     return
             module_elem = module_id, module_type
             self.modules_to_update_bootloader.append(module_elem)
-            print(f"Adding {module_type} ({module_id}) to bootloader waiting list...{' ' * 60}")
+            print(f"\nAdding {module_type} ({module_id}) to bootloader waiting list...{' ' * 60}\n")
         elif module_section == 2: # this module need to update bootloader
             for curr_module_id, curr_module_type in self.modules_to_update_second_bootloader:
                 if module_id == curr_module_id:
                     return
             module_elem = module_id, module_type
             self.modules_to_update_second_bootloader.append(module_elem)
-            print(f"Adding {module_type} ({module_id}) to second bootloader waiting list...{' ' * 60}")
+            print(f"\nAdding {module_type} ({module_id}) to second bootloader waiting list...{' ' * 60}\n")
 
     def update_response(self, response: bool, is_error_response: bool = False) -> None:
         if not is_error_response:
@@ -305,7 +305,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 progress = 100 * page_begin // bin_end
                 self.progress = progress
 
-                self.__print(f"\rFirmware Upload: {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+                self.__print(f"\rFirmware Update: {module_type} ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
 
                 page_end = page_begin + page_size
                 curr_page = bin_buffer[page_begin:page_end]
@@ -347,7 +347,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
                     curr_data = curr_page[curr_ptr : curr_ptr + 8]
                     checksum = self.send_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
-                    self.__delay(0.001)
+                    delay(0.001)
 
                 # CRC on current page (send CRC request / receive CRC response)
                 crc_page_success = self.send_firmware_command(
@@ -438,7 +438,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 is_already_updated = True
 
         if not is_already_updated:
-            self.__print("bootloader_uploade_start")
+            self.__print("bootloader_update_start")
             self.module_type = module_type
             # Init base root_path, utilizing local binary files
             root_path = path.join(self.module_firmware_path, "bootloader", "e230", self.firmware_version_info[module_type]["bootloader"])
@@ -522,7 +522,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
                     curr_data = curr_page[curr_ptr : curr_ptr + 8]
                     checksum = self.send_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
-                    self.__delay(0.001)
+                    delay(0.001)
 
                 # CRC on current page (send CRC request / receive CRC response)
                 crc_page_success = self.send_firmware_command(
@@ -594,7 +594,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 is_already_updated = True
 
         if not is_already_updated:
-            self.__print("second_bootloader_uploade_start")
+            self.__print("second_bootloader_update_start")
             self.module_type = module_type
             # Init base root_path, utilizing local binary files
             root_path = path.join(self.module_firmware_path, "bootloader", "e230", self.firmware_version_info[module_type]["bootloader"])
@@ -679,7 +679,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
                     curr_data = curr_page[curr_ptr : curr_ptr + 8]
                     checksum = self.send_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
-                    self.__delay(0.001)
+                    delay(0.001)
 
                 # CRC on current page (send CRC request / receive CRC response)
                 crc_page_success = self.send_firmware_command(
@@ -869,12 +869,6 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
         return json.dumps(message, separators=(",", ":"))
 
-    @staticmethod
-    def __delay(span):
-        init_time = time.perf_counter()
-        while time.perf_counter() - init_time < span:
-            pass
-
     def calc_crc32(self, data: bytes, crc: int) -> int:
         crc ^= int.from_bytes(data, byteorder="little", signed=False)
 
@@ -1056,7 +1050,7 @@ class ModuleFirmwareMultiUpdater():
         self.task_end_callback = task_end_callback
 
     def update_module_firmware(self, modi_ports, firmware_version_info):
-        self.module_uploaders = []
+        self.module_updaters = []
         self.network_uuid = []
         self.state = []
         self.wait_timeout = []
@@ -1065,29 +1059,29 @@ class ModuleFirmwareMultiUpdater():
             if i > 9:
                 break
             try:
-                module_uploader = ModuleFirmwareUpdater(
+                module_updater = ModuleFirmwareUpdater(
                     device = modi_port,
                     module_firmware_path = self.module_firmware_path
                 )
-                module_uploader.set_print(False)
-                module_uploader.set_raise_error(False)
+                module_updater.set_print(False)
+                module_updater.set_raise_error(False)
             except:
                 print("open " + modi_port + " error")
             else:
-                self.module_uploaders.append(module_uploader)
+                self.module_updaters.append(module_updater)
                 self.state.append(-1)
                 self.network_uuid.append('')
                 self.wait_timeout.append(0)
 
         if self.list_ui:
-            self.list_ui.set_device_num(len(self.module_uploaders))
+            self.list_ui.set_device_num(len(self.module_updaters))
             self.list_ui.ui.close_button.setEnabled(False)
 
         self.update_in_progress = True
 
-        for index, module_uploader in enumerate(self.module_uploaders):
+        for index, module_updater in enumerate(self.module_updaters):
             th.Thread(
-                target=module_uploader.update_module_firmware,
+                target=module_updater.update_module_firmware,
                 args=(firmware_version_info, ),
                 daemon=True
             ).start()
@@ -1098,9 +1092,9 @@ class ModuleFirmwareMultiUpdater():
         while True:
             is_done = True
             total_progress = 0
-            for index, module_uploader in enumerate(self.module_uploaders):
-                if module_uploader.network_uuid is not None:
-                    self.network_uuid[index] = f'0x{module_uploader.network_uuid:X}'
+            for index, module_updater in enumerate(self.module_updaters):
+                if module_updater.network_uuid is not None:
+                    self.network_uuid[index] = f'0x{module_updater.network_uuid:X}'
                     if self.list_ui:
                         self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
 
@@ -1109,61 +1103,61 @@ class ModuleFirmwareMultiUpdater():
                     is_done = False
                     if self.list_ui:
                         self.list_ui.error_message_signal.emit(index, "Waiting for module list")
-                    if module_uploader.update_in_progress:
+                    if module_updater.update_in_progress:
                         self.state[index] = 0
                     else:
                         self.wait_timeout[index] += delay
                         if self.wait_timeout[index] > 5:
                             self.wait_timeout[index] = 0
                             self.state[index] = 1
-                            module_uploader.update_error = -1
-                            module_uploader.update_error_message = "No modules"
+                            module_updater.update_error = -1
+                            module_updater.update_error_message = "No modules"
                 if self.state[index] == 0:
                     # get module update list (only module update)
                     is_done = False
                     if self.list_ui:
                         self.list_ui.error_message_signal.emit(index, "Updating modules")
-                    if module_uploader.update_error == 0:
+                    if module_updater.update_error == 0:
                         current_module_progress = 0
                         total_module_progress = 0
 
-                        if module_uploader.progress != None and len(module_uploader.modules_to_update_all) != 0:
-                            current_module_progress = module_uploader.progress
-                            if len(module_uploader.modules_updated) == len(module_uploader.modules_to_update_all):
+                        if module_updater.progress != None and len(module_updater.modules_to_update_all) != 0:
+                            current_module_progress = module_updater.progress
+                            if len(module_updater.modules_updated) == len(module_updater.modules_to_update_all):
                                 total_module_progress = 100
                             else:
-                                total_module_progress = (module_uploader.progress + len(module_uploader.modules_updated) * 100) / (len(module_uploader.modules_to_update_all) * 100) * 100
+                                total_module_progress = (module_updater.progress + len(module_updater.modules_updated) * 100) / (len(module_updater.modules_to_update_all) * 100) * 100
 
-                            total_progress += total_module_progress / len(self.module_uploaders)
+                            total_progress += total_module_progress / len(self.module_updaters)
 
                         if self.list_ui:
-                            self.list_ui.current_module_changed_signal.emit(index, module_uploader.module_type)
+                            self.list_ui.current_module_changed_signal.emit(index, module_updater.module_type)
                             self.list_ui.progress_signal.emit(index, int(current_module_progress), int(total_module_progress))
                     else:
                         self.state[index] = 1
                 elif self.state[index] == 1:
                     # end
                     is_done = False
-                    total_progress += 100 / len(self.module_uploaders)
-                    if module_uploader.update_error == 1:
+                    total_progress += 100 / len(self.module_updaters)
+                    if module_updater.update_error == 1:
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, 0)
                             self.list_ui.error_message_signal.emit(index, "Update success")
                     else:
-                        module_uploader.close()
-                        print("\n" + module_uploader.update_error_message + "\n")
+                        module_updater.close()
+                        print("\n" + module_updater.update_error_message + "\n")
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, -1)
-                            self.list_ui.error_message_signal.emit(index, module_uploader.update_error_message)
+                            self.list_ui.error_message_signal.emit(index, module_updater.update_error_message)
 
                     if self.list_ui:
                         self.list_ui.progress_signal.emit(index, 100, 100)
                     self.state[index] = 2
                 elif self.state[index] == 2:
-                    total_progress += 100 / len(self.module_uploaders)
+                    total_progress += 100 / len(self.module_updaters)
                 time.sleep(0.001)
 
-            if len(self.module_uploaders):
+            if len(self.module_updaters):
                 print(f"{self.__progress_bar(total_progress, 100)}", end="")
                 if self.ui:
                     if self.ui.is_english:
@@ -1173,7 +1167,7 @@ class ModuleFirmwareMultiUpdater():
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(int(total_progress))
-                    self.list_ui.total_status_signal.emit("Uploading...")
+                    self.list_ui.total_status_signal.emit("Update...")
 
             if is_done:
                 break
@@ -1190,4 +1184,4 @@ class ModuleFirmwareMultiUpdater():
     def __progress_bar(current: int, total: int) -> str:
         curr_bar = int(50 * current // total)
         rest_bar = int(50 - curr_bar)
-        return (f"\rFirmware Upload: [{'=' * curr_bar}>{'.' * rest_bar}] {100 * current / total:3.1f}%")
+        return (f"\rFirmware Update: [{'=' * curr_bar}>{'.' * rest_bar}] {100 * current / total:3.1f}%")

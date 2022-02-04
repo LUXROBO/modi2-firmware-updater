@@ -207,6 +207,10 @@ class FirmwareManagerForm(QDialog):
             self.module_firmware_version = version_name
 
         except Exception as e:
+            print(e)
+            self.copy_assets_firmware()
+        except:
+            print("asdasdas")
             self.copy_assets_firmware()
 
         return True

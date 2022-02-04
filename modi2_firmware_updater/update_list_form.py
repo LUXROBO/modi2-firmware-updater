@@ -1,8 +1,10 @@
 import os
 
 from PyQt5 import QtGui, uic
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QDialog
+
+from modi2_firmware_updater.util.platform_util import is_raspberrypi
 
 class ESP32UpdateListForm(QDialog):
     network_state_signal = pyqtSignal(int, int)
@@ -18,6 +20,8 @@ class ESP32UpdateListForm(QDialog):
         self.component_path = path_dict["component"]
         self.ui = uic.loadUi(path_dict["ui"])
         self.ui.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
+        self.ui.setWindowFlag(Qt.WindowMinimizeButtonHint, True)
+        self.ui.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
 
         self.ui_icon_list = [
             self.ui.image_1,
@@ -95,6 +99,15 @@ class ESP32UpdateListForm(QDialog):
 
         self.device_num = 0
         self.device_max_num = 10
+
+        if is_raspberrypi():
+            for i in range(0, 10):
+                font = self.ui_progress_value_list[i].font()
+                font.setPointSize(9)
+                self.ui_progress_list[i].setFixedWidth(80)
+                self.ui_progress_value_list[i].setFont(font)
+                self.ui_error_message_list[i].setFont(font)
+                self.ui_network_id_list[i].setFont(font)
 
     def reset_device_list(self):
         self.device_num = 0
@@ -299,13 +312,28 @@ class ModuleUpdateListForm(QDialog):
         self.device_num = 0
         self.device_max_num = 10
 
+        if is_raspberrypi():
+            for i in range(0, 10):
+                font = self.ui_current_progress_list[i].font()
+                font.setPointSize(9)
+                self.ui_current_progress_list[i].setFixedWidth(80)
+                self.ui_total_progress_list[i].setFixedWidth(80)
+                self.ui_current_progress_value_list[i].setFont(font)
+                self.ui_total_progress_value_list[i].setFont(font)
+                self.ui_error_message_list[i].setFont(font)
+                self.ui_network_id_list[i].setFont(font)
+
     def reset_device_list(self):
         self.device_num = 0
         self.ui.progress_bar_total.setValue(0)
         self.ui.total_status.setText("")
 
         for i in range(0, 10):
-            icon_path = os.path.join(self.component_path, "modules", "network_none.png")
+            if is_raspberrypi():
+                icon_path = os.path.join(self.component_path, "modules", "network_none_28.png")
+            else:
+                icon_path = os.path.join(self.component_path, "modules", "network_none.png")
+
             icon_pixmap = QtGui.QPixmap()
             icon_pixmap.load(icon_path)
             self.ui_icon_list[i].setPixmap(icon_pixmap)
@@ -326,7 +354,11 @@ class ModuleUpdateListForm(QDialog):
         self.reset_device_list()
         self.device_num = num
         for i in range(0, self.device_num):
-            icon_path = os.path.join(self.component_path, "modules", "network.png")
+            if is_raspberrypi():
+                icon_path = os.path.join(self.component_path, "modules", "network_28.png")
+            else:
+                icon_path = os.path.join(self.component_path, "modules", "network.png")
+
             pixmap = QtGui.QPixmap()
             pixmap.load(icon_path)
             self.ui_icon_list[i].setPixmap(pixmap)
@@ -337,16 +369,28 @@ class ModuleUpdateListForm(QDialog):
 
         pixmap = QtGui.QPixmap()
         if state == -1:
-            icon_path = os.path.join(self.component_path, "modules", "network_error.png")
+            if is_raspberrypi():
+                icon_path = os.path.join(self.component_path, "modules", "network_none_28.png")
+            else:
+                icon_path = os.path.join(self.component_path, "modules", "network_error.png")
             pixmap.load(icon_path)
         elif state == 0:
-            icon_path = os.path.join(self.component_path, "modules", "network.png")
+            if is_raspberrypi():
+                icon_path = os.path.join(self.component_path, "modules", "network_28.png")
+            else:
+                icon_path = os.path.join(self.component_path, "modules", "network.png")
             pixmap.load(icon_path)
         elif state == 1:
-            icon_path = os.path.join(self.component_path, "modules", "network_disconnect.png")
+            if is_raspberrypi():
+                icon_path = os.path.join(self.component_path, "modules", "network_none_28.png")
+            else:
+                icon_path = os.path.join(self.component_path, "modules", "network_disconnect.png")
             pixmap.load(icon_path)
         elif state == 2:
-            icon_path = os.path.join(self.component_path, "modules", "network_reconnect.png")
+            if is_raspberrypi():
+                icon_path = os.path.join(self.component_path, "modules", "network_none_28.png")
+            else:
+                icon_path = os.path.join(self.component_path, "modules", "network_reconnect.png")
             pixmap.load(icon_path)
 
         self.ui_icon_list[index].setPixmap(pixmap)
