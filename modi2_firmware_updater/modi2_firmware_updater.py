@@ -161,13 +161,14 @@ class Form(QDialog):
         self.language_frame_path = pathlib.PurePosixPath(self.component_path, "lang_frame.png")
         self.language_frame_pressed_path = pathlib.PurePosixPath(self.component_path, "lang_frame_pressed.png")
 
-        self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.active_path})")
-        self.ui.update_network_submodule_button.setStyleSheet(f"border-image: url({self.active_path})")
-        self.ui.delete_user_code_button.setStyleSheet(f"border-image: url({self.active_path})")
-        self.ui.update_general_modules_button.setStyleSheet(f"border-image: url({self.active_path})")
-        self.ui.manage_firmware_version_button.setStyleSheet(f"border-image: url({self.active_path})")
-        self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path})")
-        self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path})")
+        self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.active_path}); color: black;")
+        self.ui.update_network_submodule_button.setStyleSheet(f"border-image: url({self.active_path}); color: black;")
+        self.ui.delete_user_code_button.setStyleSheet(f"border-image: url({self.active_path}); color: black;")
+        self.ui.update_general_modules_button.setStyleSheet(f"border-image: url({self.active_path}); color: black;")
+        self.ui.manage_firmware_version_button.setStyleSheet(f"border-image: url({self.active_path}); color: black;")
+        self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path}); color: black;")
+        self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path}); color: black;")
+        self.ui.console.setStyleSheet(f"font-size: 10px; color: black")
 
         version_path = os.path.join(os.path.dirname(__file__), "..", "version.txt")
         with io.open(version_path, "r") as version_file:
@@ -276,7 +277,7 @@ class Form(QDialog):
             if self.is_multi:
                 self.module_update_list_form.ui.show()
             return
-        self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.pressed_path})")
+        self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.pressed_path}); color: black;")
         self.ui.console.clear()
         print("Network Firmware Updater has been initialized for base update!")
         th.Thread(
@@ -320,7 +321,7 @@ class Form(QDialog):
             if self.is_multi:
                 self.esp32_update_list_form.ui.show()
             return
-        self.ui.update_network_submodule_button.setStyleSheet(f"border-image: url({self.pressed_path})")
+        self.ui.update_network_submodule_button.setStyleSheet(f"border-image: url({self.pressed_path}); color: black;")
         self.ui.console.clear()
         print("ESP32 Firmware Updater has been initialized for esp update!")
         th.Thread(
@@ -364,7 +365,7 @@ class Form(QDialog):
             if self.is_multi:
                 self.esp32_update_list_form.ui.show()
             return
-        self.ui.delete_user_code_button.setStyleSheet(f"border-image: url({self.pressed_path})")
+        self.ui.delete_user_code_button.setStyleSheet(f"border-image: url({self.pressed_path}); color: black;")
         self.ui.console.clear()
         print("ESP32 Firmware Updater has been initialized for esp interpreter update!")
         th.Thread(
@@ -408,7 +409,7 @@ class Form(QDialog):
             if self.is_multi:
                 self.module_update_list_form.ui.show()
             return
-        self.ui.update_general_modules_button.setStyleSheet(f"border-image: url({self.pressed_path})")
+        self.ui.update_general_modules_button.setStyleSheet(f"border-image: url({self.pressed_path}); color: black;")
         self.ui.console.clear()
         print("Module Firmware Updater has been initialized for module update!")
         th.Thread(
@@ -450,7 +451,7 @@ class Form(QDialog):
 
     def manage_firmware_version_button_clicked(self):
         button_start = time.time()
-        self.ui.manage_firmware_version_button.setStyleSheet(f"border-image: url({self.pressed_path})")
+        self.ui.manage_firmware_version_button.setStyleSheet(f"border-image: url({self.pressed_path}); color: black;")
         self.ui.console.clear()
         th.Thread(
             target=self.__click_motion, args=(4, button_start), daemon=True
@@ -463,7 +464,7 @@ class Form(QDialog):
 
     def devmode_button_clicked(self):
         button_start = time.time()
-        self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path});font-size: 13px")
+        self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path}); font-size: 13px; color: black;")
         th.Thread(
             target=self.__click_motion, args=(5, button_start), daemon=True
         ).start()
@@ -472,7 +473,7 @@ class Form(QDialog):
 
     def translate_button_clicked(self):
         button_start = time.time()
-        self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path}); font-size: 13px")
+        self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_pressed_path}); font-size: 13px; color: black;")
         th.Thread(
             target=self.__click_motion, args=(6, button_start), daemon=True
         ).start()
@@ -589,20 +590,20 @@ class Form(QDialog):
             pass
 
         if button_type in [5, 6]:
-            self.buttons[button_type].setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px")
+            self.buttons[button_type].setStyleSheet(f"border-image: url({self.language_frame_path}); font-size: 13px; color: black;")
         else:
-            self.buttons[button_type].setStyleSheet(f"border-image: url({self.active_path})")
+            self.buttons[button_type].setStyleSheet(f"border-image: url({self.active_path}); color: black;")
             for i, q_button in enumerate(self.buttons):
                 if i in [button_type, 5, 6]:
                     continue
-                q_button.setStyleSheet(f"border-image: url({self.inactive_path})")
+                q_button.setStyleSheet(f"border-image: url({self.inactive_path}); color: black;")
                 q_button.setEnabled(False)
 
     def __reset_ui(self, list_ui = None):
         for i, q_button in enumerate(self.buttons):
             if i in [5, 6]:
                 continue
-            q_button.setStyleSheet(f"border-image: url({self.active_path})")
+            q_button.setStyleSheet(f"border-image: url({self.active_path}); color: black;")
             q_button.setEnabled(True)
 
         # refresh language
