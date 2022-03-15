@@ -13,7 +13,7 @@ def make_clean():
 def make_executable(mode):
     make_clean()
 
-    install_cmd = f'pyinstaller modi_single_updater.spec' if mode == "single" else f'pyinstaller modi_multi_updater.spec'
+    install_cmd = f"pyinstaller modi_single_updater.spec" if mode == "single" else f"pyinstaller modi_multi_updater.spec"
 
     result = os.system(install_cmd)
 
@@ -21,7 +21,7 @@ def make_executable(mode):
         exit(1)
 
     import platform
-    if platform.system() == 'Darwin':
+    if platform.system() == "Darwin":
         dmg_path = f"./dist/MODI+ Firmware Updater.dmg" if mode == "single" else f"./dist/MODI+ Firmware Multi Updater.dmg"
 
         if os.path.exists(dmg_path):

@@ -531,12 +531,16 @@ class Form(QDialog):
             current_version = self.version_info
             latest_version = response["name"]
 
-            download_url = response["assets"][0]["browser_download_url"]
+            import platform
+            download_url = response["html_url"]
             for asset in response["assets"]:
                 file_name = asset["name"]
                 if not "Multi" in file_name and not "multi" in file_name:
                     # single updater
-                    download_url = asset["browser_download_url"]
+                    if platform.system() == "Darwin" and ".dmg" in file_name:
+                        download_url = asset["browser_download_url"]
+                    elif platform.system() == "Windows" and ".exe" in file_name:
+                        download_url = asset["browser_download_url"]
 
             from packaging import version
             if version.parse(latest_version) > version.parse(current_version):
@@ -549,6 +553,9 @@ class Form(QDialog):
                 msg.setText(f"need to update to {latest_version}")
                 msg.setDetailedText(download_url)
                 msg.exec_()
+
+                import webbrowser
+                webbrowser.open(download_url, new=0, autoraise=True)
 
         except:
             pass
