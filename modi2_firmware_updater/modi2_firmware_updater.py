@@ -1,22 +1,23 @@
-import os
 import io
-import sys
-import time
+import os
 import pathlib
+import sys
 import threading as th
+import time
 import traceback as tb
 
 from PyQt5 import QtGui, QtWidgets, uic
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QObject, Qt, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QDialog, QMessageBox
 
-from modi2_firmware_updater.firmware_manager import FirmwareManagerForm
-from modi2_firmware_updater.update_list_form import ESP32UpdateListForm, ModuleUpdateListForm
 from modi2_firmware_updater.core.esp32_updater import ESP32FirmwareMultiUploder
 from modi2_firmware_updater.core.module_updater import ModuleFirmwareMultiUpdater
 from modi2_firmware_updater.core.network_updater import NetworkFirmwareMultiUpdater
+from modi2_firmware_updater.firmware_manager import FirmwareManagerForm
+from modi2_firmware_updater.update_list_form import ESP32UpdateListForm, ModuleUpdateListForm
 from modi2_firmware_updater.util.modi_winusb.modi_serialport import list_modi_serialports
 from modi2_firmware_updater.util.platform_util import is_raspberrypi, set_delay_option
+
 
 class StdoutRedirect(QObject):
     printOccur = pyqtSignal(str, str, name="print")

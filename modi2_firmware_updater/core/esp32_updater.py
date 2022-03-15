@@ -1,11 +1,5 @@
 from __future__ import division, print_function
-import io
-import json
-import sys
-import threading as th
-import time
-import zlib
-import struct
+
 import argparse
 import binascii
 import copy
@@ -13,16 +7,21 @@ import hashlib
 import inspect
 import io
 import itertools
+import json
 import os
 import shlex
 import string
+import struct
+import sys
+import threading as th
+import time
+import zlib
 from base64 import b64decode, b64encode
 from io import open
 from os import path
 
-from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
-
 from modi2_firmware_updater.util.message_util import unpack_data
+from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 from modi2_firmware_updater.util.module_util import get_module_type_from_uuid
 
 __version__ = "3.1-dev"
@@ -3998,6 +3997,7 @@ FK3JstjaPDbhTnM9u/28uDgYRLjoq1ml/2YEpIIv7cvl/izGpnFh4vn/AOixonk=\
 """)))
 
 from os import path
+
 
 class ESP32FirmwareUpdater():
     def __init__(self, port, module_firmware_path=None):
