@@ -1,19 +1,16 @@
-import time
 import ctypes
-from winusbcdc import WinUSBApi
-from winusbcdc import UsbSetupPacket
-from winusbcdc.usb_cdc import CDC_CMDS
-from winusbcdc import GUID, DIGCF_ALLCLASSES, DIGCF_DEFAULT, DIGCF_PRESENT, DIGCF_PROFILE, DIGCF_DEVICE_INTERFACE, \
-    SpDeviceInterfaceData, SpDeviceInterfaceDetailData, SpDevinfoData, GENERIC_WRITE, GENERIC_READ, FILE_SHARE_WRITE, \
-    FILE_SHARE_READ, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_OVERLAPPED, INVALID_HANDLE_VALUE, \
-    UsbInterfaceDescriptor, PipeInfo, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, Overlapped
-from ctypes import c_byte, byref, sizeof, c_ulong, resize, wstring_at, c_void_p, c_ubyte, create_string_buffer
+import time
+from ctypes import byref, c_byte, c_ubyte, c_ulong, c_void_p, create_string_buffer, resize, sizeof, wstring_at
 from ctypes.wintypes import DWORD
-from winusbcdc import SetupDiGetClassDevs, SetupDiEnumDeviceInterfaces, SetupDiGetDeviceInterfaceDetail, is_device, \
-    CreateFile, WinUsb_Initialize, Close_Handle, WinUsb_Free, GetLastError, WinUsb_QueryDeviceInformation, \
-    WinUsb_GetAssociatedInterface, WinUsb_QueryInterfaceSettings, WinUsb_QueryPipe, WinUsb_ControlTransfer, \
-    WinUsb_WritePipe, WinUsb_ReadPipe, WinUsb_GetOverlappedResult, SetupDiGetDeviceRegistryProperty, \
-    WinUsb_SetPipePolicy, WinUsb_FlushPipe, SPDRP_FRIENDLYNAME
+
+from winusbcdc import (DIGCF_ALLCLASSES, DIGCF_DEFAULT, DIGCF_DEVICE_INTERFACE, DIGCF_PRESENT, DIGCF_PROFILE, ERROR_IO_INCOMPLETE, ERROR_IO_PENDING, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_OVERLAPPED,
+                       FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE, GUID, INVALID_HANDLE_VALUE, OPEN_EXISTING, SPDRP_FRIENDLYNAME, Close_Handle, CreateFile, GetLastError,
+                       Overlapped, PipeInfo, SetupDiEnumDeviceInterfaces, SetupDiGetClassDevs, SetupDiGetDeviceInterfaceDetail, SetupDiGetDeviceRegistryProperty, SpDeviceInterfaceData,
+                       SpDeviceInterfaceDetailData, SpDevinfoData, UsbInterfaceDescriptor, UsbSetupPacket, WinUsb_ControlTransfer, WinUsb_FlushPipe, WinUsb_Free, WinUsb_GetAssociatedInterface,
+                       WinUsb_GetOverlappedResult, WinUsb_Initialize, WinUsb_QueryDeviceInformation, WinUsb_QueryInterfaceSettings, WinUsb_QueryPipe, WinUsb_ReadPipe, WinUsb_SetPipePolicy,
+                       WinUsb_WritePipe, WinUSBApi, is_device)
+from winusbcdc.usb_cdc import CDC_CMDS
+
 
 def list_modi_winusb_paths():
     api = ModiWinUsb()

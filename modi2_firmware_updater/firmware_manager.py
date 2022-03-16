@@ -1,13 +1,14 @@
-import os
-import json
-import stat
-import shutil
-from functools import cmp_to_key
 import http.client as httplib
+import json
+import os
+import shutil
+import stat
+from functools import cmp_to_key
 
 from PyQt5 import QtGui, uic
 from PyQt5.QtCore import QSignalMapper
 from PyQt5.QtWidgets import QDialog, QMessageBox
+
 
 class FirmwareManagerForm(QDialog):
 

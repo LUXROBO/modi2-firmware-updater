@@ -1,7 +1,9 @@
 import sys
 import time
+
 import serial
 import serial.tools.list_ports as stl
+
 
 def list_modi_serialports():
     info_list = []
