@@ -10,22 +10,61 @@ def make_clean():
         if os.path.isdir(dirpath):
             rmtree(dirpath)
 
-def make_executable():
+def make_executable(mode):
     make_clean()
-    os.system(f'pyinstaller modi_multi_updater.spec')
-    os.system(f'pyinstaller modi_single_updater.spec')
+
+    install_cmd = f"pyinstaller modi_single_updater.spec" if mode == "single" else f"pyinstaller modi_multi_updater.spec"
+
+    result = os.system(install_cmd)
+
+    if result != 0:
+        exit(1)
+
+    import platform
+    if platform.system() == "Darwin":
+        dmg_path = f"./dist/MODI+ Firmware Updater.dmg" if mode == "single" else f"./dist/MODI+ Firmware Multi Updater.dmg"
+
+        if os.path.exists(dmg_path):
+            os.remove(dmg_path)
+
+        create_dmg_cmd = """create-dmg \
+            --volname "MODI+ Firmware Updater" \
+            --volicon "modi2_firmware_updater/assets/component/network_module.ico" \
+            --window-pos 200 120 \
+            --window-size 800 300 \
+            --icon-size 100 \
+            --icon "MODI+ Firmware Updater.app" 200 100 \
+            --hide-extension "MODI+ Firmware Updater.app" \
+            --app-drop-link 600 100 \
+            "./dist/MODI+ Firmware Updater.dmg" \
+            "./dist/MODI+ Firmware Updater.app"
+        """
+
+        if mode == "multi":
+            create_dmg_cmd = """create-dmg \
+                --volname "MODI+ Firmware Multi Updater" \
+                --volicon "modi2_firmware_updater/assets/component/network_module.ico" \
+                --window-pos 200 120 \
+                --window-size 800 300 \
+                --icon-size 100 \
+                --icon "MODI+ Firmware Multi Updater.app" 200 100 \
+                --hide-extension "MODI+ Firmware Multi Updater.app" \
+                --app-drop-link 600 100 \
+                "./dist/MODI+ Firmware Multi Updater.dmg" \
+                "./dist/MODI+ Firmware Multi Updater.app"
+            """
+
+        result = os.system(create_dmg_cmd)
+
+        if result != 0:
+            exit(1)
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument(
-        '--mode', type=str, default='install',
-        choices=['clean', 'install'],
-        help='This is a script which makes your life a lot easier :)'
+        '--mode', type=str, default='single',
+        choices=['single', 'multi']
     )
     args = parser.parse_args()
     mode = args.mode
-    mode_func = {
-        'clean': make_clean,
-        'install': make_executable,
-    }.get(mode)
-    mode_func()
+    make_executable(mode)

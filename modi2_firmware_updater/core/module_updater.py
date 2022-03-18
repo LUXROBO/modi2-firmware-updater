@@ -7,11 +7,12 @@ from io import open
 from os import path
 
 from serial.serialutil import SerialException
-from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 
 from modi2_firmware_updater.util.message_util import decode_message, parse_message, unpack_data
+from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid
 from modi2_firmware_updater.util.platform_util import delay
+
 
 def retry(exception_to_catch):
     def decorator(func):

@@ -1,26 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-import os
-import sys
-
-from platform import system
-
-cwd = os.getcwd()
-
-version_path = os.path.join(cwd, "version.txt")
-with open(version_path, "r") as version_file:
-    version_info = version_file.readline().lstrip("v").rstrip("\n")
-
-site_package_paths = [path for path in sys.path if path.endswith('site-packages')]
-if not site_package_paths:
-    raise ValueError('There is no valid path for site-packages!')
-
 block_cipher = None
+
 a = Analysis(
     ['execute_multi_updater.py'],
-    pathex=site_package_paths,
+    pathex=[],
     binaries=[],
-    # Put data(i.e. assets) under virtual 'modi2_firmware_updater/'
     datas=[
         ('modi2_firmware_updater/assets', 'modi2_firmware_updater/assets'),
         ('version.txt', '.')
@@ -33,9 +18,11 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False
 )
+
 pyz = PYZ(
     a.pure, a.zipped_data, cipher=block_cipher
 )
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -43,7 +30,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='MODI+ Firmware Multi Updater - v' + version_info,
+    name='MODI+ Firmware Multi Updater',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -53,34 +40,10 @@ exe = EXE(
     console=False,
     icon='network_module.ico',
 )
+
 app = BUNDLE(
     exe,
-    name='MODI+ Firmware Multi Updater - v' + version_info + '.app',
+    name='MODI+ Firmware Multi Updater.app',
     icon='network_module.ico',
     bundle_identifier=None,
 )
-
-if system == 'Darwin':
-    import plistlib
-    from pathlib import Path
-
-    app_path = Path(app.name)
-
-    # read Info.plist
-    with open(app_path / 'Contents/Info.plist', 'rb') as f:
-        pl = plistlib.load(f)
-
-    # write Info.plist
-    with open(app_path / 'Contents/Info.plist', 'wb') as f:
-        pl['CFBundleExecutable'] = 'wrapper'
-        plistlib.dump(pl, f)
-
-    # write new wrapper script
-    shell_script = """#!/bin/bash
-    dir=$(dirname $0)
-    open -a Terminal file://${dir}/%s""" % app.appname
-    with open(app_path / 'Contents/MacOS/wrapper', 'w') as f:
-        f.write(shell_script)
-
-    # make it executable
-    (app_path  / 'Contents/MacOS/wrapper').chmod(0o755)

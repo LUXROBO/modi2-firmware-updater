@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import QDialog
 
 from modi2_firmware_updater.util.platform_util import is_raspberrypi
 
+
 class ESP32UpdateListForm(QDialog):
     network_state_signal = pyqtSignal(int, int)
     network_uuid_signal = pyqtSignal(int, str)
