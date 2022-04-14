@@ -1,0 +1,120 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: QA build
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc[0-9]'
+
+jobs:
+  build-macos-single:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Install Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+        architecture: 'x64'
+
+    - name: Install requirments
+      run: pip install -r requirements.txt
+
+    - name: Install create-dmg
+      run: brew install create-dmg
+
+    - name: Run PyInstaller on MacOS
+      run: python bootstrap.py --mode single
+
+    - name: Upload macos app
+      uses: actions/upload-artifact@v2
+      with:
+        name: macos-app
+        path: dist/MODI+ Firmware Updater.dmg
+        retention-days: 1
+
+  build-macos-multi:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Install Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+        architecture: 'x64'
+
+    - name: Install requirments
+      run: pip install -r requirements.txt
+
+    - name: Install create-dmg
+      run: brew install create-dmg
+
+    - name: Run PyInstaller on MacOS
+      run: python bootstrap.py --mode multi
+
+    - name: Upload macos app
+      uses: actions/upload-artifact@v2
+      with:
+        name: macos-app
+        path: dist/MODI+ Firmware Multi Updater.dmg
+        retention-days: 1
+
+  build-windows-single:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Install Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+        architecture: 'x64'
+
+    - name: Install requirments
+      run: pip install -r requirements.txt
+
+    - name: Run PyInstaller on Windows
+      run: python bootstrap.py --mode single
+
+    - name: Upload windows app
+      uses: actions/upload-artifact@v2
+      with:
+        name: windows-app
+        path: dist/MODI+ Firmware Updater.exe
+        retention-days: 1
+
+  build-windows-multi:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Install Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+        architecture: 'x64'
+
+    - name: Install requirments
+      run: pip install -r requirements.txt
+
+    - name: Run PyInstaller on Windows
+      run: python bootstrap.py --mode multi
+
+    - name: Upload windows app
+      uses: actions/upload-artifact@v2
+      with:
+        name: windows-app
+        path: dist/MODI+ Firmware Multi Updater.exe
+        retention-days: 1
