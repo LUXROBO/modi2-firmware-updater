@@ -1,5 +1,6 @@
 pyserial
 pyqt5
 pyinstaller
+packaging
 requests
 winusbcdc
