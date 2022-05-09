@@ -68,7 +68,7 @@ jobs:
         retention-days: 1
 
   build-windows-single:
-    runs-on: windows-latest
+    runs-on: [self-hosted, lattepanda]
 
     steps:
     - name: Checkout
@@ -86,6 +86,10 @@ jobs:
     - name: Run PyInstaller on Windows
       run: python bootstrap.py --mode single
 
+    - name: Certificate app
+      shell: cmd
+      run: .\certificate\win_certificate.bat ${{ secrets.CER_TOKEN }} ${{ secrets.CER_CONT }} "MODI+ Firmware Updater.exe"
+
     - name: Upload windows app
       uses: actions/upload-artifact@v2
       with:
@@ -94,7 +98,7 @@ jobs:
         retention-days: 1
 
   build-windows-multi:
-    runs-on: windows-latest
+    runs-on: [self-hosted, lattepanda]
 
     steps:
     - name: Checkout
@@ -111,6 +115,10 @@ jobs:
 
     - name: Run PyInstaller on Windows
       run: python bootstrap.py --mode multi
+
+    - name: Certificate app
+      shell: cmd
+      run: .\certificate\win_certificate.bat ${{ secrets.CER_TOKEN }} ${{ secrets.CER_CONT }} "MODI+ Firmware Multi Updater.exe"
 
     - name: Upload windows app
       uses: actions/upload-artifact@v2
