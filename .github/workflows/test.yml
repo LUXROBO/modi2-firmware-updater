@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-windows-single:
-    runs-on: windows-latest
+    runs-on: [self-hosted, lattepanda]
 
     steps:
     - name: Checkout
