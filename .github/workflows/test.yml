@@ -1,0 +1,33 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Release
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+
+jobs:
+  build-windows-single:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v1
+
+    - name: Install Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+        architecture: 'x64'
+
+    - name: Install requirments
+      run: pip install -r requirements.txt
+
+    - name: Run PyInstaller on Windows
+      run: python bootstrap.py --mode single
+
+    - name: dasdas
+      shell: cmd
+      run: .\certificate\win_certificate.bat luxrobomodi1! p11#3a14468743f1fbde MODI+\ Firmware\ Updater.exe
