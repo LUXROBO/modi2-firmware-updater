@@ -14,8 +14,10 @@ if not exist %SIGN_TOOL_PATH% (
 
 set TOKEN=%1
 set CONT=%2
-set APP_NAME=%3
+set APP_NAME=%~3
+
+echo %APP_NAME%
 
 cd %SIGN_TOOL_PATH%
-.\signtool.exe sign /f .\luxrobo.cer /csp "eToken Base Cryptographic Provider" /k "[{{%TOKEN%}}]=%CONT%" /fd sha1 /tr http://timestamp.digicert.com /td sha1 %APP_PATH%\%APP_NAME%
+.\signtool.exe sign /f .\luxrobo.cer /csp "eToken Base Cryptographic Provider" /k "[{{%TOKEN%}}]=%CONT%" /fd sha1 /tr http://timestamp.digicert.com /td sha1 "%APP_PATH%\%APP_NAME%""
 cd %ROOT_PATH%

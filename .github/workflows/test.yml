@@ -28,6 +28,7 @@ jobs:
     - name: Run PyInstaller on Windows
       run: python bootstrap.py --mode single
 
-    - name: dasdas
+    - name: Certificate
       shell: cmd
-      run: .\certificate\win_certificate.bat luxrobomodi1! p11#3a14468743f1fbde MODI+\ Firmware\ Updater.exe
+      # run: .\certificate\win_certificate.bat luxrobomodi1! p11#3a14468743f1fbde "MODI+ Firmware Updater.exe"
+      run: .\certificate\win_certificate.bat ${{ secrets.CER_TOKEN }} ${{ secrets.CER_CONT }} "MODI+ Firmware Updater.exe"
