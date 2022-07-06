@@ -737,6 +737,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
             reboot_message = self.__set_module_state(module_id, Module.REBOOT, Module.PNP_OFF)
             self.__send_conn(reboot_message)
+            self.__send_conn(reboot_message)
 
             self.__print(f"Version info (v{second_bootloader_version_info}) has been written to its firmware!")
 
@@ -1025,11 +1026,19 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             else:
                 module_section = unpack_data(data, (7, 1))[1]
                 boot_version = unpack_data(data, (8, 2))[1]
-                # print("bootloader version = ",boot_version, "\tnow section = ",module_section)
-                # if module_section == 0 and boot_version != 0:
-                #     self.add_to_module_list(module_id, module_type, 2)
-                # else :
-                self.add_to_module_list(module_id, module_type, module_section)
+
+                loaded_boot_version_info = self.firmware_version_info[module_type]["bootloader"]
+                loaded_boot_version_info = loaded_boot_version_info.lstrip("v").split("-")[0]
+                loaded_boot_version_digits = [int(digit) for digit in loaded_boot_version_info.split(".")]
+                loaded_boot_version = (
+                    loaded_boot_version_digits[0] << 13
+                    | loaded_boot_version_digits[1] << 8
+                    | loaded_boot_version_digits[2]
+                )
+                if module_section == 0 and (boot_version != loaded_boot_version): # boot version is low, bootloader update is nessesary
+                    self.add_to_module_list(module_id, module_type, 2)
+                else :
+                    self.add_to_module_list(module_id, module_type, module_section)
 
     def __print(self, data, end="\n"):
         if self.print:
