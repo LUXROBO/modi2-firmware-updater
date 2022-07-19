@@ -314,7 +314,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.response_error_flag = response
 
     def __update_firmware(self, module_info: Module_info) -> bool:
-        print(f"{module_info.type} ({module_info.id}) application_update_start")
+        # print(f"{module_info.type} ({module_info.id}) application_update_start")
         self.module_type = module_info.type
 
         # Init base root_path, utilizing local binary files
@@ -474,10 +474,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.progress = 100
         self.__print(f"\rUpdating {module_info.type} ({module_info.id}) {self.__progress_bar(1, 1)} 100%")
         self.update_complete_num += 1
+        self.progress = 0
         return True
 
     def __update_firmware_bootloader(self, module_info: Module_info) -> bool:
-        print(f"{module_info.type} ({module_info.id}) bootloader_update_start")
+        # print(f"{module_info.type} ({module_info.id}) bootloader_update_start")
         self.module_type = module_info.type
         # Init base root_path, utilizing local binary files
         root_path = path.join(self.module_firmware_path, "bootloader", "e230", self.firmware_version_info[module_info.type]["bootloader"])
@@ -525,12 +526,15 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             # Skip current page if empty
             if not sum(curr_page):
                 page_begin = page_begin + page_size
+                time.sleep(0.02)
                 continue
             if page_begin + page_offset + flash_memory_addr == end_flash_address:
                 page_begin = page_begin + page_size
+                time.sleep(0.02)
                 continue
             if page_begin + page_offset + flash_memory_addr == flash_info_memory_addr:
                 page_begin = page_begin + page_size
+                time.sleep(0.02)
                 continue
             # Erase page (send erase request and receive its response)
             erase_page_success = self.send_firmware_command(
@@ -627,10 +631,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.progress = 100
         self.__print(f"\rUpdating {module_info.type} ({module_info.id}) {self.__progress_bar(1, 1)} 100%")
         self.update_complete_num += 1
+        self.progress = 0
         return True
 
     def __update_firmware_second_bootloader(self, module_info: Module_info) -> bool:
-        print(f"{module_info.type} ({module_info.id}) second_bootloader_update_start")
+        # print(f"{module_info.type} ({module_info.id}) second_bootloader_update_start")
         # Init base root_path, utilizing local binary files
         root_path = path.join(self.module_firmware_path, "bootloader", "e230", self.firmware_version_info[module_info.type]["bootloader"])
         bin_path = path.join(root_path, "second_bootloader_e230.bin")
@@ -676,12 +681,15 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             # Skip current page if empty
             if not sum(curr_page):
                 page_begin = page_begin + page_size
+                time.sleep(0.02)
                 continue
             if page_begin + page_offset == end_flash_address:
                 page_begin = page_begin + page_size
+                time.sleep(0.02)
                 continue
             if page_begin + page_offset == flash_info_memory_addr:
                 page_begin = page_begin + page_size
+                time.sleep(0.02)
                 continue
 
             # Erase page (send erase request and receive its response)
@@ -782,6 +790,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.progress = 100
             self.__print(f"\rUpdating {module_info.type} ({module_info.id}) {self.__progress_bar(1, 1)} 100%")
             self.update_complete_num += 1
+            self.progress = 0
             return True
 
     @staticmethod
@@ -1129,8 +1138,7 @@ class ModuleFirmwareMultiUpdater():
                     device = modi_port,
                     module_firmware_path = self.module_firmware_path
                 )
-                # module_updater.set_print(False)
-                module_updater.set_print(True)
+                module_updater.set_print(False)
                 module_updater.set_raise_error(False)
             except:
                 print("open " + modi_port + " error")
