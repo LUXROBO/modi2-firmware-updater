@@ -13,6 +13,7 @@ from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPo
 from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid
 from modi2_firmware_updater.util.platform_util import delay
 from dataclasses import dataclass
+import random
 
 def retry(exception_to_catch):
     def decorator(func):
@@ -131,7 +132,16 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 break
             time.sleep(timeout_delay)
             timeout_count += timeout_delay
-        
+
+        if timeout_delay >= 10:
+            self.__print("Module firmwares have not been updated! error occur")
+            self.close_recv_thread()
+            self.close()
+
+            time.sleep(0.5)
+            self.reset_state()
+            return
+
         # count the number of update
         self.all_update_num = 0
         for module_info in self.update_module_list:
@@ -183,7 +193,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     continue
             if complete_flag == True:
                 break
-        
+
         if complete_flag == True:
             self.update_error = 1
         else :
@@ -213,7 +223,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
     def request_network_id(self):
         self.__send_conn(parse_message(0x28, 0x0, 0xFFF, (0xFF, 0x0F)))
-    
+
     def request_module_id(self, id:int):
         self.__send_conn(parse_message(0x8, 0x0, id, (0xFF, 0x0F)))
 
@@ -235,6 +245,8 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         module_uuid = unpacked_data[0]
         module_version_digits = unpacked_data[1]
         module_type = get_module_type_from_uuid(module_uuid)
+        if module_type == "None":
+            return
         if module_type == "network":
             self.network_uuid = module_uuid
             self.network_id = sid
@@ -314,7 +326,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.response_error_flag = response
 
     def __update_firmware(self, module_info: Module_info) -> bool:
-        # print(f"{module_info.type} ({module_info.id}) application_update_start")
+        print(f"{module_info.type} ({module_info.id}) application_update_start")
         self.module_type = module_info.type
 
         # Init base root_path, utilizing local binary files
@@ -392,7 +404,10 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 curr_data = curr_page[curr_ptr : curr_ptr + 8]
                 checksum = self.send_firmware_data(module_info.id, curr_ptr // 8, curr_data, checksum)
                 delay(0.001)
-
+            # noise = random.randrange(1,100)
+            # if noise < 4:
+            #     checksum = checksum + 1
+            #     print("noise detected")
             # CRC on current page (send CRC request / receive CRC response)
             crc_page_success = self.send_firmware_command(
                 oper_type="crc",
@@ -478,7 +493,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         return True
 
     def __update_firmware_bootloader(self, module_info: Module_info) -> bool:
-        # print(f"{module_info.type} ({module_info.id}) bootloader_update_start")
+        print(f"{module_info.type} ({module_info.id}) bootloader_update_start")
         self.module_type = module_info.type
         # Init base root_path, utilizing local binary files
         root_path = path.join(self.module_firmware_path, "bootloader", "e230", self.firmware_version_info[module_info.type]["bootloader"])
@@ -635,7 +650,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         return True
 
     def __update_firmware_second_bootloader(self, module_info: Module_info) -> bool:
-        # print(f"{module_info.type} ({module_info.id}) second_bootloader_update_start")
+        print(f"{module_info.type} ({module_info.id}) second_bootloader_update_start")
         # Init base root_path, utilizing local binary files
         root_path = path.join(self.module_firmware_path, "bootloader", "e230", self.firmware_version_info[module_info.type]["bootloader"])
         bin_path = path.join(root_path, "second_bootloader_e230.bin")
@@ -934,13 +949,53 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         return checksum
 
     def send_firmware_command(self, oper_type: str, module_id: int, crc_val: int, dest_addr: int, page_addr: int = 0,) -> bool:
-        rot_scmd = 2 if oper_type == "erase" else 1
+        rot_scmd = 0
+        success_state = None
+        fail_state = None
+        if oper_type == "erase":
+            rot_scmd = 2
+            success_state = self.ERASE_COMPLETE
+            fail_state = self.ERASE_ERROR
+        else :
+            rot_scmd = 1
+            success_state = self.CRC_COMPLETE
+            fail_state = self.CRC_ERROR
         # Send firmware command request
         self.reset_state(True)
         request_message = self.get_firmware_command(module_id, 1, rot_scmd, crc_val, page_addr=dest_addr + page_addr)
         self.__send_conn(request_message)
+        return self.receive_command_response2(id=module_id, success_response=success_state, fail_response=fail_state, max_response_error_count=3)
+        # return self.receive_command_response()
 
-        return self.receive_command_response()
+    def receive_command_response2(self, id, success_response, fail_response, response_delay: float = 0.01, response_timeout: float = 0.5, max_response_error_count: int = 10) ->bool:
+        list_index = -1
+        result_flag = False
+        for module_info in self.update_module_list:
+            if module_info.id == id:
+                list_index = self.update_module_list.index(module_info)
+                response_wait_time = 0
+                while self.update_module_list[list_index].state != success_response:
+                    time.sleep(response_delay)
+                    response_wait_time += response_delay
+                    if response_wait_time > response_timeout:
+                        self.update_error_message = "Response timed-out"
+                        if self.raise_error_message:
+                            raise Exception(self.update_error_message)
+                        result_flag = False
+                        break
+                    if self.update_module_list[list_index].state == fail_response:
+                        self.update_error_message = "Response Errored"
+                        if self.raise_error_message:
+                            raise Exception(self.update_error_message)
+                        self.response_error_flag = False
+                        result_flag = False
+                        break
+                if self.update_module_list[list_index].state == success_response:
+                    result_flag = True
+                break
+        if list_index != -1:
+            self.update_module_list[list_index].state = self.NO_ERROR
+        return result_flag
 
     def receive_command_response(self, response_delay: float = 0.01, response_timeout: float = 0.5, max_response_error_count: int = 10,) -> bool:
         # Receive firmware command response
@@ -1041,15 +1096,20 @@ class ModuleFirmwareUpdater(ModiSerialPort):
     def __update_firmware_state(self, sid: int, data: str, length:int):
         message_decoded = unpack_data(data, (4, 1))
         stream_state = message_decoded[1]
-
-        if stream_state == self.CRC_ERROR:
-            self.update_response(response=True, is_error_response=True)
-        elif stream_state == self.CRC_COMPLETE:
-            self.update_response(response=True)
-        elif stream_state == self.ERASE_ERROR:
-            self.update_response(response=True, is_error_response=True)
-        elif stream_state == self.ERASE_COMPLETE:
-            self.update_response(response=True)
+        list_index = 0
+        for module_info in self.update_module_list:
+            if module_info.id == sid:
+                list_index = self.update_module_list.index(module_info)
+                self.update_module_list[list_index]. state = stream_state
+                # print("state receive : ", stream_state)
+                if stream_state == self.CRC_ERROR:
+                    self.update_response(response=True, is_error_response=True)
+                elif stream_state == self.CRC_COMPLETE:
+                    self.update_response(response=True)
+                elif stream_state == self.ERASE_ERROR:
+                    self.update_response(response=True, is_error_response=True)
+                elif stream_state == self.ERASE_COMPLETE:
+                    self.update_response(response=True)
 
     def __update_warning(self, sid: int, data: str, length:int) -> None:
         module_uuid = unpack_data(data, (6, 1))[0]
@@ -1138,7 +1198,8 @@ class ModuleFirmwareMultiUpdater():
                     device = modi_port,
                     module_firmware_path = self.module_firmware_path
                 )
-                module_updater.set_print(False)
+                # module_updater.set_print(False)
+                module_updater.set_print(True)
                 module_updater.set_raise_error(False)
             except:
                 print("open " + modi_port + " error")
