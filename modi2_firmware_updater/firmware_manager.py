@@ -432,7 +432,7 @@ class FirmwareManagerForm(QDialog):
     @staticmethod
     def __compare_version(left, right):
         from packaging import version
-        
+
         if version.parse(left) > version.parse(right):
             return 1
         elif version.parse(left) == version.parse(right):

@@ -12,7 +12,7 @@ def set_delay_option(option):
 
 def delay(span):
     global delay_option
-    
+
     if delay_option:
         time.sleep(span)
     else:

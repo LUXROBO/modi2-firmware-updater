@@ -375,7 +375,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
             self.progress = 99
             self.__print(f"\rUpdating {module_type} ({module_id}) {self.__progress_bar(99, 100)} 99%")
-            
+
             verify_header = 0xAA
             if self.this_update_error:
                 self.has_update_error = True
