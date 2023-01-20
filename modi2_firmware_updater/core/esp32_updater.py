@@ -5639,9 +5639,9 @@ class ESP32FirmwareMultiUploder():
 
         if not update_interpreter and self.ui:
             if self.ui.is_english:
-                self.ui.update_network_submodule_button.setText("Network submodule update is in progress. (0%)")
+                self.ui.update_network_submodule_button.setText("Network/Camera submodule update is in progress. (0%)")
             else:
-                self.ui.update_network_submodule_button.setText("네트워크 서브모듈 업데이트가 진행중입니다. (0%)")
+                self.ui.update_network_submodule_button.setText("네트워크/카메라 서브모듈 업데이트가 진행중입니다. (0%)")
 
         delay = 0.1
         while True:
@@ -5706,9 +5706,9 @@ class ESP32FirmwareMultiUploder():
                             self.ui.delete_user_code_button.setText(f"사용자 코드 삭제가 진행중입니다. ({int(current_sequence/total_sequence*100)}%)")
                     else:
                         if self.ui.is_english:
-                            self.ui.update_network_submodule_button.setText(f"Network submodule update is in progress. ({int(current_sequence/total_sequence*100)}%)")
+                            self.ui.update_network_submodule_button.setText(f"Network/Camera submodule update is in progress. ({int(current_sequence/total_sequence*100)}%)")
                         else:
-                            self.ui.update_network_submodule_button.setText(f"네트워크 서브모듈 업데이트가 진행중입니다. ({int(current_sequence/total_sequence*100)}%)")
+                            self.ui.update_network_submodule_button.setText(f"네트워크/카메라 서브모듈 업데이트가 진행중입니다. ({int(current_sequence/total_sequence*100)}%)")
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(int(current_sequence / total_sequence * 100.0))

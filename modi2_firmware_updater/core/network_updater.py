@@ -652,9 +652,9 @@ class NetworkFirmwareMultiUpdater():
                 print(f"{self.__progress_bar(total_progress, 100)}", end="")
                 if self.ui:
                     if self.ui.is_english:
-                        self.ui.update_network_module_button.setText(f"Network module update is in progress. ({int(total_progress)}%)")
+                        self.ui.update_network_module_button.setText(f"Network/Camera module update is in progress. ({int(total_progress)}%)")
                     else:
-                        self.ui.update_network_module_button.setText(f"네트워크 모듈 업데이트가 진행중입니다. ({int(total_progress)}%)")
+                        self.ui.update_network_module_button.setText(f"네트워크/카메라 모듈 업데이트가 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(int(total_progress))
