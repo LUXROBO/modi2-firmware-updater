@@ -3659,16 +3659,23 @@ def slip_reader(port, trace_function):
     partial_packet = None
     in_escape = False
     successful_slip = False
+    retry_count = 0
+    max_retry = 10
     while True:
         waiting = port.inWaiting()
         read_bytes = port.read(1 if waiting == 0 else waiting)
         if read_bytes == b'':
-            if partial_packet is None:  # fail due to no data
-                msg = "Serial data stream stopped: Possible serial noise or corruption." if successful_slip else "No serial data received."
-            else:  # fail during packet transfer
-                msg = "Packet content transfer stopped (received {} bytes)".format(len(partial_packet))
-            trace_function(msg)
-            raise FatalError(msg)
+            retry_count += 1
+            if retry_count > max_retry:
+                if partial_packet is None:  # fail due to no data
+                    msg = "Serial data stream stopped: Possible serial noise or corruption." if successful_slip else "No serial data received."
+                else:  # fail during packet transfer
+                    msg = "Packet content transfer stopped (received {} bytes)".format(len(partial_packet))
+                trace_function(msg)
+                raise FatalError(msg)
+            time.sleep(0.3)
+            continue
+
         trace_function("Read %d bytes: %s", len(read_bytes), HexFormatter(read_bytes))
         for b in read_bytes:
             if type(b) is int:
