@@ -4,3 +4,4 @@ pyinstaller
 packaging
 requests
 winusbcdc
+pillow
