@@ -8,6 +8,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('modi2_firmware_updater/assets', 'modi2_firmware_updater/assets'),
+        ('modi2_firmware_updater/core', 'modi2_firmware_updater/core'),
         ('version.txt', '.')
     ],
     hookspath=[],

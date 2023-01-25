@@ -213,8 +213,8 @@ class Form(QDialog):
         ]
 
         self.button_en = [
-            "Update Network Module",
-            "Update Network Submodule",
+            "Update Network/Camera Module",
+            "Update Network/Camera Submodule",
             "Delete User Code",
             "Update General Modules",
             "Manage Module Firmware Version",
@@ -223,8 +223,8 @@ class Form(QDialog):
         ]
 
         self.button_kr = [
-            "네트워크 모듈 업데이트",
-            "네트워크 서브 모듈 업데이트",
+            "네트워크/카메라 모듈 업데이트",
+            "네트워크/카메라 서브 모듈 업데이트",
             "사용자 코드 삭제",
             "일반 모듈 업데이트",
             "펌웨어 관리",
@@ -280,7 +280,7 @@ class Form(QDialog):
             return
         self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.pressed_path}); color: black;")
         self.ui.console.clear()
-        print("Network Firmware Updater has been initialized for base update!")
+        print("Network/Camera Firmware Updater has been initialized for base update!")
         th.Thread(
             target=self.__click_motion, args=(0, button_start), daemon=True
         ).start()
