@@ -55,6 +55,8 @@ class ModuleFirmwareUpdater(ModiSerialPort):
     BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE = 3
     BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR = 4
 
+    MAX_UPDATE_MODULE_NUM = 15
+
     def __init__(self, device=None, module_firmware_path=None):
         self.print = True
 
@@ -84,6 +86,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.update_module_list = []
         self.all_update_num = 0
         self.update_complete_num = 0
+        self.gathering_update_list_timeout = 0
 
         if device != None:
             super().__init__(device, baudrate = 921600, timeout = 0.1, write_timeout = 0)
@@ -112,8 +115,19 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         timeout_delay = 0.1
         retry_max = 2
 
-        while self.update_in_progress == False:
-            time.sleep(0.1)
+        while self.gathering_update_list_timeout < 30:
+            time.sleep(timeout_delay)
+            self.gathering_update_list_timeout += 1
+
+        if len(self.update_module_list) > self.MAX_UPDATE_MODULE_NUM:
+            self.__print("Too many modules detected, please connect modules up to 15")
+            self.close_recv_thread()
+            self.close()
+            time.sleep(0.5)
+            self.reset_state()
+            return
+        self.update_in_progress = True
+
         firmware_update_message = self.__set_module_state(0xFFF, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
         self.__send_conn(firmware_update_message)
         time.sleep(0.5)
@@ -121,25 +135,27 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         time.sleep(0.5)
 
         # set update ready 
-        while timeout_count < 10:
+        while timeout_count < 30:
             ready_flag = False
             for module_info in self.update_module_list:
                 if module_info.state != self.UPDATE_READY:
                     ready_flag = True
-                    if ((int(timeout_delay) % 2) == 0) and int(timeout_delay) != 0:
+                    if ((int(timeout_count) % 5) == 0) and int(timeout_count) != 0:
                         self.check_to_update_firmware(module_info.id)
+                        print(module_info)
             if ready_flag == False:
                 break
             time.sleep(timeout_delay)
-            timeout_count += timeout_delay
+            timeout_count += 1
 
-        if timeout_delay >= 10:
-            self.__print("Module firmwares have not been updated! error occur")
+        if timeout_count >= 30:
+            self.update_error_message = "Module firmwares have not been updated! error occur"
             self.close_recv_thread()
             self.close()
-
             time.sleep(0.5)
             self.reset_state()
+            self.__print(self.update_error_message)
+            raise Exception(self.update_error_message)
             return
 
         # count the number of update
@@ -148,15 +164,15 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.all_update_num += module_info.level + 1
         timeout_count = 0
         complete_flag = True
-
+        self.__print("Module firmwares update start! total update module num : ",len(self.update_module_list))
         while timeout_count < 10:
             complete_flag = True
             time.sleep(timeout_delay)
             timeout_count += timeout_delay
-            
             for module_info in self.update_module_list:
                 module_index = self.update_module_list.index(module_info)
                 if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER :
+                    # self.__send_conn(parse_message(0x2C, 0x0, 0xFFF, (1,1)))
                     result = self.__update_firmware_second_bootloader(self.update_module_list[module_index])
                     if result == True:
                         self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER
@@ -265,6 +281,8 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                         check_flag = False
                         break
                 if check_flag == True:
+                    print(f"new module in assign id!!! ({module_type} {hex(sid)}) now connected module num = {len(self.update_module_list) + 1}")
+                    self.gathering_update_list_timeout = 0
                     temp_module = Module_info()
                     temp_module.id = sid
                     temp_module.uuid = module_uuid
@@ -279,9 +297,9 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.firmware_version_info = firmware_version_info
 
         # module list up in 3 seconds
-        time.sleep(3)
+        time.sleep(5)
 
-        self.update_in_progress = True
+        # self.update_in_progress = True
 
     def close_recv_thread(self):
         self.__running = False
@@ -404,11 +422,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 curr_data = curr_page[curr_ptr : curr_ptr + 8]
                 checksum = self.send_firmware_data(module_info.id, curr_ptr // 8, curr_data, checksum)
                 delay(0.001)
-            # noise = random.randrange(1,100)
-            # if noise < 4:
-            #     checksum = checksum + 1
-            #     print("noise detected")
-            # CRC on current page (send CRC request / receive CRC response)
+
             crc_page_success = self.send_firmware_command(
                 oper_type="crc",
                 module_id=module_info.id,
@@ -476,9 +490,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
 
         success_end_flash = self.send_end_flash_data(module_info.type, module_info.id, end_flash_data)
+
         if not success_end_flash:
             self.update_error_message = f"{module_info.type} ({module_info.id}) version writing failed."
             self.has_update_error = True
+            return False
 
         self.__print(f"Version info (os: v{os_version_info}, app: v{app_version_info}) has been written to its firmware!")
 
@@ -627,27 +643,30 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
 
             success_end_flash = self.send_end_flash_data(module_info.type, module_info.id, end_flash_data)
-            if not success_end_flash:
-                self.update_error_message = f"{module_info.type} ({module_info.id}) version writing failed."
-                self.has_update_error = True
 
             reboot_message = self.__set_module_state(module_info.id, Module.REBOOT, Module.PNP_OFF)
             self.__send_conn(reboot_message)
 
             self.__print(f"Version info (v{bootloader_version_info}) has been written to its firmware!")
+            # Firmware update flag down, resetting used flags
+            self.__print(f"Bootloader update is done for {module_info.type} ({module_info.id})")
+            self.reset_state(update_in_progress=True)
+
+            if not success_end_flash:
+                self.update_error_message = f"{module_info.type} ({module_info.id}) version writing failed."
+                self.has_update_error = True
+                return False
+            else :
+                self.progress = 100
+                self.__print(f"\rUpdating {module_info.type} ({module_info.id}) {self.__progress_bar(1, 1)} 100%")
+                self.update_complete_num += 1
+                self.progress = 0
+            return True
         else:
             self.has_update_error = True
             return False
 
-        # Firmware update flag down, resetting used flags
-        self.__print(f"Bootloader update is done for {module_info.type} ({module_info.id})")
-        self.reset_state(update_in_progress=True)
-
-        self.progress = 100
-        self.__print(f"\rUpdating {module_info.type} ({module_info.id}) {self.__progress_bar(1, 1)} 100%")
-        self.update_complete_num += 1
-        self.progress = 0
-        return True
+        
 
     def __update_firmware_second_bootloader(self, module_info: Module_info) -> bool:
         print(f"{module_info.type} ({module_info.id}) second_bootloader_update_start")
@@ -666,7 +685,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         page_offset = 0x4C00
         erase_page_num = 1
         end_flash_address = 0x0800f800
-        flash_info_memory_addr = 0x08004C00
+        flash_info_memory_addr = 0x08004800
         if module_info.type in ["speaker", "display", "env"]:
             page_size = 0x800
             bin_begin = 0x800
@@ -698,11 +717,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 page_begin = page_begin + page_size
                 time.sleep(0.02)
                 continue
-            if page_begin + page_offset == end_flash_address:
+            if page_begin + page_offset == end_flash_address:   # avoid end flash page
                 page_begin = page_begin + page_size
                 time.sleep(0.02)
                 continue
-            if page_begin + page_offset == flash_info_memory_addr:
+            if page_begin + page_offset == flash_info_memory_addr: # avoid uuid page
                 page_begin = page_begin + page_size
                 time.sleep(0.02)
                 continue
@@ -788,24 +807,24 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     end_flash_data[boot_address_index + 12] = ((0x08005000 >> (boot_address_index * 8)) & 0xFF)
 
             success_end_flash = self.send_end_flash_data(module_info.type, module_info.id, end_flash_data)
-            if not success_end_flash:
-                self.update_error_message = f"{module_info.type} ({module_info.id}) version writing failed."
-                self.has_update_error = True
-                print(self.update_error_message)
             reboot_message = self.__set_module_state(module_info.id, Module.REBOOT, Module.PNP_OFF)
             self.__send_conn(reboot_message)
             self.__send_conn(reboot_message)
 
-            self.__print(f"Version info (v{second_bootloader_version_info}) has been written to its firmware!")
-
             # Firmware update flag down, resetting used flags
-            self.__print(f"seconde bootloader update is done for {module_info.type} ({module_info.id})")
-            self.reset_state(update_in_progress=True)
-
-            self.progress = 100
-            self.__print(f"\rUpdating {module_info.type} ({module_info.id}) {self.__progress_bar(1, 1)} 100%")
-            self.update_complete_num += 1
-            self.progress = 0
+            if not success_end_flash:
+                self.update_error_message = f"{module_info.type} ({module_info.id}) version writing failed."
+                self.has_update_error = True
+                print(self.update_error_message)
+                return False
+            else :
+                self.__print(f"Version info (v{second_bootloader_version_info}) has been written to its firmware!")
+                self.progress = 100
+                self.__print(f"\rUpdating {module_info.type} ({module_info.id}) {self.__progress_bar(1, 1)} 100%")
+                self.update_complete_num += 1
+                self.progress = 0
+                self.__print(f"seconde bootloader update is done for {module_info.type} ({module_info.id})")
+                self.reset_state(update_in_progress=True)
             return True
 
     @staticmethod
@@ -1100,7 +1119,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         for module_info in self.update_module_list:
             if module_info.id == sid:
                 list_index = self.update_module_list.index(module_info)
-                self.update_module_list[list_index]. state = stream_state
+                self.update_module_list[list_index].state = stream_state
                 # print("state receive : ", stream_state)
                 if stream_state == self.CRC_ERROR:
                     self.update_response(response=True, is_error_response=True)
@@ -1131,25 +1150,30 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     check_flag = False
                     break
             if check_flag == True:
+                self.gathering_update_list_timeout = 0
                 temp_module = Module_info()
-                temp_module.id = sid
+                temp_module.id = module_uuid & 0xFFF
                 temp_module.uuid = module_uuid
                 temp_module.type = module_type
+                print(f"new module in warning!!! ({module_type} {hex(temp_module.id)}) now connected module num = {len(self.update_module_list) + 1}")
+            
                 self.update_module_list.append(temp_module)
 
         for module_info in self.update_module_list:
-            if module_info.uuid == module_uuid and module_info.state == None:
+            if module_info.id == sid and module_info.state == None:
+                print(f"{module_info.type} warning receive")
                 list_index = self.update_module_list.index(module_info)
                 if warning_type == 1:   #in bootloader but not ready to update
                     self.check_to_update_firmware(module_id)
                 elif warning_type == 2:
                     # Note that more than one warning type 2 message can be received
-                    self.update_module_list[list_index].state = self.UPDATE_READY
                     if length < 10:
-                        self.update_module_list[list_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER
+                        module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER
                     else:
                         module_section = unpack_data(data, (7, 1))[1]
                         boot_version = unpack_data(data, (8, 2))[1]
+
+                        print(module_type, self.firmware_version_info[module_type])
 
                         loaded_boot_version_info = self.firmware_version_info[module_type]["bootloader"]
                         loaded_boot_version_info = loaded_boot_version_info.lstrip("v").split("-")[0]
@@ -1160,9 +1184,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                             | loaded_boot_version_digits[2]
                         )
                         if module_section == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION and (boot_version != loaded_boot_version): # boot version is low, bootloader update is necessary
-                            self.update_module_list[list_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER
+                            module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER
                         else :
-                            self.update_module_list[list_index].level = module_section
+                            module_info.level = module_section
+                        print(f"{module_info.type} is already update")
+                        module_info.state = self.UPDATE_READY
                 break
 
     def __print(self, data, end="\n"):
@@ -1243,7 +1269,7 @@ class ModuleFirmwareMultiUpdater():
                         self.state[index] = 0
                     else:
                         self.wait_timeout[index] += delay
-                        if self.wait_timeout[index] > 5:
+                        if self.wait_timeout[index] > 15:
                             self.wait_timeout[index] = 0
                             self.state[index] = 1
                             module_updater.update_error = -1
