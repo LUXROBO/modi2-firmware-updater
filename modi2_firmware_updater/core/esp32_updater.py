@@ -5089,7 +5089,7 @@ class ESP32FirmwareUpdater():
                 if json_msg["c"] == 0x05 or json_msg["c"] == 0x0A:
                     module_uuid = unpack_data(json_msg["b"], (6, 2))[0]
                     module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network" or module_type == "camera":
+                    if module_type in ["network", "camera"]:
                         return module_uuid, module_type == "network"
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))

@@ -219,6 +219,9 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.__send_conn(firmware_update_ready_message)
 
     def add_to_module_list(self, module_id: int, module_type: str, module_section: int) -> None:
+        if module_type in ["network", "camera"]:
+            return
+
         modules_update_all_flag = True
 
         for curr_module_id, curr_module_type in self.modules_to_update_all:
@@ -1016,6 +1019,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         module_type = get_module_type_from_uuid(module_uuid)
         if module_type == "network":
             self.network_uuid = module_uuid
+
         if warning_type == 1:
             self.check_to_update_firmware(module_id)
         elif warning_type == 2:

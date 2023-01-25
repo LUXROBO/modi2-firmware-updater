@@ -93,7 +93,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                     module_uuid = unpacked_data[0]
                     module_version_digits = unpacked_data[1]
                     module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network" or module_type == "camera":
+                    if module_type in ["network", "camera"]:
                         module_version = [
                             str((module_version_digits & 0xE000) >> 13),    # major
                             str((module_version_digits & 0x1F00) >> 8),     # minor
@@ -103,7 +103,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 elif json_msg["c"] == 0x0A:
                     module_uuid = unpack_data(json_msg["b"], (6, 2))[0]
                     module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network" or module_type == "camera":
+                    if module_type in ["network", "camera"]:
                         return module_uuid , None, module_type == "network"
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
@@ -322,7 +322,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                     module_uuid = unpacked_data[0]
                     warning_type = unpacked_data[1]
                     module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network" or module_type == "camera":
+                    if module_type in ["network", "camera"]:
                         if not self.network_uuid:
                             self.network_uuid = module_uuid
                             self.network_id = self.network_uuid & 0xFFF
