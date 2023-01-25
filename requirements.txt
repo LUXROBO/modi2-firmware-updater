@@ -2,5 +2,6 @@ pyserial
 pyqt5
 pyinstaller
 packaging
+pillow
 requests
 winusbcdc
