@@ -5046,6 +5046,7 @@ class ESP32FirmwareUpdater():
         self.port = port
         self.baudrate = 921600
 
+        self.is_network = True
         self.network_uuid = None
         self.app_version_to_update = None
         self.ota_version_to_update = None
@@ -5082,14 +5083,14 @@ class ESP32FirmwareUpdater():
             try:
                 msg = self.wait_for_json(port)
                 if not msg:
-                    return None
+                    return None, None
 
                 json_msg = json.loads(msg)
                 if json_msg["c"] == 0x05 or json_msg["c"] == 0x0A:
                     module_uuid = unpack_data(json_msg["b"], (6, 2))[0]
                     module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network":
-                        return module_uuid
+                    if module_type == "network" or module_type == "camera":
+                        return module_uuid, module_type == "network"
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
                 None
@@ -5098,7 +5099,7 @@ class ESP32FirmwareUpdater():
                 None
 
             if time.time() - init_time > timeout:
-                return None
+                return None, None
 
             time.sleep(0.2)
 
@@ -5137,7 +5138,7 @@ class ESP32FirmwareUpdater():
             self.update_in_progress = True
 
             self.__print("get network uuid")
-            self.network_uuid = self.get_network_uuid(self.esp)
+            self.network_uuid, self.is_network = self.get_network_uuid(self.esp)
 
             time.sleep(1)
             self.__print("Reset interpreter...")
@@ -5192,21 +5193,33 @@ class ESP32FirmwareUpdater():
             network_serialport = ModiSerialPort(port=self.port)
             time.sleep(0.3)
             self.__print("get network uuid")
-            self.network_uuid = self.get_network_uuid(network_serialport)
+            self.network_uuid, self.is_network = self.get_network_uuid(network_serialport)
             network_serialport.close()
             time.sleep(1)
 
-            self.app_firmware_path = path.join(self.module_firmware_path, "esp32", "app", self.firmware_version_info["esp32_app"]["app"])
-            self.ota_firmware_path = path.join(self.module_firmware_path, "esp32", "ota", self.firmware_version_info["esp32_ota"]["app"])
-            self.arg = ['--chip', 'esp32',
-                        '--port', self.port,
-                        '--baud', str(self.baudrate),
-                        'write_flash',
-                        '0xd000', path.join(self.app_firmware_path,'ota_data_initial.bin'),
-                        '0x1000', path.join(self.app_firmware_path,'bootloader.bin'),
-                        '0x8000', path.join(self.app_firmware_path,'partitions.bin'),
-                        '0x00220000', path.join(self.ota_firmware_path,'modi_ota_factory.bin'),
-                        '0x00010000', path.join(self.app_firmware_path,'esp32.bin')]
+            if self.is_network:
+                self.app_firmware_path = path.join(self.module_firmware_path, "esp32", "app", self.firmware_version_info["esp32_app"]["app"])
+                self.ota_firmware_path = path.join(self.module_firmware_path, "esp32", "ota", self.firmware_version_info["esp32_ota"]["app"])
+                self.arg = ['--chip', 'esp32',
+                            '--port', self.port,
+                            '--baud', str(self.baudrate),
+                            'write_flash',
+                            '0xd000', path.join(self.app_firmware_path,'ota_data_initial.bin'),
+                            '0x1000', path.join(self.app_firmware_path,'bootloader.bin'),
+                            '0x8000', path.join(self.app_firmware_path,'partitions.bin'),
+                            '0x00220000', path.join(self.ota_firmware_path,'modi_ota_factory.bin'),
+                            '0x00010000', path.join(self.app_firmware_path,'esp32.bin')]
+            else:
+                root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "prerelease")
+                self.app_firmware_path = path.join(root_path, "esp32s3", "v1.0.0")
+                self.arg = ['--chip', 'esp32s3',
+                            '--port', self.port,
+                            '--baud', str(self.baudrate),
+                            'write_flash',
+                            '0x0000', path.join(self.app_firmware_path,'bootloader.bin'),
+                            '0x8000', path.join(self.app_firmware_path,'partition-table.bin'),
+                            '0xD000', path.join(self.app_firmware_path,'ota_data_initial.bin'),
+                            '0x10000', path.join(self.app_firmware_path,'modi2_camera_esp32.bin')]
 
             """
             Main function for esptool
@@ -5220,8 +5233,12 @@ class ESP32FirmwareUpdater():
             argv = self.arg
             esp = None
 
-            app_version_info = self.firmware_version_info["esp32_app"]["app"]
-            ota_version_info = self.firmware_version_info["esp32_ota"]["app"]
+            if self.is_network:
+                app_version_info = self.firmware_version_info["esp32_app"]["app"]
+                ota_version_info = self.firmware_version_info["esp32_ota"]["app"]
+            else:
+                app_version_info = "v1.0.0"
+                ota_version_info = "v0.0.0"
 
             self.app_version_to_update = app_version_info.lstrip("v").rstrip("\n").split("-")[0]
             self.ota_version_to_update = ota_version_info.lstrip("v").rstrip("\n").split("-")[0]
@@ -5568,8 +5585,9 @@ class ESP32FirmwareUpdater():
                     time.sleep(0.01)
                     self.esp.firmware_progress = 98
                     self.esp.set_esp_app_version(self.app_version_to_update)
-                    time.sleep(0.01)
-                    self.esp.set_esp_ota_version(self.ota_version_to_update)
+                    if self.is_network:
+                        time.sleep(0.01)
+                        self.esp.set_esp_ota_version(self.ota_version_to_update)
 
                 self.__print("ESP firmware update is complete!!")
                 self.esp.firmware_progress = 100
