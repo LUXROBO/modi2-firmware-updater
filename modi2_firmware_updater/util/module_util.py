@@ -24,6 +24,7 @@ def get_module_type_from_uuid(uuid):
         0x2060: "ir",
         0x2070: "joystick",
         0x2080: "tof",
+        0x2090: "camera",
         # Output modules
         0x4000: "display",
         0x4010: "motor",
@@ -47,6 +48,7 @@ def get_module_uuid_from_type(module_type):
         "ir"        :0x2060,
         "joystick"  :0x2070,
         "tof"       :0x2080,
+        "camera"    :0x2090,
         #  module :# Output
         "display"   :0x4000,
         "motor_a"   :0x4010,
