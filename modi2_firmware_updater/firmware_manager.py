@@ -211,7 +211,6 @@ class FirmwareManagerForm(QDialog):
             print(e)
             self.copy_assets_firmware()
         except:
-            print("asdasdas")
             self.copy_assets_firmware()
 
         return True

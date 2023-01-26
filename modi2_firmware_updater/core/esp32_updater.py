@@ -529,6 +529,11 @@ class ESPLoader(object):
                 return None
         return json_msg
 
+    def send_update_finish_packet(self):
+        finish_byte = b"\xAA" * 15
+        self._port.write(finish_byte)
+        time.sleep(0.5)
+
     def set_esp_app_version(self, version_text: str, retry = 5):
         # print(f"Writing esp app version info (v{version_text})")
         version_byte = version_text.encode("ascii")
@@ -5586,15 +5591,24 @@ class ESP32FirmwareUpdater():
                         self.esp.soft_reset(True)  # exit stub back to ROM loader
 
                 if self.update_error != -1:
-                    self.esp.firmware_progress = 94
-                    time.sleep(3)
-                    self.esp.wait_for_json()
-                    time.sleep(0.01)
-                    self.esp.firmware_progress = 98
-                    self.esp.set_esp_app_version(self.app_version_to_update)
                     if self.is_network:
+                        self.esp.firmware_progress = 94
+                        time.sleep(3)
+                        self.esp.wait_for_json()
+                        time.sleep(0.01)
+                        self.esp.firmware_progress = 98
+                        self.esp.set_esp_app_version(self.app_version_to_update)
                         time.sleep(0.01)
                         self.esp.set_esp_ota_version(self.ota_version_to_update)
+                    else:
+                        self.esp.firmware_progress = 94
+                        time.sleep(0.1)
+                        self.esp.send_update_finish_packet()
+                        time.sleep(0.1)
+                        self.esp.wait_for_json()
+                        time.sleep(0.01)
+                        self.esp.firmware_progress = 98
+                        self.esp.set_esp_app_version(self.app_version_to_update)
 
                 self.__print("ESP firmware update is complete!!")
                 self.esp.firmware_progress = 100
