@@ -737,9 +737,9 @@ class NetworkFirmwareMultiUpdater():
 
         if self.ui:
             if self.ui.is_english:
-                self.ui.update_network_submodule_button.setText("Network/Camera module update is in progress. (0%)")
+                self.ui.update_network_module_button.setText("Network/Camera module update is in progress. (0%)")
             else:
-                self.ui.update_network_submodule_button.setText("네트워크/카메라 모듈 업데이트가 진행중입니다. (0%)")
+                self.ui.update_network_module_button.setText("네트워크/카메라 모듈 업데이트가 진행중입니다. (0%)")
 
         delay = 0.01
         while True:
