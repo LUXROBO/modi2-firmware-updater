@@ -276,7 +276,7 @@ class Form(QDialog):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             if self.is_multi:
-                self.module_update_list_form.ui.show()
+                self.esp32_update_list_form.ui.show()
             return
         self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.pressed_path}); color: black;")
         self.ui.console.clear()
@@ -290,8 +290,8 @@ class Form(QDialog):
             raise Exception("No MODI+ port is connected")
 
         if self.is_multi:
-            self.module_update_list_form.ui.setWindowTitle("Update Network Modules")
-            self.module_update_list_form.reset_device_list()
+            self.esp32_update_list_form.ui.setWindowTitle("Update Network/Camera Modules")
+            self.esp32_update_list_form.reset_device_list()
 
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
@@ -299,7 +299,7 @@ class Form(QDialog):
             self.firmware_updater = NetworkFirmwareMultiUpdater(self.module_firmware_path)
             self.firmware_updater.set_task_end_callback(self.__reset_ui)
             if self.is_multi:
-                self.firmware_updater.set_ui(self.ui, self.module_update_list_form)
+                self.firmware_updater.set_ui(self.ui, self.esp32_update_list_form)
                 self.firmware_updater.update_module_firmware(modi_ports, firmware_version_info)
             else:
                 self.firmware_updater.set_ui(self.ui, None)
@@ -313,8 +313,8 @@ class Form(QDialog):
 
         if self.is_multi:
             if is_raspberrypi():
-                self.module_update_list_form.ui.setWindowState(Qt.WindowMaximized)
-            self.module_update_list_form.ui.exec_()
+                self.esp32_update_list_form.ui.setWindowState(Qt.WindowMaximized)
+            self.esp32_update_list_form.ui.exec_()
 
     def update_network_submodule_button_clicked(self):
         button_start = time.time()
@@ -334,7 +334,7 @@ class Form(QDialog):
             raise Exception("No MODI+ port is connected")
 
         if self.is_multi:
-            self.esp32_update_list_form.ui.setWindowTitle("Update Network Submodules")
+            self.esp32_update_list_form.ui.setWindowTitle("Update Network/Camera Submodules")
             self.esp32_update_list_form.reset_device_list()
 
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()

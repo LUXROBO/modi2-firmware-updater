@@ -50,7 +50,6 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         self.network_id = None
 
         self.update_in_progress = False
-        self.ui = None
 
         self.progress = 0
 
@@ -61,9 +60,6 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         self.has_update_error = False
 
         self.module_firmware_path = module_firmware_path
-
-    def set_ui(self, ui):
-        self.ui = ui
 
     def set_print(self, print):
         self.print = print
@@ -709,8 +705,6 @@ class NetworkFirmwareMultiUpdater():
         self.network_updaters = []
         self.network_uuid = []
         self.state = []
-        self.wait_timeout = []
-        self.num_to_update = []
 
         for i, modi_port in enumerate(modi_ports):
             if i > 9:
@@ -728,8 +722,6 @@ class NetworkFirmwareMultiUpdater():
                 self.network_updaters.append(network_updater)
                 self.state.append(0)
                 self.network_uuid.append('')
-                self.wait_timeout.append(0)
-                self.num_to_update.append(0)
 
         if self.list_ui:
             self.list_ui.set_device_num(len(self.network_updaters))
@@ -743,15 +735,19 @@ class NetworkFirmwareMultiUpdater():
                 args=(firmware_version_info, ),
                 daemon=True
             ).start()
-            if self.list_ui:
-                self.list_ui.error_message_signal.emit(index, "Wait for network uuid")
+
+        if self.ui:
+            if self.ui.is_english:
+                self.ui.update_network_submodule_button.setText("Network/Camera module update is in progress. (0%)")
+            else:
+                self.ui.update_network_submodule_button.setText("네트워크/카메라 모듈 업데이트가 진행중입니다. (0%)")
 
         delay = 0.01
         while True:
             is_done = True
             total_progress = 0
             for index, network_updater in enumerate(self.network_updaters):
-                if network_updater.network_uuid:
+                if network_updater.network_uuid and len(self.network_uuid[index]) == 0:
                     self.network_uuid[index] = f'0x{network_updater.network_uuid:X}'
                     if self.list_ui:
                         self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
@@ -761,13 +757,12 @@ class NetworkFirmwareMultiUpdater():
                     is_done = is_done & False
                     if network_updater.update_error == 0:
                         current_module_progress = network_updater.progress
-                        total_module_progress = network_updater.progress
-                        total_progress += total_module_progress / len(self.network_updaters)
+                        total_progress += current_module_progress / len(self.network_updaters)
 
                         if self.list_ui:
-                            self.list_ui.current_module_changed_signal.emit(index, "network")
-                            self.list_ui.error_message_signal.emit(index, "Updating module")
-                            self.list_ui.progress_signal.emit(index, int(current_module_progress), int(total_module_progress))
+                            if len(self.network_uuid[index]):
+                                self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+                            self.list_ui.progress_signal.emit(index, int(current_module_progress))
                     else:
                         total_progress += 100 / len(self.network_updaters)
                         self.state[index] = 1
@@ -778,7 +773,7 @@ class NetworkFirmwareMultiUpdater():
                         # update success
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, 0)
-                            self.list_ui.error_message_signal.emit(index, "Update success")
+                            self.list_ui.progress_signal.emit(index, 100)
                     else:
                         print("\n" + network_updater.update_error_message + "\n")
                         # update error
@@ -786,8 +781,6 @@ class NetworkFirmwareMultiUpdater():
                             self.list_ui.network_state_signal.emit(index, -1)
                             self.list_ui.error_message_signal.emit(index, network_updater.update_error_message)
 
-                    if self.list_ui:
-                        self.list_ui.progress_signal.emit(index, 100, 100)
                     self.state[index] = 2
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.network_updaters)

@@ -257,10 +257,10 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         module_version_digits = unpacked_data[1]
         module_type = get_module_type_from_uuid(module_uuid)
 
-        if module_type in ["None", "camera"]:
+        if module_type == "None":
             return
 
-        if module_type == "network":
+        if module_type in ["network", "camera"]:
             self.network_uuid = module_uuid
             self.network_id = sid
             module_version = [
@@ -1236,7 +1236,7 @@ class ModuleFirmwareMultiUpdater():
             is_done = True
             total_progress = 0
             for index, module_updater in enumerate(self.module_updaters):
-                if module_updater.network_uuid is not None:
+                if module_updater.network_uuid is not None and len(self.network_uuid[index]) == 0:
                     self.network_uuid[index] = f'0x{module_updater.network_uuid:X}'
                     if self.list_ui:
                         self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
@@ -1245,6 +1245,8 @@ class ModuleFirmwareMultiUpdater():
                     # wait module list
                     is_done = False
                     if self.list_ui:
+                        if len(self.network_uuid[index]):
+                            self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
                         self.list_ui.error_message_signal.emit(index, "Waiting for module list")
                     if module_updater.update_in_progress:
                         self.state[index] = 0
@@ -1259,6 +1261,8 @@ class ModuleFirmwareMultiUpdater():
                     # get module update list (only module update)
                     is_done = False
                     if self.list_ui:
+                        if len(self.network_uuid[index]):
+                            self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
                         self.list_ui.error_message_signal.emit(index, "Updating modules")
                     if module_updater.update_error == 0:
                         current_module_progress = 0

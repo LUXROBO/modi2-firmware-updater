@@ -41,24 +41,25 @@ def get_module_type_from_uuid(uuid):
 def get_module_uuid_from_type(module_type):
     module_type_hex = {
         # Setup modules
-        "battery"   :0x10,
+        "battery"       :0x10,
         # module :# Input
-        "env"       :0x2000,
-        "imu"      :0x2010,
-        "mic"       :0x2020,
-        "button"    :0x2030,
-        "dial"      :0x2040,
-        "ultrasonic" :0x2050,
-        "ir"        :0x2060,
-        "joystick"  :0x2070,
-        "tof"       :0x2080,
-        "camera"    :0x2090,
+        "env"           :0x2000,
+        "imu"           :0x2010,
+        "mic"           :0x2020,
+        "button"        :0x2030,
+        "dial"          :0x2040,
+        "ultrasonic"    :0x2050,
+        "ir"            :0x2060,
+        "joystick"      :0x2070,
+        "tof"           :0x2080,
+        "camera"        :0x2090,
         #  module :# Output
-        "display"   :0x4000,
-        "motor_a"   :0x4010,
-        "motor_b"   :0x4011,
-        "led"       :0x4020,
-        "speaker"   :0x4030,
+        "display"       :0x4000,
+        "motor"         :0x4010,
+        "motor_a"       :0x4010,
+        "motor_b"       :0x4011,
+        "led"           :0x4020,
+        "speaker"       :0x4030,
     }.get(module_type)
     return "network" if module_type_hex is None else module_type_hex
 

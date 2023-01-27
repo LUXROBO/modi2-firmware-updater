@@ -5069,13 +5069,9 @@ class ESP32FirmwareUpdater():
         self.update_error = 0
         self.update_error_message = ""
 
-        self.ui = None
         self.print = True
 
         self.module_firmware_path = module_firmware_path
-
-    def set_ui(self, ui):
-        self.ui = ui
 
     def set_print(self, print_):
         self.print = print_
@@ -5689,7 +5685,7 @@ class ESP32FirmwareMultiUploder():
             total_sequence = 0
 
             for index, esp32_updater in enumerate(self.esp32_updaters):
-                if esp32_updater.network_uuid is not None:
+                if esp32_updater.network_uuid is not None and len(self.network_uuid[index]) == 0:
                     self.network_uuid[index] = f'0x{esp32_updater.network_uuid:X}'
                     if self.list_ui:
                         self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
@@ -5712,6 +5708,8 @@ class ESP32FirmwareMultiUploder():
                         total_sequence += total
 
                         if self.list_ui:
+                            if len(self.network_uuid[index]):
+                                self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
                             self.list_ui.progress_signal.emit(index, int(value))
                     else:
                         self.state[index] = 2
