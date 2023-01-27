@@ -16,7 +16,7 @@ class ESP32UpdateListForm(QDialog):
     total_status_signal = pyqtSignal(str)
     error_message_signal = pyqtSignal(int, str)
 
-    def __init__(self, path_dict = {}):
+    def __init__(self, path_dict={}):
         QDialog.__init__(self)
 
         self.component_path = path_dict["component"]
@@ -140,14 +140,12 @@ class ESP32UpdateListForm(QDialog):
         if index > self.device_num - 1:
             return
 
-        module_type = "network"
-        try:
-            uuid_str = self.ui_network_id_list[index].text()
-            if len(uuid_str):
-                uuid = int(uuid_str, 16)
-                module_type = get_module_type_from_uuid(uuid)
-        except:
-            pass
+        uuid_str = self.ui_network_id_list[index].text()
+        if len(uuid_str) and uuid_str != "not connected":
+            uuid = int(uuid_str, 16)
+            module_type = get_module_type_from_uuid(uuid)
+        else:
+            module_type = "network"
 
         pixmap = QtGui.QPixmap()
         if state == -1:
@@ -204,7 +202,7 @@ class ModuleUpdateListForm(QDialog):
     total_status_signal = pyqtSignal(str)
     error_message_signal = pyqtSignal(int, str)
 
-    def __init__(self, path_dict = {}):
+    def __init__(self, path_dict={}):
         QDialog.__init__(self)
 
         self.component_path = path_dict["component"]
@@ -383,14 +381,12 @@ class ModuleUpdateListForm(QDialog):
         if index > self.device_num - 1:
             return
 
-        module_type = "network"
-        try:
-            uuid_str = self.ui_network_id_list[index].text()
-            if len(uuid_str):
-                uuid = int(uuid_str, 16)
-                module_type = get_module_type_from_uuid(uuid)
-        except:
-            pass
+        uuid_str = self.ui_network_id_list[index].text()
+        if len(uuid_str) and uuid_str != "not connected":
+            uuid = int(uuid_str, 16)
+            module_type = get_module_type_from_uuid(uuid)
+        else:
+            module_type = "network"
 
         pixmap = QtGui.QPixmap()
         if state == -1:

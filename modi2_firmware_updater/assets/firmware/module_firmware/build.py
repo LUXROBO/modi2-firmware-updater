@@ -14,6 +14,7 @@ def compare_version(left, right):
     else:
         return -1
 
+
 def rmtree(top):
     import stat
     for root, dirs, files in os.walk(top, topdown=False):
@@ -25,7 +26,9 @@ def rmtree(top):
             os.rmdir(os.path.join(root, name))
     os.rmdir(top)
 
+
 build_path = os.path.join(os.path.dirname(__file__), "build")
+
 
 def build(release_version):
 
@@ -60,13 +63,13 @@ def build(release_version):
                     if len(version_list):
                         latest_version[module_type] = version_list[0]
                         if module_type == "button":
-                            version_path =  os.path.join(root, module_type, latest_version[module_type], "version.txt")
+                            version_path = os.path.join(root, module_type, latest_version[module_type], "version.txt")
                             with open(version_path, "r") as version_file:
                                 version_info = version_file.read()
                                 version = json.loads(version_info)
                                 latest_version["os_e230"] = version["os"]
                         if module_type == "display":
-                            version_path =  os.path.join(root, module_type, latest_version[module_type], "version.txt")
+                            version_path = os.path.join(root, module_type, latest_version[module_type], "version.txt")
                             with open(version_path, "r") as version_file:
                                 version_info = version_file.read()
                                 version = json.loads(version_info)
@@ -204,6 +207,7 @@ def build(release_version):
         return False
 
     return True
+
 
 if __name__ == "__main__":
 

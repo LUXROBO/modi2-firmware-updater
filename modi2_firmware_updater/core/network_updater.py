@@ -27,15 +27,15 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
     def __init__(self, device=None, module_firmware_path=None):
         self.print = True
-        if device != None:
-            super().__init__(device, baudrate = 921600, timeout = 0.1, write_timeout = 0)
+        if device is not None:
+            super().__init__(device, baudrate=921600, timeout=0.1, write_timeout=0)
         else:
             modi_ports = list_modi_serialports()
             if not modi_ports:
                 raise SerialException("No MODI+ port is connected")
             for modi_port in modi_ports:
                 try:
-                    super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
+                    super().__init__(modi_port, baudrate=921600, timeout=0.1, write_timeout=0)
                 except Exception:
                     self.__print('Next network module')
                     continue
@@ -103,7 +103,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                         return module_uuid , None, module_type == "network"
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
-            except:
+            except Exception:
                 pass
 
             time.sleep(0.2)
@@ -152,7 +152,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         if self.is_open:
             self.write(send_pkt.encode("utf8"))
 
-    def receive_firmware_command_response(self, delay = 0.001, timeout = 5):
+    def receive_firmware_command_response(self, delay=0.001, timeout=5):
         response_wait_time = time.time()
         while True:
             responese_success = False
@@ -222,10 +222,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         while not end_flash_success:
             # Erase page (send erase request and receive erase response)
             erase_page_success = self.set_firmware_command(
-                oper_type = "erase",
-                module_id = module_id,
-                crc_val = erase_page_num,
-                page_addr = 0x0801F800
+                oper_type="erase",
+                module_id=module_id,
+                crc_val=erase_page_num,
+                page_addr=0x0801F800
             )
 
             # erase_page_success = self.set_firmware_command("erase", module_id, 0, 0x0801F800)
@@ -240,7 +240,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 curr_data = end_flash_data[end_flash_ptr : end_flash_ptr + 8]
                 checksum = self.set_firmware_data(
                     module_id,
-                    seq_num=end_flash_ptr//8,
+                    seq_num=end_flash_ptr // 8,
                     bin_data=curr_data,
                     checksum=checksum
                 )
@@ -327,7 +327,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
                         if warning_type != 2:
                             self.send_set_module_state(self.network_id, Module.UPDATE_FIRMWARE_READY, Module.PNP_OFF)
-                        if  warning_type == 2:
+                        if warning_type == 2:
                             break
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
@@ -381,7 +381,6 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         crc_error_limit = 2
         crc_error_count = 0
         while page_begin < bin_end :
-        # for page_begin in range(bin_begin, bin_end + 1, page_size):
             progress = 100 * page_begin // bin_end
             self.progress = progress
 
@@ -397,10 +396,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 continue
 
             erase_page_success = self.set_firmware_command(
-                oper_type = "erase",
-                module_id = module_id,
-                crc_val = erase_page_num,
-                page_addr = flash_memory_addr + page_begin + page_offset
+                oper_type="erase",
+                module_id=module_id,
+                crc_val=erase_page_num,
+                page_addr=flash_memory_addr + page_begin + page_offset
             )
 
             if not erase_page_success:
@@ -425,10 +424,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
             # CRC on current page (send CRC request / receive CRC response)
             crc_page_success = self.set_firmware_command(
-                oper_type = "crc",
-                module_id = module_id,
-                crc_val = checksum,
-                page_addr = flash_memory_addr + page_begin + page_offset
+                oper_type="crc",
+                module_id=module_id,
+                crc_val=checksum,
+                page_addr=flash_memory_addr + page_begin + page_offset
             )
 
             if crc_page_success:
@@ -521,7 +520,6 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         crc_error_limit = 2
         crc_error_count = 0
         while page_begin < bin_end :
-        # for page_begin in range(bin_begin, bin_end + 1, page_size):
             progress = 100 * page_begin // bin_end
             self.progress = progress
 
@@ -537,10 +535,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 continue
 
             erase_page_success = self.set_firmware_command(
-                oper_type = "erase",
-                module_id = module_id,
-                crc_val = erase_page_num,
-                page_addr = flash_memory_addr + page_begin + page_offset
+                oper_type="erase",
+                module_id=module_id,
+                crc_val=erase_page_num,
+                page_addr=flash_memory_addr + page_begin + page_offset
             )
 
             if not erase_page_success:
@@ -565,10 +563,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
             # CRC on current page (send CRC request / receive CRC response)
             crc_page_success = self.set_firmware_command(
-                oper_type = "crc",
-                module_id = module_id,
-                crc_val = checksum,
-                page_addr = flash_memory_addr + page_begin + page_offset
+                oper_type="crc",
+                module_id=module_id,
+                crc_val=checksum,
+                page_addr=flash_memory_addr + page_begin + page_offset
             )
 
             if crc_page_success:
@@ -686,6 +684,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         if self.print:
             print(data, end)
 
+
 class NetworkFirmwareMultiUpdater():
     def __init__(self, module_firmware_path):
         self.update_in_progress = False
@@ -701,7 +700,7 @@ class NetworkFirmwareMultiUpdater():
     def set_task_end_callback(self, task_end_callback):
         self.task_end_callback = task_end_callback
 
-    def update_module_firmware(self, modi_ports, firmware_version_info = {}):
+    def update_module_firmware(self, modi_ports, firmware_version_info={}):
         self.network_updaters = []
         self.network_uuid = []
         self.state = []
@@ -711,12 +710,12 @@ class NetworkFirmwareMultiUpdater():
                 break
             try:
                 network_updater = NetworkFirmwareUpdater(
-                    device = modi_port,
-                    module_firmware_path = self.module_firmware_path
+                    device=modi_port,
+                    module_firmware_path=self.module_firmware_path
                 )
                 network_updater.set_print(False)
                 network_updater.set_raise_error(False)
-            except:
+            except Exception:
                 print("open " + modi_port + " error")
             else:
                 self.network_updaters.append(network_updater)

@@ -81,7 +81,7 @@ def get_default_connected_device(serial_list, port, connect_attempts, initial_ba
                 _esp = chip_class(each_port, initial_baud, trace)
                 _esp.connect(before, connect_attempts)
             break
-        except (FatalError, OSError) as err:
+        except (FatalError, OSError):
             if port is not None:
                 raise
             # print("%s failed to connect: %s" % (each_port, err))
@@ -519,7 +519,7 @@ class ESPLoader(object):
         json_pkt += self._port.read_until(b"}")
         return json_pkt
 
-    def wait_for_json(self, timeout = 3):
+    def wait_for_json(self, timeout=3):
         json_msg = self.read_json()
         init_time = time.time()
         while not json_msg:
@@ -534,7 +534,7 @@ class ESPLoader(object):
         self._port.write(finish_byte)
         time.sleep(0.5)
 
-    def set_esp_app_version(self, version_text: str, retry = 5):
+    def set_esp_app_version(self, version_text: str, retry=5):
         # print(f"Writing esp app version info (v{version_text})")
         version_byte = version_text.encode("ascii")
         version_byte = b"\x00" * (8 - len(version_byte)) + version_byte
@@ -555,13 +555,13 @@ class ESPLoader(object):
                 if json_msg["c"] == 0xA1 and json_msg["s"] == 24:
                     break
                 # self.__boot_to_app()
-            except json.decoder.JSONDecodeError as jde:
+            except json.decoder.JSONDecodeError:
                 # print("json parse error: " + str(jde))
                 return None
 
             time.sleep(0.5)
 
-    def set_esp_ota_version(self, version_text: str, retry = 5):
+    def set_esp_ota_version(self, version_text: str, retry=5):
         # print(f"Writing esp ota version info (v{version_text})")
         version_byte = version_text.encode("ascii")
         version_byte = b"\x00" * (8 - len(version_byte)) + version_byte
@@ -581,7 +581,7 @@ class ESPLoader(object):
                 json_msg = json.loads(msg)
                 if json_msg["c"] == 0xA1 and json_msg["s"] == 70:
                     break
-            except json.decoder.JSONDecodeError as jde:
+            except json.decoder.JSONDecodeError:
                 # print("json parse error: " + str(jde))
                 return None
 
@@ -4493,29 +4493,30 @@ def add_spi_connection_arg(parent):
                             action=SpiConnectionAction)
 
 def add_spi_flash_subparsers(parent, allow_keep, auto_detect):
-        """ Add common parser arguments for SPI flash properties """
-        extra_keep_args = ['keep'] if allow_keep else []
+    """ Add common parser arguments for SPI flash properties """
+    extra_keep_args = ['keep'] if allow_keep else []
 
-        if auto_detect and allow_keep:
-            extra_fs_message = ", detect, or keep"
-        elif auto_detect:
-            extra_fs_message = ", or detect"
-        elif allow_keep:
-            extra_fs_message = ", or keep"
-        else:
-            extra_fs_message = ""
+    if auto_detect and allow_keep:
+        extra_fs_message = ", detect, or keep"
+    elif auto_detect:
+        extra_fs_message = ", or detect"
+    elif allow_keep:
+        extra_fs_message = ", or keep"
+    else:
+        extra_fs_message = ""
 
-        parent.add_argument('--flash_freq', '-ff', help='SPI Flash frequency',
-                            choices=extra_keep_args + ['80m', '60m', '48m', '40m', '30m', '26m', '24m', '20m', '16m', '15m', '12m'],
-                            default=os.environ.get('ESPTOOL_FF', 'keep' if allow_keep else '40m'))
-        parent.add_argument('--flash_mode', '-fm', help='SPI Flash mode',
-                            choices=extra_keep_args + ['qio', 'qout', 'dio', 'dout'],
-                            default=os.environ.get('ESPTOOL_FM', 'keep' if allow_keep else 'qio'))
-        parent.add_argument('--flash_size', '-fs', help='SPI Flash size in MegaBytes (1MB, 2MB, 4MB, 8MB, 16MB, 32MB, 64MB, 128MB)'
-                            ' plus ESP8266-only (256KB, 512KB, 2MB-c1, 4MB-c1)' + extra_fs_message,
-                            action=FlashSizeAction, auto_detect=auto_detect,
-                            default=os.environ.get('ESPTOOL_FS', 'keep' if allow_keep else '1MB'))
-        add_spi_connection_arg(parent)
+    parent.add_argument('--flash_freq', '-ff', help='SPI Flash frequency',
+                        choices=extra_keep_args + ['80m', '60m', '48m', '40m', '30m', '26m', '24m', '20m', '16m', '15m', '12m'],
+                        default=os.environ.get('ESPTOOL_FF', 'keep' if allow_keep else '40m'))
+    parent.add_argument('--flash_mode', '-fm', help='SPI Flash mode',
+                        choices=extra_keep_args + ['qio', 'qout', 'dio', 'dout'],
+                        default=os.environ.get('ESPTOOL_FM', 'keep' if allow_keep else 'qio'))
+    parent.add_argument('--flash_size', '-fs', help='SPI Flash size in MegaBytes (1MB, 2MB, 4MB, 8MB, 16MB, 32MB, 64MB, 128MB)'
+                        ' plus ESP8266-only (256KB, 512KB, 2MB-c1, 4MB-c1)' + extra_fs_message,
+                        action=FlashSizeAction, auto_detect=auto_detect,
+                        default=os.environ.get('ESPTOOL_FS', 'keep' if allow_keep else '1MB'))
+    add_spi_connection_arg(parent)
+
 
 def get_port_list():
     if list_modi_serialports is None:
@@ -5050,8 +5051,6 @@ KIFWbaN3AEV3WWOKRSRZdk2K1AOp6hXfdOWNSbrBNeiqw62x0WRt/lF8Zu1T/t2QeVAcKr9YIqR/yD3A
 9zKtKYrU2jI18UlzOjv/vBhMkkEZB0M1q/QFThhVdKYdGe5TMQOXuSKf/xdxa/YZ\
 """)))
 
-from os import path
-
 
 class ESP32FirmwareUpdater():
     def __init__(self, port, module_firmware_path=None):
@@ -5083,7 +5082,7 @@ class ESP32FirmwareUpdater():
         if self.print:
             print(data, end)
 
-    def get_network_uuid(self, port, timeout = 5):
+    def get_network_uuid(self, port, timeout=5):
         init_time = time.time()
         while True:
             get_uuid_pkt = b'{"c":40,"s":0,"d":4095,"b":"//8AAAAAAAA=","l":8}'
@@ -5169,7 +5168,7 @@ class ESP32FirmwareUpdater():
                 except json.decoder.JSONDecodeError as jde:
                     self.__print("json parse error: " + str(jde))
                     break
-                except:
+                except Exception:
                     self.__print("error")
                     break
 
@@ -5212,11 +5211,11 @@ class ESP32FirmwareUpdater():
                             '--port', self.port,
                             '--baud', str(self.baudrate),
                             'write_flash',
-                            '0xd000', path.join(self.app_firmware_path,'ota_data_initial.bin'),
-                            '0x1000', path.join(self.app_firmware_path,'bootloader.bin'),
-                            '0x8000', path.join(self.app_firmware_path,'partitions.bin'),
-                            '0x00220000', path.join(self.ota_firmware_path,'modi_ota_factory.bin'),
-                            '0x00010000', path.join(self.app_firmware_path,'esp32.bin')]
+                            '0xd000', path.join(self.app_firmware_path, 'ota_data_initial.bin'),
+                            '0x1000', path.join(self.app_firmware_path, 'bootloader.bin'),
+                            '0x8000', path.join(self.app_firmware_path, 'partitions.bin'),
+                            '0x00220000', path.join(self.ota_firmware_path, 'modi_ota_factory.bin'),
+                            '0x00010000', path.join(self.app_firmware_path, 'esp32.bin')]
             else:
                 root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "prerelease")
                 self.app_firmware_path = path.join(root_path, "esp32s3", "v1.0.0")
@@ -5224,10 +5223,10 @@ class ESP32FirmwareUpdater():
                             '--port', self.port,
                             '--baud', str(self.baudrate),
                             'write_flash',
-                            '0x0000', path.join(self.app_firmware_path,'bootloader.bin'),
-                            '0x8000', path.join(self.app_firmware_path,'partition-table.bin'),
-                            '0xD000', path.join(self.app_firmware_path,'ota_data_initial.bin'),
-                            '0x10000', path.join(self.app_firmware_path,'modi2_camera_esp32.bin')]
+                            '0x0000', path.join(self.app_firmware_path, 'bootloader.bin'),
+                            '0x8000', path.join(self.app_firmware_path, 'partition-table.bin'),
+                            '0xD000', path.join(self.app_firmware_path, 'ota_data_initial.bin'),
+                            '0x10000', path.join(self.app_firmware_path, 'modi2_camera_esp32.bin')]
 
             """
             Main function for esptool
@@ -5533,8 +5532,7 @@ class ESP32FirmwareUpdater():
                     try:
                         flash_id = self.esp.flash_id()
                         if flash_id in (0xffffff, 0x000000):
-                            print('WARNING: Failed to communicate with the flash chip, read/write operations will fail. '
-                                'Try checking the chip connections or removing any other hardware connected to IOs.')
+                            print('WARNING: Failed to communicate with the flash chip, read/write operations will fail. Try checking the chip connections or removing any other hardware connected to IOs.')
                     except Exception as e:
                         self.esp.trace('Unable to verify flash chip connection ({}).'.format(e))
 
@@ -5622,6 +5620,7 @@ class ESP32FirmwareUpdater():
 
             time.sleep(1)
 
+
 class ESP32FirmwareMultiUploder():
     def __init__(self, module_firmware_path):
         self.update_in_progress = False
@@ -5637,7 +5636,7 @@ class ESP32FirmwareMultiUploder():
     def set_task_end_callback(self, task_end_callback):
         self.task_end_callback = task_end_callback
 
-    def update_firmware(self, modi_ports, update_interpreter=False, firmware_version_info = {}):
+    def update_firmware(self, modi_ports, update_interpreter=False, firmware_version_info={}):
         self.esp32_updaters = []
         self.network_uuid = []
         self.state = []
@@ -5647,8 +5646,8 @@ class ESP32FirmwareMultiUploder():
                 break
             try:
                 esp32_updater = ESP32FirmwareUpdater(
-                    port = modi_port,
-                    module_firmware_path = self.module_firmware_path
+                    port=modi_port,
+                    module_firmware_path=self.module_firmware_path
                 )
                 esp32_updater.set_print(False)
                 esp32_updater.set_raise_error(False)

@@ -40,6 +40,7 @@ class StdoutRedirect(QObject):
         sys.stdout.flush()
         self.printOccur.emit(s, color)
 
+
 class PopupMessageBox(QtWidgets.QMessageBox):
     def __init__(self, main_window, level):
         QtWidgets.QMessageBox.__init__(self)
@@ -101,6 +102,7 @@ class ThreadSignal(QObject):
 
     def __init__(self):
         super().__init__()
+
 
 class Form(QDialog):
     """
@@ -169,7 +171,7 @@ class Form(QDialog):
         self.ui.manage_firmware_version_button.setStyleSheet(f"border-image: url({self.active_path}); color: black;")
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path}); color: black;")
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path}); color: black;")
-        self.ui.console.setStyleSheet(f"font-size: 10px; color: black")
+        self.ui.console.setStyleSheet("font-size: 10px; color: black")
 
         version_path = os.path.join(os.path.dirname(__file__), "..", "version.txt")
         with io.open(version_path, "r") as version_file:
@@ -257,7 +259,7 @@ class Form(QDialog):
         self.refresh_console()
 
         # Set delay option
-        delay_option = (self.is_multi==True)
+        delay_option = self.is_multi
         set_delay_option(delay_option)
 
         # check app update
@@ -537,7 +539,7 @@ class Form(QDialog):
             download_url = response["html_url"]
             for asset in response["assets"]:
                 file_name = asset["name"]
-                if not "Multi" in file_name and not "multi" in file_name:
+                if "Multi" not in file_name and "multi" not in file_name:
                     # single updater
                     if platform.system() == "Darwin" and ".dmg" in file_name:
                         download_url = asset["browser_download_url"]
@@ -559,7 +561,7 @@ class Form(QDialog):
                 import webbrowser
                 webbrowser.open(download_url, new=0, autoraise=True)
 
-        except:
+        except Exception:
             pass
 
     #
@@ -600,7 +602,7 @@ class Form(QDialog):
                 q_button.setStyleSheet(f"border-image: url({self.inactive_path}); color: black;")
                 q_button.setEnabled(False)
 
-    def __reset_ui(self, list_ui = None):
+    def __reset_ui(self, list_ui=None):
         for i, q_button in enumerate(self.buttons):
             if i in [5, 6]:
                 continue

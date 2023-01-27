@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import QDialog, QMessageBox
 
 class FirmwareManagerForm(QDialog):
 
-    def __init__(self, path_dict = {}):
+    def __init__(self, path_dict={}):
         QDialog.__init__(self)
 
         self.component_path = path_dict["component"]
@@ -154,7 +154,7 @@ class FirmwareManagerForm(QDialog):
         msg.setStandardButtons(QMessageBox.Ok)
         if download_success:
             self.refresh_firmware_info()
-            self.apply_firmware(show_message = False)
+            self.apply_firmware(show_message=False)
             msg.setIcon(QMessageBox.Icon.Information)
             msg.setText("download successful.")
         else:
@@ -169,7 +169,7 @@ class FirmwareManagerForm(QDialog):
         msg.setWindowTitle("refresh firmware")
         msg.setStandardButtons(QMessageBox.Ok)
         if refresh_success:
-            self.apply_firmware(show_message = False)
+            self.apply_firmware(show_message=False)
             msg.setIcon(QMessageBox.Icon.Information)
             msg.setText("refresh successful.")
         else:
@@ -178,7 +178,7 @@ class FirmwareManagerForm(QDialog):
         msg.exec_()
 
     def apply_button_clicked(self):
-        self.apply_firmware(show_message = True)
+        self.apply_firmware(show_message=True)
 
     def download_firmware(self):
         connection = self.__check_internet_connection()
@@ -209,8 +209,6 @@ class FirmwareManagerForm(QDialog):
 
         except Exception as e:
             print(e)
-            self.copy_assets_firmware()
-        except:
             self.copy_assets_firmware()
 
         return True
@@ -367,6 +365,7 @@ class FirmwareManagerForm(QDialog):
                 msg.exec_()
 
         except Exception as e:
+            print(str(e))
             return False
 
         return True
