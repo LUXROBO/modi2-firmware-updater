@@ -169,40 +169,39 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             time.sleep(timeout_delay)
             timeout_count += timeout_delay
             for module_info in self.update_module_list:
-                module_index = self.update_module_list.index(module_info)
-                if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER:
-                    result = self.__update_firmware_second_bootloader(self.update_module_list[module_index])
+                if module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER:
+                    result = self.__update_firmware_second_bootloader(module_info)
                     if result:
-                        self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER
+                        module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER
                     else:
                         complete_flag = False
-                        self.update_module_list[module_index].retry += 1
-                        if self.update_module_list[module_index].retry > retry_max:
-                            self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
+                        module_info.retry += 1
+                        if module_info.retry > retry_max:
+                            module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
                         continue
-                if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER:
-                    result = self.__update_firmware_bootloader(self.update_module_list[module_index])
+                if module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER:
+                    result = self.__update_firmware_bootloader(module_info)
                     if result:
-                        self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION
+                        module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION
                     else:
-                        self.update_module_list[module_index].retry += 1
+                        module_info.retry += 1
                         complete_flag = False
-                        if self.update_module_list[module_index].retry > retry_max:
-                            self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
+                        if module_info.retry > retry_max:
+                            module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
                         continue
-                if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION:
-                    result = self.__update_firmware(self.update_module_list[module_index])
+                if module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION:
+                    result = self.__update_firmware(module_info)
                     if result:
-                        self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE
+                        module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE
                     else:
-                        self.update_module_list[module_index].retry += 1
+                        module_info.retry += 1
                         complete_flag = False
-                        if self.update_module_list[module_index].retry > retry_max:
-                            self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
+                        if module_info.retry > retry_max:
+                            module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
                         continue
-                if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE:
+                if module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE:
                     continue
-                elif self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR:
+                elif module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR:
                     complete_flag = False
                     continue
             if complete_flag:
@@ -975,13 +974,13 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         return self.receive_command_response(id=module_id, success_response=success_state, fail_response=fail_state)
 
     def receive_command_response(self, id, success_response, fail_response, response_delay: float = 0.01, response_timeout: float = 0.5) -> bool:
-        list_index = -1
+        has_response = False
         result_flag = False
         for module_info in self.update_module_list:
             if module_info.id == id:
-                list_index = self.update_module_list.index(module_info)
+                has_response = True
                 response_wait_time = 0
-                while self.update_module_list[list_index].state != success_response:
+                while module_info.state != success_response:
                     time.sleep(response_delay)
                     response_wait_time += response_delay
                     if response_wait_time > response_timeout:
@@ -990,18 +989,18 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                             raise Exception(self.update_error_message)
                         result_flag = False
                         break
-                    if self.update_module_list[list_index].state == fail_response:
+                    if module_info.state == fail_response:
                         self.update_error_message = "Response Errored"
                         if self.raise_error_message:
                             raise Exception(self.update_error_message)
                         self.response_error_flag = False
                         result_flag = False
                         break
-                if self.update_module_list[list_index].state == success_response:
+                if module_info.state == success_response:
                     result_flag = True
                 break
-        if list_index != -1:
-            self.update_module_list[list_index].state = self.NO_ERROR
+        if has_response:
+            module_info.state = self.NO_ERROR
         return result_flag
 
     def send_firmware_data(self, module_id: int, seq_num: int, bin_data: bytes, crc_val: int) -> int:
@@ -1074,11 +1073,9 @@ class ModuleFirmwareUpdater(ModiSerialPort):
     def __update_firmware_state(self, sid: int, data: str, length: int):
         message_decoded = unpack_data(data, (4, 1))
         stream_state = message_decoded[1]
-        list_index = 0
         for module_info in self.update_module_list:
             if module_info.id == sid:
-                list_index = self.update_module_list.index(module_info)
-                self.update_module_list[list_index].state = stream_state
+                module_info.state = stream_state
                 if stream_state == self.CRC_ERROR:
                     self.update_response(response=True, is_error_response=True)
                 elif stream_state == self.CRC_COMPLETE:
