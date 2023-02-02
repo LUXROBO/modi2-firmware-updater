@@ -14,6 +14,7 @@ from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPo
 from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid
 from modi2_firmware_updater.util.platform_util import delay
 
+
 def retry(exception_to_catch):
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -26,14 +27,16 @@ def retry(exception_to_catch):
 
     return decorator
 
+
 @dataclass
 class Module_info:
-    uuid:int = None
-    id:int = None
-    type:str = None
-    state:int = None
-    level:int = None
-    retry:int = 0
+    uuid: int = None
+    id: int = None
+    type: str = None
+    state: int = None
+    level: int = None
+    retry: int = 0
+
 
 class ModuleFirmwareUpdater(ModiSerialPort):
     """Module Firmware Updater: Updates a firmware of given module"""
@@ -86,15 +89,15 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.update_complete_num = 0
         self.gathering_update_list_timeout = 0
 
-        if device != None:
-            super().__init__(device, baudrate = 921600, timeout = 0.1, write_timeout = 0)
+        if device is not None:
+            super().__init__(device, baudrate=921600, timeout=0.1, write_timeout=0)
         else:
             modi_ports = list_modi_serialports()
             if not modi_ports:
                 raise SerialException("No MODI+ port is connected")
             for modi_port in modi_ports:
                 try:
-                    super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
+                    super().__init__(modi_port, baudrate=921600, timeout=0.1, write_timeout=0)
                 except Exception:
                     self.__print('Next network module')
                     continue
@@ -140,7 +143,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     ready_flag = True
                     if int(timeout_count) % 5 == 0 and int(timeout_count) != 0:
                         self.check_to_update_firmware(module_info.id)
-            if ready_flag == False:
+            if not ready_flag:
                 break
             time.sleep(timeout_delay)
             timeout_count += 1
@@ -166,49 +169,45 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             time.sleep(timeout_delay)
             timeout_count += timeout_delay
             for module_info in self.update_module_list:
-                module_index = self.update_module_list.index(module_info)
-                if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER:
-                    result = self.__update_firmware_second_bootloader(self.update_module_list[module_index])
-                    if result == True:
-                        self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER
+                if module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER:
+                    result = self.__update_firmware_second_bootloader(module_info)
+                    if result:
+                        module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER
                     else:
                         complete_flag = False
-                        self.update_module_list[module_index].retry += 1
-                        if self.update_module_list[module_index].retry > retry_max:
-                            self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
+                        module_info.retry += 1
+                        if module_info.retry > retry_max:
+                            module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
                         continue
-                if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER:
-                    result = self.__update_firmware_bootloader(self.update_module_list[module_index])
-                    if result == True:
-                        self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION
+                if module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_BOOTLOADER:
+                    result = self.__update_firmware_bootloader(module_info)
+                    if result:
+                        module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION
                     else:
-                        self.update_module_list[module_index].retry += 1
+                        module_info.retry += 1
                         complete_flag = False
-                        if self.update_module_list[module_index].retry > retry_max:
-                            self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
+                        if module_info.retry > retry_max:
+                            module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
                         continue
-                if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION:
-                    result = self.__update_firmware(self.update_module_list[module_index])
-                    if result == True:
-                        self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE
+                if module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION:
+                    result = self.__update_firmware(module_info)
+                    if result:
+                        module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE
                     else:
-                        self.update_module_list[module_index].retry += 1
+                        module_info.retry += 1
                         complete_flag = False
-                        if self.update_module_list[module_index].retry > retry_max:
-                            self.update_module_list[module_index].level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
+                        if module_info.retry > retry_max:
+                            module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR
                         continue
-                if self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE:
+                if module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_DONE:
                     continue
-                elif  self.update_module_list[module_index].level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR:
+                elif module_info.level == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_ERROR:
                     complete_flag = False
                     continue
-            if complete_flag == True:
+            if complete_flag:
                 break
 
-        if complete_flag == True:
-            self.update_error = 1
-        else:
-            self.update_error = -1
+        self.update_error = 1 if complete_flag else -1
 
         reboot_message = self.__set_module_state(0xFFF, Module.REBOOT, Module.PNP_OFF)
         self.__send_conn(reboot_message)
@@ -235,11 +234,11 @@ class ModuleFirmwareUpdater(ModiSerialPort):
     def request_network_id(self):
         self.__send_conn(parse_message(0x28, 0x0, 0xFFF, (0xFF, 0x0F)))
 
-    def request_module_id(self, id:int):
+    def request_module_id(self, id: int):
         self.__send_conn(parse_message(0x8, 0x0, id, (0xFF, 0x0F)))
 
-    def __request_uuid(self, sid, data, length:int):
-        if self.update_in_progress == False:
+    def __request_uuid(self, sid, data, length: int):
+        if self.update_in_progress is False:
             if sid == self.network_id:
                 return
             else:
@@ -248,19 +247,19 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     if module_info.id == sid:
                         check_flag = False
                         break
-                if check_flag == True:
+                if check_flag:
                     self.request_module_id(sid)
 
-    def __assign_module_id(self, sid, data, length:int):
+    def __assign_module_id(self, sid, data, length: int):
         unpacked_data = unpack_data(data, (6, 2))
         module_uuid = unpacked_data[0]
         module_version_digits = unpacked_data[1]
         module_type = get_module_type_from_uuid(module_uuid)
 
-        if module_type in ["None", "camera"]:
+        if module_type == "None":
             return
 
-        if module_type == "network":
+        if module_type in ["network", "camera"]:
             self.network_uuid = module_uuid
             self.network_id = sid
             module_version = [
@@ -271,13 +270,13 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.network_version = ".".join(module_version)
         else:
             # module list up
-            if self.update_in_progress == False:
+            if self.update_in_progress is False:
                 check_flag = True
                 for module_info in self.update_module_list:
                     if module_info.uuid == module_uuid:
                         check_flag = False
                         break
-                if check_flag == True:
+                if check_flag:
                     self.gathering_update_list_timeout = 0
                     temp_module = Module_info()
                     temp_module.id = sid
@@ -285,7 +284,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     temp_module.type = module_type
                     self.update_module_list.append(temp_module)
 
-    def update_module_firmware(self, firmware_version_info = {}):
+    def update_module_firmware(self, firmware_version_info={}):
         self.has_update_error = False
         self.request_network_id()
         self.request_module_id(0xFFF)
@@ -392,7 +391,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             erase_page_success = self.send_firmware_command(
                 oper_type="erase",
                 module_id=module_info.id,
-                crc_val=erase_page_num, # when page erase, crc value is replaced by data size
+                crc_val=erase_page_num,
                 dest_addr=flash_memory_addr,
                 page_addr=page_begin + page_offset,
             )
@@ -565,7 +564,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             erase_page_success = self.send_firmware_command(
                 oper_type="erase",
                 module_id=module_info.id,
-                crc_val=erase_page_num, # when page erase, crc value is replaced by data size
+                crc_val=erase_page_num,
                 dest_addr=flash_memory_addr,
                 page_addr=page_begin + page_offset,
             )
@@ -601,7 +600,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 page_addr=page_begin + page_offset,
             )
 
-            if crc_page_success == False:
+            if crc_page_success is False:
                 crc_error_count = crc_error_count + 1
                 if crc_error_count > crc_error_limit:
                     crc_error_count = 0
@@ -707,11 +706,13 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 page_begin = page_begin + page_size
                 time.sleep(0.02)
                 continue
-            if page_begin + page_offset == end_flash_address:   # avoid end flash page
+            if page_begin + page_offset == end_flash_address:
+                # avoid end flash page
                 page_begin = page_begin + page_size
                 time.sleep(0.02)
                 continue
-            if page_begin + page_offset == flash_info_memory_addr: # avoid uuid page
+            if page_begin + page_offset == flash_info_memory_addr:
+                # avoid uuid page
                 page_begin = page_begin + page_size
                 time.sleep(0.02)
                 continue
@@ -719,8 +720,8 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             # Erase page (send erase request and receive its response)
             erase_page_success = self.send_firmware_command(
                 oper_type="erase",
-                module_id = module_info.id,
-                crc_val=erase_page_num, # when page erase, crc value is replaced by data size
+                module_id=module_info.id,
+                crc_val=erase_page_num,
                 dest_addr=flash_memory_addr,
                 page_addr=page_begin + page_offset,
             )
@@ -755,7 +756,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 page_addr=page_begin + page_offset,
             )
 
-            if crc_page_success == False:
+            if crc_page_success is False:
                 crc_error_count = crc_error_count + 1
                 if crc_error_count > crc_error_limit:
                     crc_error_count = 0
@@ -871,7 +872,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 curr_data = end_flash_data[end_flash_ptr: end_flash_ptr + 8]
                 checksum = self.send_firmware_data(
                     module_id,
-                    seq_num=end_flash_ptr//8,
+                    seq_num=end_flash_ptr // 8,
                     bin_data=curr_data,
                     crc_val=checksum
                 )
@@ -970,17 +971,16 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.reset_state(True)
         request_message = self.get_firmware_command(module_id, 1, rot_scmd, crc_val, page_addr=dest_addr + page_addr)
         self.__send_conn(request_message)
-        return self.receive_command_response2(id=module_id, success_response=success_state, fail_response=fail_state, max_response_error_count=3)
-        # return self.receive_command_response()
+        return self.receive_command_response(id=module_id, success_response=success_state, fail_response=fail_state)
 
-    def receive_command_response2(self, id, success_response, fail_response, response_delay: float = 0.01, response_timeout: float = 0.5, max_response_error_count: int = 10) ->bool:
-        list_index = -1
+    def receive_command_response(self, id, success_response, fail_response, response_delay: float = 0.01, response_timeout: float = 0.5) -> bool:
+        has_response = False
         result_flag = False
         for module_info in self.update_module_list:
             if module_info.id == id:
-                list_index = self.update_module_list.index(module_info)
+                has_response = True
                 response_wait_time = 0
-                while self.update_module_list[list_index].state != success_response:
+                while module_info.state != success_response:
                     time.sleep(response_delay)
                     response_wait_time += response_delay
                     if response_wait_time > response_timeout:
@@ -989,45 +989,19 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                             raise Exception(self.update_error_message)
                         result_flag = False
                         break
-                    if self.update_module_list[list_index].state == fail_response:
+                    if module_info.state == fail_response:
                         self.update_error_message = "Response Errored"
                         if self.raise_error_message:
                             raise Exception(self.update_error_message)
                         self.response_error_flag = False
                         result_flag = False
                         break
-                if self.update_module_list[list_index].state == success_response:
+                if module_info.state == success_response:
                     result_flag = True
                 break
-        if list_index != -1:
-            self.update_module_list[list_index].state = self.NO_ERROR
+        if has_response:
+            module_info.state = self.NO_ERROR
         return result_flag
-
-    def receive_command_response(self, response_delay: float = 0.01, response_timeout: float = 0.5, max_response_error_count: int = 10,) -> bool:
-        # Receive firmware command response
-        response_wait_time = 0
-        while not self.response_flag:
-            # Calculate timeout at each iteration
-            time.sleep(response_delay)
-            response_wait_time += response_delay
-
-            # If timed-out
-            if response_wait_time > response_timeout:
-                self.update_error_message = "Response timed-out"
-                if self.raise_error_message:
-                    raise Exception(self.update_error_message)
-                return False
-
-            # If error is raised
-            if self.response_error_flag:
-                self.update_error_message = "Response Errored"
-                if self.raise_error_message:
-                    raise Exception(self.update_error_message)
-                self.response_error_flag = False
-                return False
-
-        self.response_flag = False
-        return True
 
     def send_firmware_data(self, module_id: int, seq_num: int, bin_data: bytes, crc_val: int) -> int:
         # Send firmware data
@@ -1083,7 +1057,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             if not msg:
                 return
             ins, sid, did, data, length = decode_message(msg)
-        except:
+        except Exception:
             return
 
         command = {
@@ -1096,14 +1070,12 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         if command:
             command(sid, data, length)
 
-    def __update_firmware_state(self, sid: int, data: str, length:int):
+    def __update_firmware_state(self, sid: int, data: str, length: int):
         message_decoded = unpack_data(data, (4, 1))
         stream_state = message_decoded[1]
-        list_index = 0
         for module_info in self.update_module_list:
             if module_info.id == sid:
-                list_index = self.update_module_list.index(module_info)
-                self.update_module_list[list_index].state = stream_state
+                module_info.state = stream_state
                 if stream_state == self.CRC_ERROR:
                     self.update_response(response=True, is_error_response=True)
                 elif stream_state == self.CRC_COMPLETE:
@@ -1113,7 +1085,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 elif stream_state == self.ERASE_COMPLETE:
                     self.update_response(response=True)
 
-    def __update_warning(self, sid: int, data: str, length:int) -> None:
+    def __update_warning(self, sid: int, data: str, length: int) -> None:
         module_uuid = unpack_data(data, (6, 1))[0]
         warning_type = unpack_data(data, (6, 1))[1]
 
@@ -1130,13 +1102,13 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.network_uuid = module_uuid
         else:
             # if get module list state, do
-            if self.update_in_progress == False:
+            if self.update_in_progress is False:
                 check_flag = True
                 for module_info in self.update_module_list:
                     if module_info.uuid == module_uuid:
                         check_flag = False
                         break
-                if check_flag == True:
+                if check_flag:
                     self.gathering_update_list_timeout = 0
                     temp_module = Module_info()
                     temp_module.id = module_uuid & 0xFFF
@@ -1146,9 +1118,9 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     self.update_module_list.append(temp_module)
 
             for module_info in self.update_module_list:
-                if module_info.id == sid and module_info.state == None:
-                    list_index = self.update_module_list.index(module_info)
-                    if warning_type == 1:   #in bootloader but not ready to update
+                if module_info.id == sid and module_info.state is None:
+                    if warning_type == 1:
+                        # in bootloader but not ready to update
                         self.check_to_update_firmware(module_id)
                     elif warning_type == 2:
                         # Note that more than one warning type 2 message can be received
@@ -1166,7 +1138,8 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                                 | loaded_boot_version_digits[1] << 8
                                 | loaded_boot_version_digits[2]
                             )
-                            if module_section == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION and (boot_version != loaded_boot_version): # boot version is low, bootloader update is necessary
+                            if module_section == self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_APPLICATION and (boot_version != loaded_boot_version):
+                                # boot version is low, bootloader update is necessary
                                 module_info.level = self.BOOT_UPDATE_SECTION_NEED_TO_UPDATE_SECOND_BOOTLOADER
                             else:
                                 module_info.level = module_section
@@ -1176,6 +1149,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
     def __print(self, data, end="\n"):
         if self.print:
             print(data, end)
+
 
 class ModuleFirmwareMultiUpdater():
     def __init__(self, module_firmware_path):
@@ -1203,12 +1177,12 @@ class ModuleFirmwareMultiUpdater():
                 break
             try:
                 module_updater = ModuleFirmwareUpdater(
-                    device = modi_port,
-                    module_firmware_path = self.module_firmware_path
+                    device=modi_port,
+                    module_firmware_path=self.module_firmware_path
                 )
                 module_updater.set_print(False)
                 module_updater.set_raise_error(False)
-            except:
+            except Exception:
                 print("open " + modi_port + " error")
             else:
                 self.module_updaters.append(module_updater)
@@ -1236,7 +1210,7 @@ class ModuleFirmwareMultiUpdater():
             is_done = True
             total_progress = 0
             for index, module_updater in enumerate(self.module_updaters):
-                if module_updater.network_uuid is not None:
+                if module_updater.network_uuid is not None and len(self.network_uuid[index]) == 0:
                     self.network_uuid[index] = f'0x{module_updater.network_uuid:X}'
                     if self.list_ui:
                         self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
@@ -1245,6 +1219,8 @@ class ModuleFirmwareMultiUpdater():
                     # wait module list
                     is_done = False
                     if self.list_ui:
+                        if len(self.network_uuid[index]):
+                            self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
                         self.list_ui.error_message_signal.emit(index, "Waiting for module list")
                     if module_updater.update_in_progress:
                         self.state[index] = 0
@@ -1259,12 +1235,14 @@ class ModuleFirmwareMultiUpdater():
                     # get module update list (only module update)
                     is_done = False
                     if self.list_ui:
+                        if len(self.network_uuid[index]):
+                            self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
                         self.list_ui.error_message_signal.emit(index, "Updating modules")
                     if module_updater.update_error == 0:
                         current_module_progress = 0
                         total_module_progress = 0
 
-                        if module_updater.progress != None and (module_updater.all_update_num) != 0:
+                        if module_updater.progress is not None and (module_updater.all_update_num) != 0:
                             current_module_progress = module_updater.progress
                             if (module_updater.update_complete_num) == (module_updater.all_update_num):
                                 total_module_progress = 100

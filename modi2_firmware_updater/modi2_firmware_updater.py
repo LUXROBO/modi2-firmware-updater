@@ -40,6 +40,7 @@ class StdoutRedirect(QObject):
         sys.stdout.flush()
         self.printOccur.emit(s, color)
 
+
 class PopupMessageBox(QtWidgets.QMessageBox):
     def __init__(self, main_window, level):
         QtWidgets.QMessageBox.__init__(self)
@@ -101,6 +102,7 @@ class ThreadSignal(QObject):
 
     def __init__(self):
         super().__init__()
+
 
 class Form(QDialog):
     """
@@ -169,7 +171,7 @@ class Form(QDialog):
         self.ui.manage_firmware_version_button.setStyleSheet(f"border-image: url({self.active_path}); color: black;")
         self.ui.translate_button.setStyleSheet(f"border-image: url({self.language_frame_path}); color: black;")
         self.ui.devmode_button.setStyleSheet(f"border-image: url({self.language_frame_path}); color: black;")
-        self.ui.console.setStyleSheet(f"font-size: 10px; color: black")
+        self.ui.console.setStyleSheet("font-size: 10px; color: black")
 
         version_path = os.path.join(os.path.dirname(__file__), "..", "version.txt")
         with io.open(version_path, "r") as version_file:
@@ -257,7 +259,7 @@ class Form(QDialog):
         self.refresh_console()
 
         # Set delay option
-        delay_option = (self.is_multi==True)
+        delay_option = self.is_multi
         set_delay_option(delay_option)
 
         # check app update
@@ -276,7 +278,7 @@ class Form(QDialog):
         button_start = time.time()
         if self.firmware_updater and self.firmware_updater.update_in_progress:
             if self.is_multi:
-                self.module_update_list_form.ui.show()
+                self.esp32_update_list_form.ui.show()
             return
         self.ui.update_network_module_button.setStyleSheet(f"border-image: url({self.pressed_path}); color: black;")
         self.ui.console.clear()
@@ -290,8 +292,8 @@ class Form(QDialog):
             raise Exception("No MODI+ port is connected")
 
         if self.is_multi:
-            self.module_update_list_form.ui.setWindowTitle("Update Network Modules")
-            self.module_update_list_form.reset_device_list()
+            self.esp32_update_list_form.ui.setWindowTitle("Update Network/Camera Modules")
+            self.esp32_update_list_form.reset_device_list()
 
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
 
@@ -299,7 +301,7 @@ class Form(QDialog):
             self.firmware_updater = NetworkFirmwareMultiUpdater(self.module_firmware_path)
             self.firmware_updater.set_task_end_callback(self.__reset_ui)
             if self.is_multi:
-                self.firmware_updater.set_ui(self.ui, self.module_update_list_form)
+                self.firmware_updater.set_ui(self.ui, self.esp32_update_list_form)
                 self.firmware_updater.update_module_firmware(modi_ports, firmware_version_info)
             else:
                 self.firmware_updater.set_ui(self.ui, None)
@@ -313,8 +315,8 @@ class Form(QDialog):
 
         if self.is_multi:
             if is_raspberrypi():
-                self.module_update_list_form.ui.setWindowState(Qt.WindowMaximized)
-            self.module_update_list_form.ui.exec_()
+                self.esp32_update_list_form.ui.setWindowState(Qt.WindowMaximized)
+            self.esp32_update_list_form.ui.exec_()
 
     def update_network_submodule_button_clicked(self):
         button_start = time.time()
@@ -334,7 +336,7 @@ class Form(QDialog):
             raise Exception("No MODI+ port is connected")
 
         if self.is_multi:
-            self.esp32_update_list_form.ui.setWindowTitle("Update Network Submodules")
+            self.esp32_update_list_form.ui.setWindowTitle("Update Network/Camera Submodules")
             self.esp32_update_list_form.reset_device_list()
 
         firmware_version_info = self.firmware_manage_form.get_config_firmware_version_info()
@@ -537,7 +539,7 @@ class Form(QDialog):
             download_url = response["html_url"]
             for asset in response["assets"]:
                 file_name = asset["name"]
-                if not "Multi" in file_name and not "multi" in file_name:
+                if "Multi" not in file_name and "multi" not in file_name:
                     # single updater
                     if platform.system() == "Darwin" and ".dmg" in file_name:
                         download_url = asset["browser_download_url"]
@@ -559,7 +561,7 @@ class Form(QDialog):
                 import webbrowser
                 webbrowser.open(download_url, new=0, autoraise=True)
 
-        except:
+        except Exception:
             pass
 
     #
@@ -600,7 +602,7 @@ class Form(QDialog):
                 q_button.setStyleSheet(f"border-image: url({self.inactive_path}); color: black;")
                 q_button.setEnabled(False)
 
-    def __reset_ui(self, list_ui = None):
+    def __reset_ui(self, list_ui=None):
         for i, q_button in enumerate(self.buttons):
             if i in [5, 6]:
                 continue
