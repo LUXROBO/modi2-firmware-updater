@@ -1,0 +1,4 @@
+{
+    "bootloader":"v1.0.1",
+    "second_bootloader":"v1.0.1"
+}

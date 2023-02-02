@@ -14,7 +14,8 @@ jobs:
     needs: [build-macos-single, build-macos-multi, build-windows-single, build-windows-multi]
 
     steps:
-    - uses: actions/checkout@v1
+    - name: checkout
+      uses: actions/checkout@v2
 
     - name: create release
       id: create_release
@@ -84,7 +85,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
 
     - name: Install Python
       uses: actions/setup-python@v2
@@ -113,7 +114,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
 
     - name: Install Python
       uses: actions/setup-python@v2
@@ -138,11 +139,11 @@ jobs:
         retention-days: 1
 
   build-windows-single:
-    runs-on: windows-latest
+    runs-on: [self-hosted, lattepanda]
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
 
     - name: Install Python
       uses: actions/setup-python@v2
@@ -156,6 +157,10 @@ jobs:
     - name: Run PyInstaller on Windows
       run: python bootstrap.py --mode single
 
+    - name: Certificate app
+      shell: cmd
+      run: .\certificate\win_certificate.bat ${{ secrets.CER_TOKEN }} ${{ secrets.CER_CONT }} "MODI+ Firmware Updater.exe"
+
     - name: Upload windows app
       uses: actions/upload-artifact@v2
       with:
@@ -164,11 +169,11 @@ jobs:
         retention-days: 1
 
   build-windows-multi:
-    runs-on: windows-latest
+    runs-on: [self-hosted, lattepanda]
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
 
     - name: Install Python
       uses: actions/setup-python@v2
@@ -181,6 +186,10 @@ jobs:
 
     - name: Run PyInstaller on Windows
       run: python bootstrap.py --mode multi
+
+    - name: Certificate app
+      shell: cmd
+      run: .\certificate\win_certificate.bat ${{ secrets.CER_TOKEN }} ${{ secrets.CER_CONT }} "MODI+ Firmware Multi Updater.exe"
 
     - name: Upload windows app
       uses: actions/upload-artifact@v2

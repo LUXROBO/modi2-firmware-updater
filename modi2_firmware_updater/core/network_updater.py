@@ -27,15 +27,15 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
     def __init__(self, device=None, module_firmware_path=None):
         self.print = True
-        if device != None:
-            super().__init__(device, baudrate = 921600, timeout = 0.1, write_timeout = 0)
+        if device is not None:
+            super().__init__(device, baudrate=921600, timeout=0.1, write_timeout=0)
         else:
             modi_ports = list_modi_serialports()
             if not modi_ports:
                 raise SerialException("No MODI+ port is connected")
             for modi_port in modi_ports:
                 try:
-                    super().__init__(modi_port, baudrate = 921600, timeout = 0.1, write_timeout = 0)
+                    super().__init__(modi_port, baudrate=921600, timeout=0.1, write_timeout=0)
                 except Exception:
                     self.__print('Next network module')
                     continue
@@ -44,12 +44,12 @@ class NetworkFirmwareUpdater(ModiSerialPort):
             self.__print(f"Connecting to MODI+ network module at {modi_port}")
 
         self.bootloader = False
+        self.is_network = True
         self.network_version = None
         self.network_uuid = None
         self.network_id = None
 
         self.update_in_progress = False
-        self.ui = None
 
         self.progress = 0
 
@@ -61,16 +61,13 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
         self.module_firmware_path = module_firmware_path
 
-    def set_ui(self, ui):
-        self.ui = ui
-
     def set_print(self, print):
         self.print = print
 
     def set_raise_error(self, raise_error_message):
         self.raise_error_message = raise_error_message
 
-    def get_network_info(self):
+    def get_connected_module_info(self):
         timeout = 3
         init_time = time.time()
         while True:
@@ -80,7 +77,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
             recved = self.wait_for_json(timeout)
 
             if time.time() - init_time > timeout:
-                return None, None
+                return None, None, None
 
             try:
                 if not recved:
@@ -92,21 +89,21 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                     module_uuid = unpacked_data[0]
                     module_version_digits = unpacked_data[1]
                     module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network":
+                    if module_type in ["network", "camera"]:
                         module_version = [
-                            str((module_version_digits & 0xE000) >> 13),  # major
-                            str((module_version_digits & 0x1F00) >> 8),  # minor
-                            str(module_version_digits & 0x00FF)   # patch
+                            str((module_version_digits & 0xE000) >> 13),    # major
+                            str((module_version_digits & 0x1F00) >> 8),     # minor
+                            str(module_version_digits & 0x00FF)             # patch
                         ]
-                        return module_uuid , ".".join(module_version)
+                        return module_uuid , ".".join(module_version), module_type == "network"
                 elif json_msg["c"] == 0x0A:
                     module_uuid = unpack_data(json_msg["b"], (6, 2))[0]
                     module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network":
-                        return module_uuid , None
+                    if module_type in ["network", "camera"]:
+                        return module_uuid , None, module_type == "network"
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
-            except:
+            except Exception:
                 pass
 
             time.sleep(0.2)
@@ -155,7 +152,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         if self.is_open:
             self.write(send_pkt.encode("utf8"))
 
-    def receive_firmware_command_response(self, delay = 0.001, timeout = 5):
+    def receive_firmware_command_response(self, delay=0.001, timeout=5):
         response_wait_time = time.time()
         while True:
             responese_success = False
@@ -225,10 +222,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         while not end_flash_success:
             # Erase page (send erase request and receive erase response)
             erase_page_success = self.set_firmware_command(
-                oper_type = "erase",
-                module_id = module_id,
-                crc_val = erase_page_num,
-                page_addr = 0x0801f800
+                oper_type="erase",
+                module_id=module_id,
+                crc_val=erase_page_num,
+                page_addr=0x0801F800
             )
 
             # erase_page_success = self.set_firmware_command("erase", module_id, 0, 0x0801F800)
@@ -243,7 +240,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 curr_data = end_flash_data[end_flash_ptr : end_flash_ptr + 8]
                 checksum = self.set_firmware_data(
                     module_id,
-                    seq_num=end_flash_ptr//8,
+                    seq_num=end_flash_ptr // 8,
                     bin_data=curr_data,
                     checksum=checksum
                 )
@@ -276,7 +273,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         self.firmware_version_info = firmware_version_info
 
         self.__print("get network info")
-        self.network_uuid, self.network_version = self.get_network_info()
+        self.network_uuid, self.network_version, self.is_network = self.get_connected_module_info()
 
         if self.network_uuid:
             self.network_id = self.network_uuid & 0xFFF
@@ -321,14 +318,16 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                     module_uuid = unpacked_data[0]
                     warning_type = unpacked_data[1]
                     module_type = get_module_type_from_uuid(module_uuid)
-                    if module_type == "network":
+                    if module_type in ["network", "camera"]:
                         if not self.network_uuid:
                             self.network_uuid = module_uuid
                             self.network_id = self.network_uuid & 0xFFF
 
+                        self.is_network = (module_type == "network")
+
                         if warning_type != 2:
                             self.send_set_module_state(self.network_id, Module.UPDATE_FIRMWARE_READY, Module.PNP_OFF)
-                        if  warning_type == 2:
+                        if warning_type == 2:
                             break
             except json.decoder.JSONDecodeError as jde:
                 self.__print("json parse error: " + str(jde))
@@ -344,7 +343,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
         # update network module
         self.__print("update network module")
-        update_success = self.update_network_module(self.network_id)
+        if self.is_network:
+            update_success = self.update_network_module(self.network_id)
+        else:
+            update_success = self.update_camera_module(self.network_id)
 
         self.close()
 
@@ -379,7 +381,6 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         crc_error_limit = 2
         crc_error_count = 0
         while page_begin < bin_end :
-        # for page_begin in range(bin_begin, bin_end + 1, page_size):
             progress = 100 * page_begin // bin_end
             self.progress = progress
 
@@ -395,10 +396,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
                 continue
 
             erase_page_success = self.set_firmware_command(
-                oper_type = "erase",
-                module_id = module_id,
-                crc_val = erase_page_num,
-                page_addr = flash_memory_addr + page_begin + page_offset
+                oper_type="erase",
+                module_id=module_id,
+                crc_val=erase_page_num,
+                page_addr=flash_memory_addr + page_begin + page_offset
             )
 
             if not erase_page_success:
@@ -423,10 +424,10 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
             # CRC on current page (send CRC request / receive CRC response)
             crc_page_success = self.set_firmware_command(
-                oper_type = "crc",
-                module_id = module_id,
-                crc_val = checksum,
-                page_addr = flash_memory_addr + page_begin + page_offset
+                oper_type="crc",
+                module_id=module_id,
+                crc_val=checksum,
+                page_addr=flash_memory_addr + page_begin + page_offset
             )
 
             if crc_page_success:
@@ -496,6 +497,145 @@ class NetworkFirmwareUpdater(ModiSerialPort):
 
         return not self.has_update_error
 
+    def update_camera_module(self, module_id):
+        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "prerelease", "camera", "v1.0.0")
+        bin_path = path.join(root_path, "camera.bin")
+        with open(bin_path, "rb") as bin_file:
+            bin_buffer = bin_file.read()
+
+        # Init metadata of the bytes loaded
+        page_size = 0x800
+        flash_memory_addr = 0x08000000
+        erase_page_num = 2
+
+        bin_size = sys.getsizeof(bin_buffer)
+        bin_begin = page_size
+        bin_end = bin_size - ((bin_size - bin_begin) % page_size)
+
+        page_offset = 0x8800
+        page_begin = bin_begin
+
+        erase_error_limit = 2
+        erase_error_count = 0
+        crc_error_limit = 2
+        crc_error_count = 0
+        while page_begin < bin_end :
+            progress = 100 * page_begin // bin_end
+            self.progress = progress
+
+            self.__print(f"\rUpdating camera ({module_id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+
+            page_end = page_begin + page_size
+            curr_page = bin_buffer[page_begin:page_end]
+
+            # Skip current page if empty
+            if curr_page == bytes(len(curr_page)):
+                page_begin = page_begin + page_size
+                time.sleep(0.02)
+                continue
+
+            erase_page_success = self.set_firmware_command(
+                oper_type="erase",
+                module_id=module_id,
+                crc_val=erase_page_num,
+                page_addr=flash_memory_addr + page_begin + page_offset
+            )
+
+            if not erase_page_success:
+                erase_error_count = erase_error_count + 1
+                if erase_error_count > erase_error_limit:
+                    erase_error_count = 0
+                    self.has_update_error = True
+                    self.update_error_message = f"camera ({module_id}) erase flash failed."
+                    break
+                continue
+            else:
+                erase_error_count = 0
+
+            checksum = 0
+            for curr_ptr in range(0, page_size, 8):
+                if page_begin + curr_ptr >= bin_size:
+                    break
+
+                curr_data = curr_page[curr_ptr : curr_ptr + 8]
+                checksum = self.set_firmware_data(module_id, curr_ptr // 8, curr_data, checksum)
+                delay(0.001)
+
+            # CRC on current page (send CRC request / receive CRC response)
+            crc_page_success = self.set_firmware_command(
+                oper_type="crc",
+                module_id=module_id,
+                crc_val=checksum,
+                page_addr=flash_memory_addr + page_begin + page_offset
+            )
+
+            if crc_page_success:
+                crc_error_count = 0
+            else:
+                crc_error_count = crc_error_count + 1
+                if crc_error_count > crc_error_limit:
+                    crc_error_count = 0
+                    self.has_update_error = True
+                    self.update_error_message = "Check crc failed."
+                    break
+                continue
+
+            page_begin = page_begin + page_size
+            time.sleep(0.01)
+
+        self.progress = 99
+        self.__print(f"\rUpdating camera ({module_id}) {self.__progress_bar(99, 100)} 99%")
+
+        verify_header = 0xAA
+        if self.has_update_error:
+            verify_header = 0xFF
+
+        # Get version info from version_path, using appropriate methods
+        camera_version_info = "v1.0.0"
+        camera_version_info = camera_version_info.lstrip("v").split("-")[0]
+        camera_version_digits = [int(digit) for digit in camera_version_info.split(".")]
+        camera_version = (
+            camera_version_digits[0] << 13
+            | camera_version_digits[1] << 8
+            | camera_version_digits[2]
+        )
+
+        # Set end-flash data to be sent at the end of the firmware update
+        end_flash_data = bytearray(16)
+        end_flash_data[0] = verify_header
+        end_flash_data[6] = camera_version & 0xFF
+        end_flash_data[7] = (camera_version >> 8) & 0xFF
+
+        for xxx in range(4):
+            end_flash_data[xxx + 12] = ((0x08009000 >> (xxx * 8)) & 0xFF)
+
+        success_end_flash = self.set_end_flash_data(module_id, end_flash_data)
+        if not success_end_flash:
+            self.update_error_message = "version writing failed."
+            self.has_update_error = True
+            print(self.update_error_message)
+
+        self.__print(f"Version info (v{camera_version_info}) has been written to its firmware!")
+
+        # Firmware update flag down, resetting used flags
+        self.__print(f"Firmware update is done for camera ({module_id})")
+
+        # Reboot all connected modules
+        self.send_set_module_state(0xFFF, Module.REBOOT, Module.PNP_OFF)
+        self.__print("Reboot message has been sent to all connected modules")
+
+        time.sleep(1)
+
+        self.progress = 100
+        self.__print(f"\rUpdating camera ({module_id}) {self.__progress_bar(100, 100)} 100%")
+        self.__print("Module firmwares have been updated!")
+
+        time.sleep(1)
+
+        self.close()
+
+        return not self.has_update_error
+
     def read_json(self):
         json_pkt = b""
         while json_pkt != b"{":
@@ -544,6 +684,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         if self.print:
             print(data, end)
 
+
 class NetworkFirmwareMultiUpdater():
     def __init__(self, module_firmware_path):
         self.update_in_progress = False
@@ -559,31 +700,27 @@ class NetworkFirmwareMultiUpdater():
     def set_task_end_callback(self, task_end_callback):
         self.task_end_callback = task_end_callback
 
-    def update_module_firmware(self, modi_ports, firmware_version_info = {}):
+    def update_module_firmware(self, modi_ports, firmware_version_info={}):
         self.network_updaters = []
         self.network_uuid = []
         self.state = []
-        self.wait_timeout = []
-        self.num_to_update = []
 
         for i, modi_port in enumerate(modi_ports):
             if i > 9:
                 break
             try:
                 network_updater = NetworkFirmwareUpdater(
-                    device = modi_port,
-                    module_firmware_path = self.module_firmware_path
+                    device=modi_port,
+                    module_firmware_path=self.module_firmware_path
                 )
                 network_updater.set_print(False)
                 network_updater.set_raise_error(False)
-            except:
+            except Exception:
                 print("open " + modi_port + " error")
             else:
                 self.network_updaters.append(network_updater)
                 self.state.append(0)
                 self.network_uuid.append('')
-                self.wait_timeout.append(0)
-                self.num_to_update.append(0)
 
         if self.list_ui:
             self.list_ui.set_device_num(len(self.network_updaters))
@@ -597,15 +734,19 @@ class NetworkFirmwareMultiUpdater():
                 args=(firmware_version_info, ),
                 daemon=True
             ).start()
-            if self.list_ui:
-                self.list_ui.error_message_signal.emit(index, "Wait for network uuid")
+
+        if self.ui:
+            if self.ui.is_english:
+                self.ui.update_network_module_button.setText("Network/Camera module update is in progress. (0%)")
+            else:
+                self.ui.update_network_module_button.setText("네트워크/카메라 모듈 업데이트가 진행중입니다. (0%)")
 
         delay = 0.01
         while True:
             is_done = True
             total_progress = 0
             for index, network_updater in enumerate(self.network_updaters):
-                if network_updater.network_uuid:
+                if network_updater.network_uuid and len(self.network_uuid[index]) == 0:
                     self.network_uuid[index] = f'0x{network_updater.network_uuid:X}'
                     if self.list_ui:
                         self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
@@ -615,13 +756,12 @@ class NetworkFirmwareMultiUpdater():
                     is_done = is_done & False
                     if network_updater.update_error == 0:
                         current_module_progress = network_updater.progress
-                        total_module_progress = network_updater.progress
-                        total_progress += total_module_progress / len(self.network_updaters)
+                        total_progress += current_module_progress / len(self.network_updaters)
 
                         if self.list_ui:
-                            self.list_ui.current_module_changed_signal.emit(index, "network")
-                            self.list_ui.error_message_signal.emit(index, "Updating module")
-                            self.list_ui.progress_signal.emit(index, int(current_module_progress), int(total_module_progress))
+                            if len(self.network_uuid[index]):
+                                self.list_ui.network_uuid_signal.emit(index, self.network_uuid[index])
+                            self.list_ui.progress_signal.emit(index, int(current_module_progress))
                     else:
                         total_progress += 100 / len(self.network_updaters)
                         self.state[index] = 1
@@ -632,7 +772,7 @@ class NetworkFirmwareMultiUpdater():
                         # update success
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, 0)
-                            self.list_ui.error_message_signal.emit(index, "Update success")
+                            self.list_ui.progress_signal.emit(index, 100)
                     else:
                         print("\n" + network_updater.update_error_message + "\n")
                         # update error
@@ -640,8 +780,6 @@ class NetworkFirmwareMultiUpdater():
                             self.list_ui.network_state_signal.emit(index, -1)
                             self.list_ui.error_message_signal.emit(index, network_updater.update_error_message)
 
-                    if self.list_ui:
-                        self.list_ui.progress_signal.emit(index, 100, 100)
                     self.state[index] = 2
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.network_updaters)
@@ -652,9 +790,9 @@ class NetworkFirmwareMultiUpdater():
                 print(f"{self.__progress_bar(total_progress, 100)}", end="")
                 if self.ui:
                     if self.ui.is_english:
-                        self.ui.update_network_module_button.setText(f"Network module update is in progress. ({int(total_progress)}%)")
+                        self.ui.update_network_module_button.setText(f"Network/Camera module update is in progress. ({int(total_progress)}%)")
                     else:
-                        self.ui.update_network_module_button.setText(f"네트워크 모듈 업데이트가 진행중입니다. ({int(total_progress)}%)")
+                        self.ui.update_network_module_button.setText(f"네트워크/카메라 모듈 업데이트가 진행중입니다. ({int(total_progress)}%)")
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(int(total_progress))

@@ -200,7 +200,7 @@
       <enum>Qt::NoFocus</enum>
      </property>
      <property name="text">
-      <string>네트워크 모듈 업데이트</string>
+      <string>네트워크/카메라 모듈 업데이트</string>
      </property>
      <property name="iconSize">
       <size>
@@ -260,7 +260,7 @@
       <enum>Qt::NoFocus</enum>
      </property>
      <property name="text">
-      <string>네트워크 서브 모듈 업데이트</string>
+      <string>네트워크/카메라 서브 모듈 업데이트</string>
      </property>
      <property name="iconSize">
       <size>

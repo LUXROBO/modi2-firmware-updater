@@ -4,6 +4,7 @@ from PyQt5 import QtGui, uic
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QDialog
 
+from modi2_firmware_updater.util.module_util import get_module_type_from_uuid
 from modi2_firmware_updater.util.platform_util import is_raspberrypi
 
 
@@ -15,7 +16,7 @@ class ESP32UpdateListForm(QDialog):
     total_status_signal = pyqtSignal(str)
     error_message_signal = pyqtSignal(int, str)
 
-    def __init__(self, path_dict = {}):
+    def __init__(self, path_dict={}):
         QDialog.__init__(self)
 
         self.component_path = path_dict["component"]
@@ -119,8 +120,8 @@ class ESP32UpdateListForm(QDialog):
             icon_path = os.path.join(self.component_path, "modules", "network_none.png")
             pixmap = QtGui.QPixmap()
             pixmap.load(icon_path)
-
             self.ui_icon_list[i].setPixmap(pixmap)
+
             self.ui_progress_list[i].setValue(0)
             self.ui_progress_value_list[i].setText("0%")
             self.ui_error_message_list[i].setText("")
@@ -139,15 +140,19 @@ class ESP32UpdateListForm(QDialog):
         if index > self.device_num - 1:
             return
 
+        uuid_str = self.ui_network_id_list[index].text()
+        if len(uuid_str) and uuid_str != "not connected":
+            uuid = int(uuid_str, 16)
+            module_type = get_module_type_from_uuid(uuid)
+        else:
+            module_type = "network"
+
         pixmap = QtGui.QPixmap()
         if state == -1:
-            icon_path = os.path.join(self.component_path, "modules", "network_error.png")
+            icon_path = os.path.join(self.component_path, "modules", f"{module_type}_error.png")
             pixmap.load(icon_path)
         elif state == 0:
-            icon_path = os.path.join(self.component_path, "modules", "network.png")
-            pixmap.load(icon_path)
-        else:
-            icon_path = os.path.join(self.component_path, "modules", "network_reconnect.png")
+            icon_path = os.path.join(self.component_path, "modules", f"{module_type}.png")
             pixmap.load(icon_path)
 
         self.ui_icon_list[index].setPixmap(pixmap)
@@ -157,6 +162,14 @@ class ESP32UpdateListForm(QDialog):
             return
 
         self.ui_network_id_list[index].setText(str)
+
+        uuid = int(str, 16)
+        module_type = get_module_type_from_uuid(uuid)
+
+        icon_path = os.path.join(self.component_path, "modules", f"{module_type}.png")
+        pixmap = QtGui.QPixmap()
+        pixmap.load(icon_path)
+        self.ui_icon_list[index].setPixmap(pixmap)
 
     def progress_value_changed(self, index, value):
         if index > self.device_num - 1:
@@ -189,7 +202,7 @@ class ModuleUpdateListForm(QDialog):
     total_status_signal = pyqtSignal(str)
     error_message_signal = pyqtSignal(int, str)
 
-    def __init__(self, path_dict = {}):
+    def __init__(self, path_dict={}):
         QDialog.__init__(self)
 
         self.component_path = path_dict["component"]
@@ -368,30 +381,25 @@ class ModuleUpdateListForm(QDialog):
         if index > self.device_num - 1:
             return
 
+        uuid_str = self.ui_network_id_list[index].text()
+        if len(uuid_str) and uuid_str != "not connected":
+            uuid = int(uuid_str, 16)
+            module_type = get_module_type_from_uuid(uuid)
+        else:
+            module_type = "network"
+
         pixmap = QtGui.QPixmap()
         if state == -1:
             if is_raspberrypi():
-                icon_path = os.path.join(self.component_path, "modules", "network_none_28.png")
+                icon_path = os.path.join(self.component_path, "modules", f"{module_type}_error_28.png")
             else:
-                icon_path = os.path.join(self.component_path, "modules", "network_error.png")
+                icon_path = os.path.join(self.component_path, "modules", f"{module_type}_error.png")
             pixmap.load(icon_path)
         elif state == 0:
             if is_raspberrypi():
-                icon_path = os.path.join(self.component_path, "modules", "network_28.png")
+                icon_path = os.path.join(self.component_path, "modules", f"{module_type}_28.png")
             else:
-                icon_path = os.path.join(self.component_path, "modules", "network.png")
-            pixmap.load(icon_path)
-        elif state == 1:
-            if is_raspberrypi():
-                icon_path = os.path.join(self.component_path, "modules", "network_none_28.png")
-            else:
-                icon_path = os.path.join(self.component_path, "modules", "network_disconnect.png")
-            pixmap.load(icon_path)
-        elif state == 2:
-            if is_raspberrypi():
-                icon_path = os.path.join(self.component_path, "modules", "network_none_28.png")
-            else:
-                icon_path = os.path.join(self.component_path, "modules", "network_reconnect.png")
+                icon_path = os.path.join(self.component_path, "modules", f"{module_type}.png")
             pixmap.load(icon_path)
 
         self.ui_icon_list[index].setPixmap(pixmap)
@@ -401,6 +409,17 @@ class ModuleUpdateListForm(QDialog):
             return
 
         self.ui_network_id_list[index].setText(str)
+
+        uuid = int(str, 16)
+        module_type = get_module_type_from_uuid(uuid)
+
+        if is_raspberrypi():
+            icon_path = os.path.join(self.component_path, "modules", f"{module_type}_28.png")
+        else:
+            icon_path = os.path.join(self.component_path, "modules", f"{module_type}.png")
+        pixmap = QtGui.QPixmap()
+        pixmap.load(icon_path)
+        self.ui_icon_list[index].setPixmap(pixmap)
 
     def current_module_changed(self, index, module_type):
         if index > self.device_num - 1:

@@ -8,51 +8,58 @@ BROADCAST_ID = 0xFFF
 
 
 def get_module_type_from_uuid(uuid):
-    hexadecimal = hex(uuid).lstrip("0x")
-    hexadecimal = int(hexadecimal, 16) >> 32
-    type_indicator = hexadecimal
-    module_type = {
-        # Setup modules
-        0x10  : "battery",
-        # Input modules
-        0x2000: "env",
-        0x2010: "imu",
-        0x2020: "mic",
-        0x2030: "button",
-        0x2040: "dial",
-        0x2050: "ultrasonic",
-        0x2060: "ir",
-        0x2070: "joystick",
-        0x2080: "tof",
-        # Output modules
-        0x4000: "display",
-        0x4010: "motor",
-        0x4011: "motor",
-        0x4020: "led",
-        0x4030: "speaker",
-    }.get(type_indicator)
-    return "network" if module_type is None else module_type
+    try:
+        hexadecimal = hex(uuid).lstrip("0x")
+        hexadecimal = int(hexadecimal, 16) >> 32
+        type_indicator = hexadecimal
+        module_type = {
+            # Setup modules
+            0x10  : "battery",
+            # Input modules
+            0x2000: "env",
+            0x2010: "imu",
+            0x2020: "mic",
+            0x2030: "button",
+            0x2040: "dial",
+            0x2050: "ultrasonic",
+            0x2060: "ir",
+            0x2070: "joystick",
+            0x2080: "tof",
+            0x2090: "camera",
+            # Output modules
+            0x4000: "display",
+            0x4010: "motor",
+            0x4011: "motor",
+            0x4020: "led",
+            0x4030: "speaker",
+        }.get(type_indicator)
+        return "network" if module_type is None else module_type
+    except Exception:
+        return "None"
+
 
 def get_module_uuid_from_type(module_type):
     module_type_hex = {
         # Setup modules
-        "battery"   :0x10  ,
-        # module :# Input
-        "env"       :0x2000,
-        "imu"      :0x2010,
-        "mic"       :0x2020,
-        "button"    :0x2030,
-        "dial"      :0x2040,
-        "ultrasonic" :0x2050,
-        "ir"        :0x2060,
-        "joystick"  :0x2070,
-        "tof"       :0x2080,
-        #  module :# Output
-        "display"   :0x4000,
-        "motor_a"   :0x4010,
-        "motor_b"   :0x4011,
-        "led"       :0x4020,
-        "speaker"   :0x4030,
+        "battery": 0x10,
+        # module: # Input
+        "env": 0x2000,
+        "imu": 0x2010,
+        "mic": 0x2020,
+        "button": 0x2030,
+        "dial": 0x2040,
+        "ultrasonic": 0x2050,
+        "ir": 0x2060,
+        "joystick": 0x2070,
+        "tof": 0x2080,
+        "camera": 0x2090,
+        #  module: # Output
+        "display": 0x4000,
+        "motor": 0x4010,
+        "motor_a": 0x4010,
+        "motor_b": 0x4011,
+        "led": 0x4020,
+        "speaker": 0x4030,
     }.get(module_type)
     return "network" if module_type_hex is None else module_type_hex
 
