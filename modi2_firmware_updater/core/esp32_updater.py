@@ -542,7 +542,8 @@ class ESPLoader(object):
                 if msg:
                     ins, sid, did, data, length = decode_message(msg)
 
-                    if ins == 0xA1 and sid == 0x09:
+                    # esp app boot packet
+                    if ins == 0xA1 and sid == 0x40:
                         break
 
             except Exception:
