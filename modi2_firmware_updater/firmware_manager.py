@@ -208,7 +208,7 @@ class FirmwareManagerForm(QDialog):
             self.module_firmware_version = version_name
 
         except Exception as e:
-            print(e)
+            print("download firmware fail")
             self.copy_assets_firmware()
 
         return True
@@ -316,8 +316,8 @@ class FirmwareManagerForm(QDialog):
                 for version in version_list:
                     self.module_ui_dic[key]["bootloader"].addItem(version)
 
-        except Exception as e:
-            print(e)
+        except Exception:
+            print("refresh firmware fail")
             return False
 
         return True
@@ -364,8 +364,8 @@ class FirmwareManagerForm(QDialog):
                 msg.setText(f"module firmware updated to {latest_version}")
                 msg.exec_()
 
-        except Exception as e:
-            print(str(e))
+        except Exception:
+            print("check firmware version fail")
             return False
 
         return True
@@ -412,8 +412,8 @@ class FirmwareManagerForm(QDialog):
             conn.request("HEAD", "/")
             conn.close()
             return True
-        except Exception as e:
-            print(e)
+        except Exception:
+            print("check internet connection fail")
             return False
 
     @staticmethod
