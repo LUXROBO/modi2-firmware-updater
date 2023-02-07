@@ -21,7 +21,7 @@ from base64 import b64decode, b64encode
 from io import open
 from os import path
 
-from modi2_firmware_updater.util.message_util import unpack_data
+from modi2_firmware_updater.util.message_util import decode_message, unpack_data
 from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPort, list_modi_serialports
 from modi2_firmware_updater.util.module_util import get_module_type_from_uuid
 
@@ -533,6 +533,24 @@ class ESPLoader(object):
         finish_byte = b"\xAA" * 15
         self._port.write(finish_byte)
         time.sleep(0.5)
+
+    def wait_update_finish_packet(self, timeout=5):
+        init_time = time.time()
+        while True:
+            try:
+                msg = self.wait_for_json()
+                if msg:
+                    ins, sid, did, data, length = decode_message(msg)
+
+                    if ins == 0xA1 and sid == 0x09:
+                        break
+
+            except Exception:
+                pass
+
+            time.sleep(0.001)
+            if time.time() - init_time > timeout:
+                break
 
     def set_esp_app_version(self, version_text: str, retry=5):
         # print(f"Writing esp app version info (v{version_text})")
@@ -5587,8 +5605,8 @@ class ESP32FirmwareUpdater():
                 if self.update_error != -1:
                     if self.is_network:
                         self.esp.firmware_progress = 94
-                        time.sleep(3)
-                        self.esp.wait_for_json()
+                        time.sleep(0.2)
+                        self.esp.wait_update_finish_packet()
                         time.sleep(0.01)
                         self.esp.firmware_progress = 98
                         self.esp.set_esp_app_version(self.app_version_to_update)
@@ -5599,7 +5617,7 @@ class ESP32FirmwareUpdater():
                         time.sleep(0.1)
                         self.esp.send_update_finish_packet()
                         time.sleep(0.1)
-                        self.esp.wait_for_json()
+                        self.esp.wait_update_finish_packet()
                         time.sleep(0.01)
                         self.esp.firmware_progress = 98
                         self.esp.set_esp_app_version(self.app_version_to_update)
