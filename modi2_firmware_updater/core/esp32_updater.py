@@ -5235,9 +5235,13 @@ class ESP32FirmwareUpdater():
                             '0x8000', path.join(self.app_firmware_path, 'partitions.bin'),
                             '0x00220000', path.join(self.ota_firmware_path, 'modi_ota_factory.bin'),
                             '0x00010000', path.join(self.app_firmware_path, 'esp32.bin')]
+
+
+                app_version_info = self.firmware_version_info["esp32_app"]["app"]
+                ota_version_info = self.firmware_version_info["esp32_ota"]["app"]
             else:
                 root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "prerelease")
-                self.app_firmware_path = path.join(root_path, "esp32s3", "v1.0.0")
+                self.app_firmware_path = path.join(root_path, "esp32s3", "v1.0.1")
                 self.arg = ['--chip', 'esp32s3',
                             '--port', self.port,
                             '--baud', str(self.baudrate),
@@ -5246,6 +5250,9 @@ class ESP32FirmwareUpdater():
                             '0x8000', path.join(self.app_firmware_path, 'partition-table.bin'),
                             '0xD000', path.join(self.app_firmware_path, 'ota_data_initial.bin'),
                             '0x10000', path.join(self.app_firmware_path, 'modi2_camera_esp32.bin')]
+
+                app_version_info = "v1.0.1"
+                ota_version_info = "v0.0.0"
 
             """
             Main function for esptool
@@ -5258,13 +5265,6 @@ class ESP32FirmwareUpdater():
             """
             argv = self.arg
             esp = None
-
-            if self.is_network:
-                app_version_info = self.firmware_version_info["esp32_app"]["app"]
-                ota_version_info = self.firmware_version_info["esp32_ota"]["app"]
-            else:
-                app_version_info = "v1.0.0"
-                ota_version_info = "v0.0.0"
 
             self.app_version_to_update = app_version_info.lstrip("v").rstrip("\n").split("-")[0]
             self.ota_version_to_update = ota_version_info.lstrip("v").rstrip("\n").split("-")[0]
