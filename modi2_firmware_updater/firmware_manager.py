@@ -28,12 +28,14 @@ class FirmwareManagerForm(QDialog):
         self.ui.close_button.clicked.connect(self.ui.close)
 
         self.ui.download_button.clicked.connect(self.download_button_clicked)
+        self.ui.develop_download_button.clicked.connect(self.develop_download_button_clicked)
         self.ui.refresh_button.clicked.connect(self.refresh_button_clicked)
         self.ui.apply_button.clicked.connect(self.apply_button_clicked)
 
         self.module_list = [
             "battery",
             "button",
+            "camera",
             "dial",
             "display",
             "env",
@@ -83,6 +85,11 @@ class FirmwareManagerForm(QDialog):
                 "os": self.ui.tof_os_text,
                 "bootloader": self.ui.tof_bootloader_combobox
             },
+            "camera": {
+                "icon": self.ui.camera_image,
+                "app": self.ui.camera_app_combobox,
+                "sub": self.ui.camera_sub_combobox
+            },
             "led": {
                 "icon": self.ui.led_image,
                 "app": self.ui.led_app_combobox,
@@ -115,39 +122,43 @@ class FirmwareManagerForm(QDialog):
             },
             "network": {
                 "icon": self.ui.network_image,
-                "app": self.ui.network_app_combobox
-            },
-            "esp32_app": {
-                "icon": self.ui.esp32_app_image,
-                "app": self.ui.esp32_app_combobox
-            },
-            "esp32_ota": {
-                "icon": self.ui.esp32_ota_image,
-                "app": self.ui.esp32_ota_combobox
+                "app": self.ui.network_app_combobox,
+                "sub": self.ui.network_sub_combobox,
+                "ota": self.ui.network_ota_combobox,
             },
         }
 
         mapper = QSignalMapper(self)
         for key in self.module_ui_dic.keys():
-            if key in ["network", "esp32_app", "esp32_ota"]:
-                icon_path = os.path.join(self.component_path, "modules", "network_28.png")
-                pixmap = QtGui.QPixmap()
-                pixmap.load(icon_path)
-                self.module_ui_dic[key]["icon"].setPixmap(pixmap)
-            else:
-                module_type = key
-                icon_path = os.path.join(self.component_path, "modules", module_type + "_28.png")
-                pixmap = QtGui.QPixmap()
-                pixmap.load(icon_path)
-                self.module_ui_dic[key]["icon"].setPixmap(pixmap)
-                mapper.setMapping(self.module_ui_dic[key]["app"], str(module_type))
-                self.module_ui_dic[key]["app"].currentTextChanged.connect(mapper.map)
+            module_type = key
+            icon_path = os.path.join(self.component_path, "modules", module_type + "_28.png")
+            pixmap = QtGui.QPixmap()
+            pixmap.load(icon_path)
+            self.module_ui_dic[key]["icon"].setPixmap(pixmap)
+            mapper.setMapping(self.module_ui_dic[key]["app"], str(module_type))
+            self.module_ui_dic[key]["app"].currentTextChanged.connect(mapper.map)
         mapper.mapped["QString"].connect(self.app_version_combobox_changed)
 
         self.module_firmware_version = self.get_config_firmware_version_info()["version"]
 
     def download_button_clicked(self):
         download_success = self.download_firmware()
+        msg = QMessageBox()
+        msg.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
+        msg.setWindowTitle("download firmware")
+        msg.setStandardButtons(QMessageBox.Ok)
+        if download_success:
+            self.refresh_firmware_info()
+            self.apply_firmware(show_message=False)
+            msg.setIcon(QMessageBox.Icon.Information)
+            msg.setText("download successful.")
+        else:
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setText("check internet connection.")
+        msg.exec_()
+
+    def develop_download_button_clicked(self):
+        download_success = self.download_firmware(remove_rc=False)
         msg = QMessageBox()
         msg.setWindowIcon(QtGui.QIcon(os.path.join(self.component_path, "network_module.ico")))
         msg.setWindowTitle("download firmware")
@@ -180,7 +191,7 @@ class FirmwareManagerForm(QDialog):
     def apply_button_clicked(self):
         self.apply_firmware(show_message=True)
 
-    def download_firmware(self):
+    def download_firmware(self, remove_rc=True):
         connection = self.__check_internet_connection()
         if not connection:
             self.copy_assets_firmware()
@@ -191,7 +202,7 @@ class FirmwareManagerForm(QDialog):
                 self.__rmtree(self.local_firmware_binary_path)
 
             import requests
-            release_url = "https://api.github.com/repos/LUXROBO/modi-v2-module-binary/releases/latest"
+            release_url = "https://api.github.com/repos/LUXROBO/modi2-module-release/releases/latest"
             response = requests.get(release_url).json()
             download_url = response["zipball_url"]
             version_name = response["name"]
@@ -202,14 +213,23 @@ class FirmwareManagerForm(QDialog):
             from zipfile import ZipFile
             zip = ZipFile(BytesIO(content.content))
             root_dir_name = zip.infolist()[0].filename.split("/")[0]
-            zip.extractall(self.local_firmware_path)
-            os.rename(os.path.join(self.local_firmware_path, root_dir_name), self.local_firmware_binary_path)
+            zip_path = os.path.join(self.local_firmware_path, root_dir_name)
+            zip_module_firmware_path = os.path.join(zip_path, "module_firmware")
+            zip_content_path = os.path.join(root_dir_name, "module_firmware")
+            zip.extractall(path=self.local_firmware_path, members=[member for member in zip.namelist() if member.startswith(zip_content_path)])
+
+            os.rename(zip_module_firmware_path, self.local_firmware_binary_path)
+            self.__rmtree(zip_path)
+
+            if remove_rc:
+                self._remove_rc_directory(self.local_firmware_binary_path)
 
             self.module_firmware_version = version_name
 
         except Exception as e:
-            print("download firmware fail")
+            print(f"download firmware fail: {e}")
             self.copy_assets_firmware()
+            return False
 
         return True
 
@@ -228,19 +248,9 @@ class FirmwareManagerForm(QDialog):
         file_list = os.listdir(self.local_firmware_binary_path)
         firmware_list = {}
         for ele in file_list:
-            if not os.path.isfile(ele) and ele != ".git":
-                if ele in self.module_list:
-                    # modules - barrey, button, ...., network
-                    module_type = ele
-                    version_dir = os.path.join(self.local_firmware_binary_path, module_type)
-                    version_list = os.listdir(version_dir)
-                    if len(version_list):
-                        firmware_list[module_type] = []
-                        for version in version_list:
-                            module_path = os.path.join(version_dir, version, module_type + ".bin")
-                            if os.path.exists(module_path):
-                                firmware_list[module_type].append(version)
-                elif ele == "bootloader":
+            if not os.path.isfile(ele):
+                module_type = ele
+                if module_type == "bootloader":
                     # check e230
                     bootloader_e230_version_dir = os.path.join(self.local_firmware_binary_path, ele, "e230")
                     bootloader_e230_version_list = os.listdir(bootloader_e230_version_dir)
@@ -261,28 +271,71 @@ class FirmwareManagerForm(QDialog):
                             second_bootloader_path = os.path.join(bootloader_e103_version_dir, version, "second_bootloader_e103.bin")
                             if os.path.exists(bootloader_path) and os.path.exists(second_bootloader_path):
                                 firmware_list["bootloader_e103"].append(version)
-                elif ele == "esp32":
+                elif module_type == "network":
+                    # check e103
+                    e103_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "e103")
+                    e103_version_list = os.listdir(e103_version_dir)
+                    if len(e103_version_list):
+                        firmware_list["network_app"] = []
+                        for version in e103_version_list:
+                            module_path = os.path.join(e103_version_dir, version, module_type + ".bin")
+                            if os.path.exists(module_path):
+                                firmware_list["network_app"].append(version)
                     # check esp32 app
-                    esp32_app_version_dir = os.path.join(self.local_firmware_binary_path, ele, "app")
+                    esp32_app_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32", "app")
                     esp32_app_version_list = os.listdir(esp32_app_version_dir)
                     if len(esp32_app_version_list):
-                        firmware_list["esp32_app"] = []
+                        firmware_list["network_sub"] = []
                         for version in esp32_app_version_list:
                             bootloader_path = os.path.join(esp32_app_version_dir, version, "bootloader.bin")
                             eps32_path = os.path.join(esp32_app_version_dir, version, "esp32.bin")
                             ota_data_initial_path = os.path.join(esp32_app_version_dir, version, "ota_data_initial.bin")
                             partitions_path = os.path.join(esp32_app_version_dir, version, "partitions.bin")
                             if os.path.exists(bootloader_path) and os.path.exists(eps32_path) and os.path.exists(ota_data_initial_path) and os.path.exists(partitions_path):
-                                firmware_list["esp32_app"].append(version)
+                                firmware_list["network_sub"].append(version)
                     # check esp32 ota
-                    esp32_ota_version_dir = os.path.join(self.local_firmware_binary_path, ele, "ota")
+                    esp32_ota_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32", "ota")
                     esp32_ota_version_list = os.listdir(esp32_ota_version_dir)
                     if len(esp32_ota_version_list):
-                        firmware_list["esp32_ota"] = []
+                        firmware_list["network_ota"] = []
                         for version in esp32_ota_version_list:
                             modi_ota_factory_path = os.path.join(esp32_ota_version_dir, version, "modi_ota_factory.bin")
                             if os.path.exists(modi_ota_factory_path):
-                                firmware_list["esp32_ota"].append(version)
+                                firmware_list["network_ota"].append(version)
+                elif module_type == "camera":
+                    # check e103
+                    e103_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "e103")
+                    e103_version_list = os.listdir(e103_version_dir)
+                    if len(e103_version_list):
+                        firmware_list["camera_app"] = []
+                        for version in e103_version_list:
+                            module_path = os.path.join(e103_version_dir, version, module_type + ".bin")
+                            if os.path.exists(module_path):
+                                firmware_list["camera_app"].append(version)
+                    # check esp32s3 app
+                    esp32_app_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32s3", "app")
+                    esp32_app_version_list = os.listdir(esp32_app_version_dir)
+                    if len(esp32_app_version_list):
+                        firmware_list["camera_sub"] = []
+                        for version in esp32_app_version_list:
+                            bootloader_path = os.path.join(esp32_app_version_dir, version, "bootloader.bin")
+                            eps32_path = os.path.join(esp32_app_version_dir, version, "modi2_camera_esp32.bin")
+                            ota_data_initial_path = os.path.join(esp32_app_version_dir, version, "ota_data_initial.bin")
+                            partitions_path = os.path.join(esp32_app_version_dir, version, "partition-table.bin")
+                            if os.path.exists(bootloader_path) and os.path.exists(eps32_path) and os.path.exists(ota_data_initial_path) and os.path.exists(partitions_path):
+                                firmware_list["camera_sub"].append(version)
+                elif module_type in self.module_list:
+                    # battery, button, ....
+                    module_type = ele
+                    version_dir = os.path.join(self.local_firmware_binary_path, module_type)
+                    version_list = os.listdir(version_dir)
+                    if len(version_list):
+                        firmware_list[module_type] = []
+                        for version in version_list:
+                            module_path = os.path.join(version_dir, version, module_type + ".bin")
+                            if os.path.exists(module_path):
+                                firmware_list[module_type].append(version)
+
         return firmware_list
 
     def refresh_firmware_info(self):
@@ -295,29 +348,64 @@ class FirmwareManagerForm(QDialog):
                 if key in ["bootloader_e103", "bootloader_e230"]:
                     continue
 
-                # app version
-                version_list = firmware_list[key]
-                version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
-                self.module_ui_dic[key]["app"].clear()
-                for version in version_list:
-                    self.module_ui_dic[key]["app"].addItem(version)
+                if key == "network_app":
+                    # app version
+                    version_list = firmware_list["network_app"]
+                    version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
+                    self.module_ui_dic["network"]["app"].clear()
+                    for version in version_list:
+                        self.module_ui_dic["network"]["app"].addItem(version)
 
-                if key in ["network", "esp32_app", "esp32_ota"]:
-                    continue
+                    # sub version
+                    version_list = firmware_list["network_sub"]
+                    version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
+                    self.module_ui_dic["network"]["sub"].clear()
+                    for version in version_list:
+                        self.module_ui_dic["network"]["sub"].addItem(version)
 
-                # bootloader version
-                bootloader_name = "bootloader_e230"
-                if key in ["env", "speaker", "display"]:
-                    bootloader_name = "bootloader_e103"
+                    # ota version
+                    version_list = firmware_list["network_ota"]
+                    version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
+                    self.module_ui_dic["network"]["ota"].clear()
+                    for version in version_list:
+                        self.module_ui_dic["network"]["ota"].addItem(version)
+                elif key == "camera_app":
+                    # app version
+                    version_list = firmware_list["camera_app"]
+                    version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
+                    self.module_ui_dic["camera"]["app"].clear()
+                    for version in version_list:
+                        self.module_ui_dic["camera"]["app"].addItem(version)
 
-                version_list = firmware_list[bootloader_name]
-                version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
-                self.module_ui_dic[key]["bootloader"].clear()
-                for version in version_list:
-                    self.module_ui_dic[key]["bootloader"].addItem(version)
+                    # sub version
+                    version_list = firmware_list["camera_sub"]
+                    version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
+                    self.module_ui_dic["camera"]["sub"].clear()
+                    for version in version_list:
+                        self.module_ui_dic["camera"]["sub"].addItem(version)
+                elif key in ["network_sub", "network_ota", "camera_sub"]:
+                    pass
+                else:
+                    # app version
+                    version_list = firmware_list[key]
+                    version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
+                    self.module_ui_dic[key]["app"].clear()
+                    for version in version_list:
+                        self.module_ui_dic[key]["app"].addItem(version)
+
+                    # bootloader version
+                    bootloader_name = "bootloader_e230"
+                    if key in ["env", "speaker", "display"]:
+                        bootloader_name = "bootloader_e103"
+
+                    version_list = firmware_list[bootloader_name]
+                    version_list = sorted(version_list, key=cmp_to_key(self.__compare_version), reverse=True)
+                    self.module_ui_dic[key]["bootloader"].clear()
+                    for version in version_list:
+                        self.module_ui_dic[key]["bootloader"].addItem(version)
 
         except Exception:
-            print("refresh firmware fail")
+            print(f"refresh firmware fail")
             return False
 
         return True
@@ -345,10 +433,10 @@ class FirmwareManagerForm(QDialog):
 
         try:
             import requests
-            response = requests.get("https://api.github.com/repos/LUXROBO/modi-v2-module-binary/releases/latest").json()
+            response = requests.get("https://download.luxrobo.com/modi2-module-firmware/version.json").json()
 
             current_version = self.module_firmware_version
-            latest_version = response["name"]
+            latest_version = response["release"]
 
             from packaging import version
             if version.parse(latest_version) > version.parse(current_version):
@@ -373,14 +461,20 @@ class FirmwareManagerForm(QDialog):
     def get_selected_firmware_version_info(self):
         module_version_dic = {}
         for key in self.module_ui_dic.keys():
-            module_version_dic[key] = {}
-            module_version_dic[key]["app"] = self.module_ui_dic[key]["app"].currentText()
-
-            if key in ["network", "esp32_app", "esp32_ota"]:
-                continue
-
-            module_version_dic[key]["os"] = self.module_ui_dic[key]["os"].text()
-            module_version_dic[key]["bootloader"] = self.module_ui_dic[key]["bootloader"].currentText()
+            if key == "network":
+                module_version_dic["network"] = {}
+                module_version_dic[key]["app"] = self.module_ui_dic[key]["app"].currentText()
+                module_version_dic[key]["sub"] = self.module_ui_dic[key]["sub"].currentText()
+                module_version_dic[key]["ota"] = self.module_ui_dic[key]["ota"].currentText()
+            elif key == "camera":
+                module_version_dic["camera"] = {}
+                module_version_dic[key]["app"] = self.module_ui_dic[key]["app"].currentText()
+                module_version_dic[key]["sub"] = self.module_ui_dic[key]["sub"].currentText()
+            else:
+                module_version_dic[key] = {}
+                module_version_dic[key]["app"] = self.module_ui_dic[key]["app"].currentText()
+                module_version_dic[key]["os"] = self.module_ui_dic[key]["os"].text()
+                module_version_dic[key]["bootloader"] = self.module_ui_dic[key]["bootloader"].currentText()
         return module_version_dic
 
     def get_config_firmware_version_info(self):
@@ -398,12 +492,24 @@ class FirmwareManagerForm(QDialog):
         if len(selected_app_version) == 0:
             return
 
+        if module_type in ["network", "camera"]:
+            return
+
         self.module_ui_dic[module_type]["os"].clear()
         version_text_path = os.path.join(self.local_firmware_binary_path, module_type, selected_app_version, "version.txt")
         with open(version_text_path, "r") as version_text_file:
             version_text = version_text_file.read()
             version_info = json.loads(version_text)
             self.module_ui_dic[module_type]["os"].setText(version_info["os"])
+
+    def _remove_rc_directory(self, top):
+        for directory in os.listdir(top):
+            directory_path = os.path.join(top, directory)
+            if os.path.isdir(directory_path):
+                if "-rc" in directory:
+                    self.__rmtree(directory_path)
+                else:
+                    self._remove_rc_directory(directory_path)
 
     @staticmethod
     def __check_internet_connection():

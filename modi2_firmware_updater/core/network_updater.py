@@ -359,7 +359,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         self.update_in_progress = False
 
     def update_network_module(self, module_id):
-        root_path = path.join(self.module_firmware_path, "network", self.firmware_version_info["network"]["app"])
+        root_path = path.join(self.module_firmware_path, "network", "e103", self.firmware_version_info["network"]["app"])
         bin_path = path.join(root_path, "network.bin")
         with open(bin_path, "rb") as bin_file:
             bin_buffer = bin_file.read()
@@ -498,7 +498,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
         return not self.has_update_error
 
     def update_camera_module(self, module_id):
-        root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "prerelease", "camera", "v1.0.0")
+        root_path = path.join(self.module_firmware_path, "camera", "e103", self.firmware_version_info["camera"]["app"])
         bin_path = path.join(root_path, "camera.bin")
         with open(bin_path, "rb") as bin_file:
             bin_buffer = bin_file.read()
@@ -591,7 +591,7 @@ class NetworkFirmwareUpdater(ModiSerialPort):
             verify_header = 0xFF
 
         # Get version info from version_path, using appropriate methods
-        camera_version_info = "v1.0.0"
+        camera_version_info = self.firmware_version_info["camera"]["app"]
         camera_version_info = camera_version_info.lstrip("v").split("-")[0]
         camera_version_digits = [int(digit) for digit in camera_version_info.split(".")]
         camera_version = (
