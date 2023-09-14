@@ -14,7 +14,6 @@ from modi2_firmware_updater.util.modi_winusb.modi_serialport import ModiSerialPo
 from modi2_firmware_updater.util.module_util import Module, get_module_type_from_uuid
 from modi2_firmware_updater.util.platform_util import delay
 
-
 def retry(exception_to_catch):
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -27,7 +26,6 @@ def retry(exception_to_catch):
 
     return decorator
 
-
 @dataclass
 class Module_info:
     uuid: int = None
@@ -36,7 +34,6 @@ class Module_info:
     state: int = None
     level: int = None
     retry: int = 0
-
 
 class ModuleFirmwareUpdater(ModiSerialPort):
     """Module Firmware Updater: Updates a firmware of given module"""
@@ -86,11 +83,12 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
         self.update_module_list = []
         self.all_update_num = 0
+        self.all_update_module_num = 0
         self.update_complete_num = 0
         self.gathering_update_list_timeout = 0
 
         if device is not None:
-            super().__init__(device, baudrate=921600, timeout=0.1, write_timeout=0)
+            super().__init__(device, baudrate=921600, timeout=0.02, write_timeout=0.1)
         else:
             modi_ports = list_modi_serialports()
             if not modi_ports:
@@ -116,6 +114,10 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         timeout_delay = 0.1
         retry_max = 2
 
+        firmware_update_message = self.__set_module_state(0xFFF, Module.FORCED_PAUSE, Module.PNP_OFF)
+        self.__send_conn(firmware_update_message)
+        time.sleep(1)
+
         while self.gathering_update_list_timeout < 30:
             time.sleep(timeout_delay)
             self.gathering_update_list_timeout += 1
@@ -128,12 +130,13 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.reset_state()
             return
         self.update_in_progress = True
-
-        firmware_update_message = self.__set_module_state(0xFFF, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
-        self.__send_conn(firmware_update_message)
-        time.sleep(0.5)
-        self.__send_conn(firmware_update_message)
-        time.sleep(0.5)
+        self.all_update_module_num = len(self.update_module_list)
+        # for i in range(2):
+        #     for module in self.update_module_list:
+        #         firmware_update_message = self.__set_module_state(module.id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
+        #         self.__send_conn(firmware_update_message)
+        #         time.sleep(0.02)
+        #     time.sleep(0.5)
 
         # set update ready
         while timeout_count < 30:
@@ -141,7 +144,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             for module_info in self.update_module_list:
                 if module_info.state != self.UPDATE_READY:
                     ready_flag = True
-                    if int(timeout_count) % 5 == 0 and int(timeout_count) != 0:
+                    if (int(timeout_count) % 5) == 0 and int(timeout_count) != 0:
                         self.check_to_update_firmware(module_info.id)
             if not ready_flag:
                 break
@@ -163,7 +166,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             self.all_update_num += module_info.level + 1
         timeout_count = 0
         complete_flag = True
-        self.__print("Module firmwares update start! total update module num: ", len(self.update_module_list))
+        self.__print("Module firmwares update start! total update module num: ", self.all_update_module_num)
         while timeout_count < 10:
             complete_flag = True
             time.sleep(timeout_delay)
@@ -231,24 +234,28 @@ class ModuleFirmwareUpdater(ModiSerialPort):
     def set_raise_error(self, raise_error_message):
         self.raise_error_message = raise_error_message
 
-    def request_network_id(self):
-        self.__send_conn(parse_message(0x28, 0x0, 0xFFF, (0xFF, 0x0F)))
+    def request_network_id(self, id: int):
+        self.__send_conn(parse_message(0x28, 0x0, id, (0xFF, 0x0F)))
 
     def request_module_id(self, id: int):
         self.__send_conn(parse_message(0x8, 0x0, id, (0xFF, 0x0F)))
 
     def __request_uuid(self, sid, data, length: int):
-        if self.update_in_progress is False:
-            if sid == self.network_id:
-                return
-            else:
-                check_flag = True
-                for module_info in self.update_module_list:
-                    if module_info.id == sid:
-                        check_flag = False
-                        break
-                if check_flag:
-                    self.request_module_id(sid)
+        if sid == self.network_id:
+            return
+        else:
+            check_flag = True
+            for module_info in self.update_module_list:
+                if module_info.id == sid:
+                    check_flag = False
+                    self.__send_conn(self.__set_module_state(module_info.id, Module.UPDATE_FIRMWARE, Module.PNP_OFF))
+                    time.sleep(0.01)
+                    break
+            if check_flag and self.update_in_progress is False:
+                self.request_module_id(sid)
+                self.request_network_id(sid)
+                self.gathering_update_list_timeout = 0
+
 
     def __assign_module_id(self, sid, data, length: int):
         unpacked_data = unpack_data(data, (6, 2))
@@ -283,18 +290,18 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     temp_module.uuid = module_uuid
                     temp_module.type = module_type
                     self.update_module_list.append(temp_module)
+                    self.__send_conn(self.__set_module_state(temp_module.id, Module.UPDATE_FIRMWARE, Module.PNP_OFF))
+                    time.sleep(0.01)
 
     def update_module_firmware(self, firmware_version_info={}):
         self.has_update_error = False
-        self.request_network_id()
+        self.request_network_id(0xFFF)
         self.request_module_id(0xFFF)
         self.reset_state()
         self.firmware_version_info = firmware_version_info
 
         # module list up in 3 seconds
         time.sleep(5)
-
-        # self.update_in_progress = True
 
     def close_recv_thread(self):
         self.__running = False
@@ -1022,7 +1029,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
     def __read_conn(self):
         for _ in range(0, 3):
-            self.request_network_id()
+            self.request_network_id(0xFFF)
             time.sleep(0.01)
 
         while self.__running:
@@ -1118,7 +1125,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     self.update_module_list.append(temp_module)
 
             for module_info in self.update_module_list:
-                if module_info.id == sid and module_info.state is None:
+                if (module_info.id == sid) and (module_info.state is not self.UPDATE_READY):
                     if warning_type == 1:
                         # in bootloader but not ready to update
                         self.check_to_update_firmware(module_id)
@@ -1166,11 +1173,15 @@ class ModuleFirmwareMultiUpdater():
     def set_task_end_callback(self, task_end_callback):
         self.task_end_callback = task_end_callback
 
+    def set_debug_callback(self, debug_callback):
+        self.debug_callback = debug_callback
+
     def update_module_firmware(self, modi_ports, firmware_version_info):
         self.module_updaters = []
         self.network_uuid = []
         self.state = []
         self.wait_timeout = []
+        self.module_num = []
 
         for i, modi_port in enumerate(modi_ports):
             if i > 9:
@@ -1180,7 +1191,7 @@ class ModuleFirmwareMultiUpdater():
                     device=modi_port,
                     module_firmware_path=self.module_firmware_path
                 )
-                module_updater.set_print(False)
+                module_updater.set_print(True)
                 module_updater.set_raise_error(False)
             except Exception:
                 print("open " + modi_port + " error")
@@ -1189,6 +1200,7 @@ class ModuleFirmwareMultiUpdater():
                 self.state.append(-1)
                 self.network_uuid.append('')
                 self.wait_timeout.append(0)
+                self.module_num.append(0)
 
         if self.list_ui:
             self.list_ui.set_device_num(len(self.module_updaters))
@@ -1224,6 +1236,7 @@ class ModuleFirmwareMultiUpdater():
                         self.list_ui.error_message_signal.emit(index, "Waiting for module list")
                     if module_updater.update_in_progress:
                         self.state[index] = 0
+                        self.module_num[index] = module_updater.all_update_module_num
                     else:
                         self.wait_timeout[index] += delay
                         if self.wait_timeout[index] > 15:
@@ -1276,6 +1289,9 @@ class ModuleFirmwareMultiUpdater():
                     self.state[index] = 2
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.module_updaters)
+                    if self.debug_callback:
+                        self.debug_callback(self.module_num[index], module_updater.update_error)
+
                 time.sleep(0.001)
 
             if len(self.module_updaters):
@@ -1297,6 +1313,7 @@ class ModuleFirmwareMultiUpdater():
         self.update_in_progress = False
 
         if self.task_end_callback:
+            print('end_callback')
             self.task_end_callback(self.list_ui)
 
         print("\nFirmware update is complete!!")

@@ -215,9 +215,8 @@ class FirmwareManagerForm(QDialog):
             root_dir_name = zip.infolist()[0].filename.split("/")[0]
             zip_path = os.path.join(self.local_firmware_path, root_dir_name)
             zip_module_firmware_path = os.path.join(zip_path, "module_firmware")
-            zip_content_path = os.path.join(root_dir_name, "module_firmware")
-            zip.extractall(path=self.local_firmware_path, members=[member for member in zip.namelist() if member.startswith(zip_content_path)])
 
+            zip.extractall(path=self.local_firmware_path, members=[member for member in zip.namelist() if member.find("module_firmware") != -1])
             os.rename(zip_module_firmware_path, self.local_firmware_binary_path)
             self.__rmtree(zip_path)
 
