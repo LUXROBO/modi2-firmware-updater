@@ -246,94 +246,98 @@ class FirmwareManagerForm(QDialog):
 
         file_list = os.listdir(self.local_firmware_binary_path)
         firmware_list = {}
-        for ele in file_list:
-            if not os.path.isfile(ele):
-                module_type = ele
-                if module_type == "bootloader":
-                    # check e230
-                    bootloader_e230_version_dir = os.path.join(self.local_firmware_binary_path, ele, "e230")
-                    bootloader_e230_version_list = os.listdir(bootloader_e230_version_dir)
-                    if len(bootloader_e230_version_list):
-                        firmware_list["bootloader_e230"] = []
-                        for version in bootloader_e230_version_list:
-                            bootloader_path = os.path.join(bootloader_e230_version_dir, version, "bootloader_e230.bin")
-                            second_bootloader_path = os.path.join(bootloader_e230_version_dir, version, "second_bootloader_e230.bin")
-                            if os.path.exists(bootloader_path) and os.path.exists(second_bootloader_path):
-                                firmware_list["bootloader_e230"].append(version)
-                    # check e103
-                    bootloader_e103_version_dir = os.path.join(self.local_firmware_binary_path, ele, "e103")
-                    bootloader_e103_version_list = os.listdir(bootloader_e103_version_dir)
-                    if len(bootloader_e103_version_list):
-                        firmware_list["bootloader_e103"] = []
-                        for version in bootloader_e103_version_list:
-                            bootloader_path = os.path.join(bootloader_e103_version_dir, version, "bootloader_e103.bin")
-                            second_bootloader_path = os.path.join(bootloader_e103_version_dir, version, "second_bootloader_e103.bin")
-                            if os.path.exists(bootloader_path) and os.path.exists(second_bootloader_path):
-                                firmware_list["bootloader_e103"].append(version)
-                elif module_type == "network":
-                    # check e103
-                    e103_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "e103")
-                    e103_version_list = os.listdir(e103_version_dir)
-                    if len(e103_version_list):
-                        firmware_list["network_app"] = []
-                        for version in e103_version_list:
-                            module_path = os.path.join(e103_version_dir, version, module_type + ".bin")
-                            if os.path.exists(module_path):
-                                firmware_list["network_app"].append(version)
-                    # check esp32 app
-                    esp32_app_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32", "app")
-                    esp32_app_version_list = os.listdir(esp32_app_version_dir)
-                    if len(esp32_app_version_list):
-                        firmware_list["network_sub"] = []
-                        for version in esp32_app_version_list:
-                            bootloader_path = os.path.join(esp32_app_version_dir, version, "bootloader.bin")
-                            eps32_path = os.path.join(esp32_app_version_dir, version, "esp32.bin")
-                            ota_data_initial_path = os.path.join(esp32_app_version_dir, version, "ota_data_initial.bin")
-                            partitions_path = os.path.join(esp32_app_version_dir, version, "partitions.bin")
-                            if os.path.exists(bootloader_path) and os.path.exists(eps32_path) and os.path.exists(ota_data_initial_path) and os.path.exists(partitions_path):
-                                firmware_list["network_sub"].append(version)
-                    # check esp32 ota
-                    esp32_ota_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32", "ota")
-                    esp32_ota_version_list = os.listdir(esp32_ota_version_dir)
-                    if len(esp32_ota_version_list):
-                        firmware_list["network_ota"] = []
-                        for version in esp32_ota_version_list:
-                            modi_ota_factory_path = os.path.join(esp32_ota_version_dir, version, "modi_ota_factory.bin")
-                            if os.path.exists(modi_ota_factory_path):
-                                firmware_list["network_ota"].append(version)
-                elif module_type == "camera":
-                    # check e103
-                    e103_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "e103")
-                    e103_version_list = os.listdir(e103_version_dir)
-                    if len(e103_version_list):
-                        firmware_list["camera_app"] = []
-                        for version in e103_version_list:
-                            module_path = os.path.join(e103_version_dir, version, module_type + ".bin")
-                            if os.path.exists(module_path):
-                                firmware_list["camera_app"].append(version)
-                    # check esp32s3 app
-                    esp32_app_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32s3", "app")
-                    esp32_app_version_list = os.listdir(esp32_app_version_dir)
-                    if len(esp32_app_version_list):
-                        firmware_list["camera_sub"] = []
-                        for version in esp32_app_version_list:
-                            bootloader_path = os.path.join(esp32_app_version_dir, version, "bootloader.bin")
-                            eps32_path = os.path.join(esp32_app_version_dir, version, "modi2_camera_esp32.bin")
-                            ota_data_initial_path = os.path.join(esp32_app_version_dir, version, "ota_data_initial.bin")
-                            partitions_path = os.path.join(esp32_app_version_dir, version, "partition-table.bin")
-                            if os.path.exists(bootloader_path) and os.path.exists(eps32_path) and os.path.exists(ota_data_initial_path) and os.path.exists(partitions_path):
-                                firmware_list["camera_sub"].append(version)
-                elif module_type in self.module_list:
-                    # battery, button, ....
+
+        try:
+            for ele in file_list:
+                if not os.path.isfile(ele):
                     module_type = ele
-                    version_dir = os.path.join(self.local_firmware_binary_path, module_type)
-                    version_list = os.listdir(version_dir)
-                    if len(version_list):
-                        firmware_list[module_type] = []
-                        for version in version_list:
-                            module_path = os.path.join(version_dir, version, module_type + ".bin")
-                            if os.path.exists(module_path):
-                                firmware_list[module_type].append(version)
+                    if module_type == "bootloader":
+                        # check e230
+                        bootloader_e230_version_dir = os.path.join(self.local_firmware_binary_path, ele, "e230")
+                        bootloader_e230_version_list = os.listdir(bootloader_e230_version_dir)
+                        if len(bootloader_e230_version_list):
+                            firmware_list["bootloader_e230"] = []
+                            for version in bootloader_e230_version_list:
+                                bootloader_path = os.path.join(bootloader_e230_version_dir, version, "bootloader_e230.bin")
+                                second_bootloader_path = os.path.join(bootloader_e230_version_dir, version, "second_bootloader_e230.bin")
+                                if os.path.exists(bootloader_path) and os.path.exists(second_bootloader_path):
+                                    firmware_list["bootloader_e230"].append(version)
+                        # check e103
+                        bootloader_e103_version_dir = os.path.join(self.local_firmware_binary_path, ele, "e103")
+                        bootloader_e103_version_list = os.listdir(bootloader_e103_version_dir)
+                        if len(bootloader_e103_version_list):
+                            firmware_list["bootloader_e103"] = []
+                            for version in bootloader_e103_version_list:
+                                bootloader_path = os.path.join(bootloader_e103_version_dir, version, "bootloader_e103.bin")
+                                second_bootloader_path = os.path.join(bootloader_e103_version_dir, version, "second_bootloader_e103.bin")
+                                if os.path.exists(bootloader_path) and os.path.exists(second_bootloader_path):
+                                    firmware_list["bootloader_e103"].append(version)
+                    elif module_type == "network":
+                        # check e103
+                        e103_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "e103")
+                        e103_version_list = os.listdir(e103_version_dir)
+                        if len(e103_version_list):
+                            firmware_list["network_app"] = []
+                            for version in e103_version_list:
+                                module_path = os.path.join(e103_version_dir, version, module_type + ".bin")
+                                if os.path.exists(module_path):
+                                    firmware_list["network_app"].append(version)
+                        # check esp32 app
+                        esp32_app_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32", "app")
+                        esp32_app_version_list = os.listdir(esp32_app_version_dir)
+                        if len(esp32_app_version_list):
+                            firmware_list["network_sub"] = []
+                            for version in esp32_app_version_list:
+                                bootloader_path = os.path.join(esp32_app_version_dir, version, "bootloader.bin")
+                                eps32_path = os.path.join(esp32_app_version_dir, version, "esp32.bin")
+                                ota_data_initial_path = os.path.join(esp32_app_version_dir, version, "ota_data_initial.bin")
+                                partitions_path = os.path.join(esp32_app_version_dir, version, "partitions.bin")
+                                if os.path.exists(bootloader_path) and os.path.exists(eps32_path) and os.path.exists(ota_data_initial_path) and os.path.exists(partitions_path):
+                                    firmware_list["network_sub"].append(version)
+                        # check esp32 ota
+                        esp32_ota_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32", "ota")
+                        esp32_ota_version_list = os.listdir(esp32_ota_version_dir)
+                        if len(esp32_ota_version_list):
+                            firmware_list["network_ota"] = []
+                            for version in esp32_ota_version_list:
+                                modi_ota_factory_path = os.path.join(esp32_ota_version_dir, version, "modi_ota_factory.bin")
+                                if os.path.exists(modi_ota_factory_path):
+                                    firmware_list["network_ota"].append(version)
+                    elif module_type == "camera":
+                        # check e103
+                        e103_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "e103")
+                        e103_version_list = os.listdir(e103_version_dir)
+                        if len(e103_version_list):
+                            firmware_list["camera_app"] = []
+                            for version in e103_version_list:
+                                module_path = os.path.join(e103_version_dir, version, module_type + ".bin")
+                                if os.path.exists(module_path):
+                                    firmware_list["camera_app"].append(version)
+                        # check esp32s3 app
+                        esp32_app_version_dir = os.path.join(self.local_firmware_binary_path, module_type, "esp32s3", "app")
+                        esp32_app_version_list = os.listdir(esp32_app_version_dir)
+                        if len(esp32_app_version_list):
+                            firmware_list["camera_sub"] = []
+                            for version in esp32_app_version_list:
+                                bootloader_path = os.path.join(esp32_app_version_dir, version, "bootloader.bin")
+                                eps32_path = os.path.join(esp32_app_version_dir, version, "modi2_camera_esp32.bin")
+                                ota_data_initial_path = os.path.join(esp32_app_version_dir, version, "ota_data_initial.bin")
+                                partitions_path = os.path.join(esp32_app_version_dir, version, "partition-table.bin")
+                                if os.path.exists(bootloader_path) and os.path.exists(eps32_path) and os.path.exists(ota_data_initial_path) and os.path.exists(partitions_path):
+                                    firmware_list["camera_sub"].append(version)
+                    elif module_type in self.module_list:
+                        # battery, button, ....
+                        module_type = ele
+                        version_dir = os.path.join(self.local_firmware_binary_path, module_type)
+                        version_list = os.listdir(version_dir)
+                        if len(version_list):
+                            firmware_list[module_type] = []
+                            for version in version_list:
+                                module_path = os.path.join(version_dir, version, module_type + ".bin")
+                                if os.path.exists(module_path):
+                                    firmware_list[module_type].append(version)
+        except Exception as e:
+            return {}
 
         return firmware_list
 
