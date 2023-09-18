@@ -291,12 +291,12 @@ class Form(QDialog):
 
     def auto_update_test_task(self):
         while True:
-            # if self.auto_update_flag == True:
-            #     self.auto_update_flag = False
-            #     self.debug_file.close()
-            #     self.debug_file = open(self.debug_file_name, "a+")
-            #     time.sleep(3)
-            #     self.update_general_modules_button_clicked()
+            if self.auto_update_flag == True:
+                self.auto_update_flag = False
+                self.debug_file.close()
+                self.debug_file = open(self.debug_file_name, "a+")
+                time.sleep(3)
+                self.update_general_modules_button_clicked()
             time.sleep(1)
     #
     # Main methods
