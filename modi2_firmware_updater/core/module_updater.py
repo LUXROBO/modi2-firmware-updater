@@ -86,6 +86,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.all_update_module_num = 0
         self.update_complete_num = 0
         self.gathering_update_list_timeout = 0
+        self.module_listup_flag = False
 
         if device is not None:
             super().__init__(device, baudrate=921600, timeout=0.02, write_timeout=0.1)
@@ -131,12 +132,6 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             return
         self.update_in_progress = True
         self.all_update_module_num = len(self.update_module_list)
-        # for i in range(2):
-        #     for module in self.update_module_list:
-        #         firmware_update_message = self.__set_module_state(module.id, Module.UPDATE_FIRMWARE, Module.PNP_OFF)
-        #         self.__send_conn(firmware_update_message)
-        #         time.sleep(0.02)
-        #     time.sleep(0.5)
 
         # set update ready
         while timeout_count < 30:
@@ -153,18 +148,22 @@ class ModuleFirmwareUpdater(ModiSerialPort):
 
         if timeout_count >= 30:
             self.update_error_message = "Module firmwares have not been updated! error occur"
+            self.update_error = -1
+            reboot_message = self.__set_module_state(0xFFF, Module.REBOOT, Module.PNP_OFF)
+            self.__send_conn(reboot_message)
+            time.sleep(1)
             self.close_recv_thread()
             self.close()
-            time.sleep(0.5)
             self.reset_state()
             self.__print(self.update_error_message)
-            raise Exception(self.update_error_message)
+            return
 
         # count the number of update
         self.all_update_num = 0
         for module_info in self.update_module_list:
             self.all_update_num += module_info.level + 1
         timeout_count = 0
+        self.module_listup_flag = True
         complete_flag = True
         self.__print("Module firmwares update start! total update module num: ", self.all_update_module_num)
         while timeout_count < 10:
@@ -1173,9 +1172,6 @@ class ModuleFirmwareMultiUpdater():
     def set_task_end_callback(self, task_end_callback):
         self.task_end_callback = task_end_callback
 
-    def set_debug_callback(self, debug_callback):
-        self.debug_callback = debug_callback
-
     def update_module_firmware(self, modi_ports, firmware_version_info):
         self.module_updaters = []
         self.network_uuid = []
@@ -1283,24 +1279,25 @@ class ModuleFirmwareMultiUpdater():
                         if self.list_ui:
                             self.list_ui.network_state_signal.emit(index, -1)
                             self.list_ui.error_message_signal.emit(index, module_updater.update_error_message)
-
                     if self.list_ui:
                         self.list_ui.progress_signal.emit(index, 100, 100)
                     self.state[index] = 2
                 elif self.state[index] == 2:
                     total_progress += 100 / len(self.module_updaters)
-                    if self.debug_callback:
-                        self.debug_callback(self.module_num[index], module_updater.update_error)
-
                 time.sleep(0.001)
 
             if len(self.module_updaters):
-                # print(f"{self.__progress_bar(total_progress, 100)}", end="")
                 if self.ui:
-                    if self.ui.is_english:
-                        self.ui.update_general_modules_button.setText(f"General modules update is in progress. ({int(total_progress)}%)")
+                    if self.module_updaters[0].module_listup_flag == True:
+                        if self.ui.is_english:
+                            self.ui.update_general_modules_button.setText(f"General modules update is in progress. ({int(total_progress)}%)")
+                        else:
+                            self.ui.update_general_modules_button.setText(f"일반 모듈 업데이트가 진행중입니다. ({int(total_progress)}%)")
                     else:
-                        self.ui.update_general_modules_button.setText(f"일반 모듈 업데이트가 진행중입니다. ({int(total_progress)}%)")
+                        if self.ui.is_english:
+                            self.ui.update_general_modules_button.setText(f"General modules update is in progress. (listup...)")
+                        else:
+                            self.ui.update_general_modules_button.setText(f"일반 모듈 업데이트가 진행중입니다. (모듈 확인 중...)")
 
                 if self.list_ui:
                     self.list_ui.total_progress_signal.emit(int(total_progress))
@@ -1313,7 +1310,6 @@ class ModuleFirmwareMultiUpdater():
         self.update_in_progress = False
 
         if self.task_end_callback:
-            print('end_callback')
             self.task_end_callback(self.list_ui)
 
         print("\nFirmware update is complete!!")
