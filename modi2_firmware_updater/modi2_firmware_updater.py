@@ -272,32 +272,9 @@ class Form(QDialog):
 
         self.ui.show()
 
-        now = datetime.now()
-        self.debug_file_name = f"updater_test_{now.date()}_{now.hour}_{now.minute}.csv"
-
-        self.debug_file = open(self.debug_file_name, "w")
-        self.debug_file.write("회차, 개수, 결과\n")
-        self.debug_file.close()
-        self.debug_count = 0
-        self.auto_update_flag = True
-        th.Thread(
-            target=self.auto_update_test_task,
-            daemon=True
-        ).start()
-
     def __del__(self):
-        self.debug_file.close()
         print("delete")
 
-    def auto_update_test_task(self):
-        while True:
-            # if self.auto_update_flag == True:
-            #     self.auto_update_flag = False
-            #     self.debug_file.close()
-            #     self.debug_file = open(self.debug_file_name, "a+")
-            #     time.sleep(3)
-            #     self.update_general_modules_button_clicked()
-            time.sleep(1)
     #
     # Main methods
     #
@@ -460,7 +437,6 @@ class Form(QDialog):
         def run_task(self, modi_ports, firmware_version_info):
             self.firmware_updater = ModuleFirmwareMultiUpdater(self.module_firmware_path)
             self.firmware_updater.set_task_end_callback(self.__reset_ui)
-            self.firmware_updater.set_debug_callback(self.debugging_callback)
 
             if self.is_multi:
                 self.firmware_updater.set_ui(self.ui, self.module_update_list_form)
@@ -591,11 +567,6 @@ class Form(QDialog):
 
         except Exception:
             pass
-
-    def debugging_callback(self, module_num, error_code):
-        self.debug_file.write(f"{self.debug_count},{module_num}, {error_code}\n")
-        self.debug_count += 1
-        self.auto_update_flag = True
 
     #
     # Helper functions
