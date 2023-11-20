@@ -379,7 +379,8 @@ class ModuleFirmwareUpdater(ModiSerialPort):
             progress = 100 * page_begin // bin_end
             self.progress = progress
 
-            self.__print(f"\rFirmware Update: {module_info.type} ({module_info.id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+            # self.__print(f"\rFirmware Update: {module_info.type} ({module_info.id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
+            print(f"\rFirmware Update: {module_info.type} ({module_info.id}) {self.__progress_bar(page_begin, bin_end)} {progress}%", end="")
 
             page_end = page_begin + page_size
             curr_page = bin_buffer[page_begin:page_end]
