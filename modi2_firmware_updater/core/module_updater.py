@@ -210,11 +210,13 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                 break
 
         self.update_error = 1 if complete_flag else -1
-
+        self.update_module_list.clear()
         reboot_message = self.__set_module_state(0xFFF, Module.REBOOT, Module.PNP_OFF)
         self.__send_conn(reboot_message)
         self.__print("Reboot message has been sent to all connected modules")
-
+        time.sleep(2)
+        run_mode_message = self.__set_module_state(0xFFF, Module.RUN, Module.PNP_ON)
+        self.__send_conn(run_mode_message)
         time.sleep(1)
 
         self.__print("Module firmwares have been updated!")
@@ -317,6 +319,7 @@ class ModuleFirmwareUpdater(ModiSerialPort):
         self.response_flag = False
         self.response_error_flag = False
         self.response_error_count = 0
+
 
         if not update_in_progress:
             self.__print("Make sure you have connected module(s) to update")
@@ -642,7 +645,6 @@ class ModuleFirmwareUpdater(ModiSerialPort):
                     end_flash_data[xxx + 12] = ((0x08001000 >> (xxx * 8)) & 0xFF)
 
             success_end_flash = self.send_end_flash_data(module_info.type, module_info.id, end_flash_data)
-
             reboot_message = self.__set_module_state(module_info.id, Module.REBOOT, Module.PNP_OFF)
             self.__send_conn(reboot_message)
 
