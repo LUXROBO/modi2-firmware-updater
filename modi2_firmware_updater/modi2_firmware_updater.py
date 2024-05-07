@@ -5,6 +5,7 @@ import sys
 import threading as th
 import time
 import traceback as tb
+from datetime import datetime
 
 from PyQt5 import QtGui, QtWidgets, uic
 from PyQt5.QtCore import QObject, Qt, pyqtSignal, pyqtSlot
@@ -270,6 +271,9 @@ class Form(QDialog):
             self.ui.setWindowState(Qt.WindowMaximized)
 
         self.ui.show()
+
+    def __del__(self):
+        print("delete")
 
     #
     # Main methods
