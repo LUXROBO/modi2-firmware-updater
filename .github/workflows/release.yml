@@ -79,6 +79,18 @@ jobs:
         asset_name: MODI+ Firmware Multi Updater.exe
         asset_content_type: application/zip
 
+    - name: notify-teams-module-channel
+      uses: aliencube/microsoft-teams-actions@v0.8.0
+      with:
+        webhook_uri: ${{ secrets.MODULE_DEV_TEAMS_WEBHOOK }}
+        title: MODI+ Firmware Updater ${{ github.ref_name }} is released!!
+        summary: MODI+ Firmware Updater ${{ github.ref_name }} is released!!
+        text: |
+          MODI+ Firmware Updater ${{ github.ref_name }} 버전이 릴리즈 되었습니다.
+
+          자세한 변경 사항은 릴리즈 노트를 참고해 주시기 바랍니다.
+
+          URL: https://github.com/LUXROBO/modi2-firmware-updater/releases/tag/${{ github.ref_name }}
 
   build-macos-single:
     runs-on: macos-latest

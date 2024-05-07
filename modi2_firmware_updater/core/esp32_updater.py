@@ -5224,8 +5224,11 @@ class ESP32FirmwareUpdater():
             time.sleep(1)
 
             if self.is_network:
-                self.app_firmware_path = path.join(self.module_firmware_path, "esp32", "app", self.firmware_version_info["esp32_app"]["app"])
-                self.ota_firmware_path = path.join(self.module_firmware_path, "esp32", "ota", self.firmware_version_info["esp32_ota"]["app"])
+                app_version_info = self.firmware_version_info["network"]["sub"]
+                ota_version_info = self.firmware_version_info["network"]["ota"]
+
+                self.app_firmware_path = path.join(self.module_firmware_path, "network", "esp32", "app", app_version_info)
+                self.ota_firmware_path = path.join(self.module_firmware_path, "network", "esp32", "ota", ota_version_info)
                 self.arg = ['--chip', 'esp32',
                             '--port', self.port,
                             '--baud', str(self.baudrate),
@@ -5235,9 +5238,12 @@ class ESP32FirmwareUpdater():
                             '0x8000', path.join(self.app_firmware_path, 'partitions.bin'),
                             '0x00220000', path.join(self.ota_firmware_path, 'modi_ota_factory.bin'),
                             '0x00010000', path.join(self.app_firmware_path, 'esp32.bin')]
+
             else:
-                root_path = path.join(path.dirname(__file__), "..", "assets", "firmware", "prerelease")
-                self.app_firmware_path = path.join(root_path, "esp32s3", "v1.0.0")
+                app_version_info = self.firmware_version_info["camera"]["sub"]
+                ota_version_info = "v0.0.0"
+
+                self.app_firmware_path = path.join(self.module_firmware_path, "camera", "esp32s3", "app", app_version_info)
                 self.arg = ['--chip', 'esp32s3',
                             '--port', self.port,
                             '--baud', str(self.baudrate),
@@ -5246,6 +5252,7 @@ class ESP32FirmwareUpdater():
                             '0x8000', path.join(self.app_firmware_path, 'partition-table.bin'),
                             '0xD000', path.join(self.app_firmware_path, 'ota_data_initial.bin'),
                             '0x10000', path.join(self.app_firmware_path, 'modi2_camera_esp32.bin')]
+
 
             """
             Main function for esptool
@@ -5258,13 +5265,6 @@ class ESP32FirmwareUpdater():
             """
             argv = self.arg
             esp = None
-
-            if self.is_network:
-                app_version_info = self.firmware_version_info["esp32_app"]["app"]
-                ota_version_info = self.firmware_version_info["esp32_ota"]["app"]
-            else:
-                app_version_info = "v1.0.0"
-                ota_version_info = "v0.0.0"
 
             self.app_version_to_update = app_version_info.lstrip("v").rstrip("\n").split("-")[0]
             self.ota_version_to_update = ota_version_info.lstrip("v").rstrip("\n").split("-")[0]
@@ -5621,7 +5621,6 @@ class ESP32FirmwareUpdater():
                         self.esp.wait_update_finish_packet()
                         time.sleep(0.01)
                         self.esp.firmware_progress = 98
-                        self.esp.set_esp_app_version(self.app_version_to_update)
 
                 self.__print("ESP firmware update is complete!!")
                 self.esp.firmware_progress = 100
