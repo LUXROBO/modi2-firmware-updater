@@ -16,6 +16,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
+    - name: Install Dependencies
+      run: brew install gettext
+
     - name: Install Python
       uses: actions/setup-python@v2
       with:
@@ -44,6 +47,9 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+
+    - name: Install Dependencies
+      run: brew install gettext
 
     - name: Install Python
       uses: actions/setup-python@v2
