@@ -10,14 +10,11 @@ on:
 
 jobs:
   build-macos-single:
-    runs-on: macos-latest
+    runs-on: macos-12
 
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-
-    - name: Install Dependencies
-      run: brew install gettext
 
     - name: Install Python
       uses: actions/setup-python@v2
@@ -42,14 +39,11 @@ jobs:
         retention-days: 1
 
   build-macos-multi:
-    runs-on: macos-latest
+    runs-on: macos-12
 
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-
-    - name: Install Dependencies
-      run: brew install gettext
 
     - name: Install Python
       uses: actions/setup-python@v2
