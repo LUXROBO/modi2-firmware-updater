@@ -86,10 +86,6 @@ jobs:
     - name: Run PyInstaller on Windows
       run: python bootstrap.py --mode single
 
-    - name: Certificate app
-      shell: cmd
-      run: .\certificate\win_certificate.bat ${{ secrets.CER_TOKEN }} ${{ secrets.CER_CONT }} "MODI+ Firmware Updater.exe"
-
     - name: Upload windows app
       uses: actions/upload-artifact@v2
       with:
@@ -115,10 +111,6 @@ jobs:
 
     - name: Run PyInstaller on Windows
       run: python bootstrap.py --mode multi
-
-    - name: Certificate app
-      shell: cmd
-      run: .\certificate\win_certificate.bat ${{ secrets.CER_TOKEN }} ${{ secrets.CER_CONT }} "MODI+ Firmware Multi Updater.exe"
 
     - name: Upload windows app
       uses: actions/upload-artifact@v2
